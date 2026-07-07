@@ -1,0 +1,22 @@
+{
+  "browser": {
+    "headless": false,
+    "channel": null,
+    "args": [
+      "--start-maximized"
+    ],
+    "viewport": null
+  },
+
+  "youtube": {
+    "home": "https://www.youtube.com"
+  },
+
+  "health": {
+    "interval": 5000
+  },
+
+  "logging": {
+    "level": "info"
+  }
+}

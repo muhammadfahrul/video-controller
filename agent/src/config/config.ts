@@ -1,13 +1,23 @@
 export const config = {
 
-    headless: false,
+    browser: {
 
-    youtubeHome: "https://www.youtube.com",
+        headless: false,
 
-    browserArgs: [
+        channel: undefined,
 
-        "--start-maximized"
+        args: [
 
-    ]
+            "--start-maximized"
+
+        ]
+
+    },
+
+    youtube: {
+
+        home: "https://www.youtube.com"
+
+    }
 
 };

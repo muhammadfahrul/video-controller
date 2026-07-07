@@ -1,77 +1,97 @@
 import {
     Browser,
     BrowserContext,
-    chromium,
     Page
 } from "playwright";
 
-import { config } from "../config/config";
+import { BrowserLauncher } from "./BrowserLauncher";
 import { BrowserState } from "./BrowserState";
+import { ConfigService } from "../services/ConfigService";
+import { LoggerService } from "../services/LoggerService";
 
 export class BrowserManager {
 
-    private browser?: Browser;
-    private context?: BrowserContext;
-    private page?: Page;
+    private readonly launcher: BrowserLauncher;
+
+    private browser: Browser | null = null;
+
+    private context: BrowserContext | null = null;
+
+    private page: Page | null = null;
 
     private state: BrowserState = BrowserState.STOPPED;
 
-    async start(): Promise<void> {
+    constructor() {
 
-        if (this.state === BrowserState.RUNNING) {
+        this.launcher = new BrowserLauncher();
+
+    }
+
+    public async start(): Promise<void> {
+
+        if (this.isRunning()) {
+
+            LoggerService.warn("Browser already running.");
+
             return;
+
         }
 
         this.state = BrowserState.STARTING;
 
-        try {
+        LoggerService.info("Launching browser...");
 
-            this.browser = await chromium.launch({
-                headless: config.headless,
-                args: config.browserArgs
-            });
+        const config = ConfigService
+            .getInstance()
+            .getConfig();
 
-            this.context = await this.browser.newContext({
-                viewport: null
-            });
+        this.browser = await this.launcher.launch(config.browser);
 
-            this.page = await this.context.newPage();
+        this.context = await this.browser.newContext({
 
-            await this.page.goto(config.youtubeHome);
+            viewport: config.browser.viewport
 
-            this.initializeEvents();
+        });
 
-            this.state = BrowserState.RUNNING;
+        this.page = await this.context.newPage();
 
-        } catch (error) {
+        this.registerEvents();
 
-            this.state = BrowserState.ERROR;
+        this.state = BrowserState.RUNNING;
 
-            throw error;
-
-        }
+        LoggerService.info("Browser ready.");
 
     }
 
-    async stop(): Promise<void> {
+    public async stop(): Promise<void> {
 
         if (!this.browser) {
+
             return;
+
         }
 
         this.state = BrowserState.STOPPING;
 
+        LoggerService.info("Closing browser...");
+
         await this.browser.close();
 
-        this.browser = undefined;
-        this.context = undefined;
-        this.page = undefined;
+        this.browser = null;
+
+        this.context = null;
+
+        this.page = null;
 
         this.state = BrowserState.STOPPED;
 
+        LoggerService.info("Browser stopped.");
+
     }
 
-    async restart(): Promise<void> {
+    public async restart(): Promise<void> {
+
+        LoggerService.info("Restarting browser...");
 
         await this.stop();
 
@@ -79,61 +99,61 @@ export class BrowserManager {
 
     }
 
-    isRunning(): boolean {
+    public isRunning(): boolean {
 
         return this.state === BrowserState.RUNNING;
 
     }
 
-    getState(): BrowserState {
-
-        return this.state;
-
-    }
-
-    getBrowser(): Browser {
+    public getBrowser(): Browser {
 
         if (!this.browser) {
-            throw new Error("Browser belum dijalankan.");
+
+            throw new Error("Browser has not been started.");
+
         }
 
         return this.browser;
 
     }
 
-    getContext(): BrowserContext {
+    public getContext(): BrowserContext {
 
         if (!this.context) {
-            throw new Error("BrowserContext belum tersedia.");
+
+            throw new Error("Context has not been created.");
+
         }
 
         return this.context;
 
     }
 
-    getPage(): Page {
+    public getPage(): Page {
 
         if (!this.page) {
-            throw new Error("Page belum tersedia.");
+
+            throw new Error("Page has not been created.");
+
         }
 
         return this.page;
 
     }
 
-    private initializeEvents(): void {
+    public getState(): BrowserState {
+
+        return this.state;
+
+    }
+
+    private registerEvents(): void {
 
         this.browser?.on("disconnected", () => {
 
-            console.warn("Browser disconnected.");
+            LoggerService.warn("Browser disconnected.");
 
             this.state = BrowserState.ERROR;
-
-        });
-
-        this.page?.on("close", () => {
-
-            console.warn("Page closed.");
 
         });
 
