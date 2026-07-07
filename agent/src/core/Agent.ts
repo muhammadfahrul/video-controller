@@ -61,51 +61,36 @@ export class Agent {
 
 
 
-    constructor(){
-
+    constructor() {
 
         this.browser =
             new BrowserService();
 
-
-
         this.queue =
             new QueueService();
 
-        const identity =
-            new AgentIdentityProvider()
-            .get();
-
-
-
-        this.socketClient =
-            new SocketClient(
-                "http://localhost:3000",
-                identity
-            );
+        this.commandDispatcher =
+            new CommandDispatcher();
 
         const commandService =
             new CommandService(
                 this.commandDispatcher
             );
 
-        this.commandDispatcher =
-            new CommandDispatcher();
-
-        this.commandDispatcher.register(
-
-            CommandType.PLAY,
-
-            new PlayHandler(
-                this.player
-            )
-
-        );
-
-
         this.commandRouter =
             new CommandRouter(
                 commandService
+            );
+
+        const identity =
+            new AgentIdentityProvider()
+                .get();
+
+        this.socketClient =
+            new SocketClient(
+                "http://localhost:3000",
+                identity,
+                this.commandRouter
             );
 
     }
@@ -113,12 +98,9 @@ export class Agent {
 
 
 
-    async start(){
-
+    async start() {
 
         await this.browser.start();
-
-
 
         this.player =
             new PlayerService(
@@ -127,19 +109,14 @@ export class Agent {
 
         this.registerCommands();
 
-        this.socketClient
-            .connect();
-
-
+        this.socketClient!.connect();
 
         this.heartbeat =
             new HeartbeatService(
-                this.socketClient
+                this.socketClient!
             );
 
-
         this.heartbeat.start();
-
 
     }
 
@@ -171,44 +148,51 @@ export class Agent {
     }
 
 
-    private registerCommands(){
+    private registerCommands() {
 
+        if (!this.player) {
+
+            throw new Error(
+                "Player not initialized."
+            );
+
+        }
 
         this.commandDispatcher.register(
-
             CommandType.PLAY,
-
-            new PlayHandler(
-                this.player!
-            )
-
+            new PlayHandler(this.player)
         );
 
-
         this.commandDispatcher.register(
-
             CommandType.PAUSE,
-
-            new PauseHandler(
-                this.player!
-            )
-
+            new PauseHandler(this.player)
         );
-
 
         this.commandDispatcher.register(
-
             CommandType.VOLUME,
-
-            new VolumeHandler(
-                this.player!
-            )
-
+            new VolumeHandler(this.player)
         );
-
 
     }
 
+    public getSocketClient() {
 
+        return this.socketClient;
+
+    }
+
+    public getDispatcher() {
+
+        return this.commandDispatcher;
+
+    }
+
+    public async stop() {
+
+        this.heartbeat?.stop();
+
+        await this.browser.stop();
+
+    }
 
 }
