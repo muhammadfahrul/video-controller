@@ -117,4 +117,30 @@ export class QueueService {
 
     }
 
+    public playById(
+        id: string
+    ) {
+
+        const index =
+            this.items.findIndex(
+                item => item.id === id
+            );
+
+        if (
+            index === -1
+        ) {
+
+            return undefined;
+
+        }
+
+        this.currentIndex =
+            index;
+
+        return this.items[
+            index
+        ];
+
+    }
+
 }

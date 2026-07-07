@@ -113,9 +113,13 @@ async function main() {
                     },
 
                     {
+                        
                         type: "input",
+
                         name: "title",
+
                         message: "Title"
+
                     }
 
                 ]);
@@ -128,7 +132,7 @@ async function main() {
 
         }
 
-        if (command === "REMOVE_QUEUE") {
+        if (command === "REMOVE_QUEUE" || command === "PLAY_QUEUE_ITEM") {
 
             const answer =
                 await inquirer.prompt([

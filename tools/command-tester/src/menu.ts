@@ -46,7 +46,9 @@ export async function selectCommand() {
 
                 "REMOVE_QUEUE",
 
-                "CLEAR_QUEUE"
+                "CLEAR_QUEUE",
+
+                "PLAY_QUEUE_ITEM"
 
             ]
 

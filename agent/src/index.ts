@@ -81,26 +81,26 @@ async function bootstrap(){
 
     }
 
-    const dispatcher =
-        new CommandDispatcher();
+    // const dispatcher =
+    //     new CommandDispatcher();
 
 
-    dispatcher.register(
-        CommandType.PLAY,
-        new PlayHandler(player)
-    );
+    // dispatcher.register(
+    //     CommandType.PLAY,
+    //     new PlayHandler(player)
+    // );
 
 
-    dispatcher.register(
-        CommandType.PAUSE,
-        new PauseHandler(player)
-    );
+    // dispatcher.register(
+    //     CommandType.PAUSE,
+    //     new PauseHandler(player)
+    // );
 
 
-    dispatcher.register(
-        CommandType.VOLUME,
-        new VolumeHandler(player)
-    );
+    // dispatcher.register(
+    //     CommandType.VOLUME,
+    //     new VolumeHandler(player)
+    // );
 
     // await dispatcher.dispatch({
 
