@@ -11,7 +11,7 @@ import {
     QueueService
 } from "../../services/QueueService";
 
-export class NextHandler
+export class PreviousHandler
     implements CommandHandler {
 
     constructor(
@@ -29,17 +29,17 @@ export class NextHandler
     ) {
 
         console.log(
-            "NextHandler.execute",
+            "PreviousHandler.execute",
             command
         );
 
         const item =
-            this.queue.next();
+            this.queue.previous();
 
         if (!item) {
 
             console.log(
-                "Already at last video."
+                "Already at first video."
             );
 
             return;

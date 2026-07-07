@@ -33,7 +33,9 @@ import {
     MuteHandler,
     UnmuteHandler,
     StopHandler,
-    OpenVideoHandler
+    OpenVideoHandler,
+    NextHandler,
+    PreviousHandler
 } from "../commands";
 
 
@@ -210,6 +212,22 @@ export class Agent {
             CommandType.OPEN_VIDEO,
             new OpenVideoHandler(
                 this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.NEXT,
+            new NextHandler(
+                this.player!,
+                this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.PREVIOUS,
+            new PreviousHandler(
+                this.player!,
+                this.queue
             )
         );
     }

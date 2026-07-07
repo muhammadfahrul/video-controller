@@ -23,3 +23,7 @@ export * from "./handlers/MuteHandler";
 export * from "./handlers/UnmuteHandler";
 
 export * from "./handlers/StopHandler";
+
+export * from "./handlers/NextHandler";
+
+export * from "./handlers/PreviousHandler";

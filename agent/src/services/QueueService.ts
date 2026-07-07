@@ -1,49 +1,75 @@
-import {
-    QueueManager,
-    QueueItem
-} from "../queue";
-
-
 export class QueueService {
 
+    private items: QueueItem[] = [];
 
-    private readonly queue:
-        QueueManager;
+    private currentIndex = -1;
 
+    add(item: QueueItem) {
 
+        this.items.push(item);
 
-    constructor(){
+        if (this.currentIndex === -1) {
 
-        this.queue =
-            new QueueManager();
+            this.currentIndex = 0;
 
-    }
-
-
-
-    add(
-        item:QueueItem
-    ){
-
-        this.queue.add(item);
+        }
 
     }
 
+    current() {
 
+        if (this.currentIndex < 0) {
 
-    next(){
+            return undefined;
 
-        return this.queue.next();
+        }
 
-    }
-
-
-
-    getAll(){
-
-        return this.queue.getAll();
+        return this.items[this.currentIndex];
 
     }
 
+    next() {
+
+        if (
+
+            this.currentIndex + 1 >=
+
+            this.items.length
+
+        ) {
+
+            return undefined;
+
+        }
+
+        this.currentIndex++;
+
+        return this.current();
+
+    }
+
+    previous() {
+
+        if (
+
+            this.currentIndex <= 0
+
+        ) {
+
+            return undefined;
+
+        }
+
+        this.currentIndex--;
+
+        return this.current();
+
+    }
+
+    getAll() {
+
+        return this.items;
+
+    }
 
 }
