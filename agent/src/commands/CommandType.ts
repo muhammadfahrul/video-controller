@@ -33,4 +33,6 @@ export enum CommandType {
     CLEAR_QUEUE = "CLEAR_QUEUE",
 
     PLAY_QUEUE_ITEM = "PLAY_QUEUE_ITEM",
+
+    SHUFFLE_QUEUE = "SHUFFLE_QUEUE",
 }

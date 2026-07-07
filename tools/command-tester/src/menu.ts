@@ -48,7 +48,9 @@ export async function selectCommand() {
 
                 "CLEAR_QUEUE",
 
-                "PLAY_QUEUE_ITEM"
+                "PLAY_QUEUE_ITEM",
+
+                "SHUFFLE_QUEUE"
 
             ]
 

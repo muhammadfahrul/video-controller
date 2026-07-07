@@ -39,7 +39,8 @@ import {
     AddQueueHandler,
     RemoveQueueHandler,
     ClearQueueHandler,
-    PlayQueueItemHandler
+    PlayQueueItemHandler,
+    ShuffleQueueHandler
 } from "../commands";
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
@@ -284,6 +285,13 @@ export class Agent {
             CommandType.PLAY_QUEUE_ITEM,
             new PlayQueueItemHandler(
                 this.player!,
+                this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.SHUFFLE_QUEUE,
+            new ShuffleQueueHandler(
                 this.queue
             )
         );
