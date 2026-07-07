@@ -37,6 +37,9 @@ import {
     NextHandler,
     PreviousHandler
 } from "../commands";
+import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
+import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
+import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 
 
 export class Agent {
@@ -228,6 +231,27 @@ export class Agent {
             new PreviousHandler(
                 this.player!,
                 this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.FULLSCREEN,
+            new FullscreenHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.EXIT_FULLSCREEN,
+            new ExitFullscreenHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.TOGGLE_FULLSCREEN,
+            new ToggleFullscreenHandler(
+                this.player!
             )
         );
     }

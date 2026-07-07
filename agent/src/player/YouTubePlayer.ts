@@ -233,9 +233,21 @@ export class YouTubePlayer {
 
 
 
-    public async fullscreen():Promise<void>{
+    public async fullscreen() {
 
         await this.dom.fullscreen();
+
+    }
+
+    public async exitFullscreen() {
+
+        await this.dom.exitFullscreen();
+
+    }
+
+    public async toggleFullscreen() {
+
+        await this.dom.toggleFullscreen();
 
     }
 

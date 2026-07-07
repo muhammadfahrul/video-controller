@@ -27,3 +27,9 @@ export * from "./handlers/StopHandler";
 export * from "./handlers/NextHandler";
 
 export * from "./handlers/PreviousHandler";
+
+export * from "./handlers/FullscreenHandler";
+
+export * from "./handlers/ExitFullscreenHandler";
+
+export * from "./handlers/ToggleFullscreenHandler";

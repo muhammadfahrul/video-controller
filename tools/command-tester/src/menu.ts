@@ -34,7 +34,13 @@ export async function selectCommand() {
 
                 "OPEN_VIDEO",
 
-                "EXIT"
+                "EXIT",
+
+                "FULLSCREEN",
+                
+                "EXIT_FULLSCREEN",
+
+                "TOGGLE_FULLSCREEN"
 
             ]
 

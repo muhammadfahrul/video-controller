@@ -117,4 +117,22 @@ export class PlayerService {
 
     }
 
+    public async fullscreen() {
+
+        await this.player.fullscreen();
+
+    }
+
+    public async exitFullscreen() {
+
+        await this.player.exitFullscreen();
+
+    }
+
+    public async toggleFullscreen() {
+
+        await this.player.toggleFullscreen();
+
+    }
+
 }

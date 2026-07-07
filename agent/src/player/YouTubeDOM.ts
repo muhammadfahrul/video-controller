@@ -247,34 +247,63 @@ export class YouTubeDOM {
 
 
 
-    public async fullscreen():Promise<void>{
+    public async fullscreen() {
+
+        await this.page.evaluate(async () => {
+
+            if (
+                document.fullscreenElement
+            ) {
+
+                return;
+
+            }
+
+            await document.documentElement
+                .requestFullscreen();
+
+        });
+
+    }
 
 
-        await this.page.evaluate(
+    public async exitFullscreen() {
 
-            selector=>{
+        await this.page.evaluate(async () => {
+
+            if (
+                !document.fullscreenElement
+            ) {
+
+                return;
+
+            }
+
+            await document.exitFullscreen();
+
+        });
+
+    }
 
 
-                const video =
-                    document.querySelector(
-                        selector
-                    ) as HTMLVideoElement | null;
+    public async toggleFullscreen() {
 
+        await this.page.evaluate(async () => {
 
+            if (
+                document.fullscreenElement
+            ) {
 
-                if(video){
+                await document.exitFullscreen();
 
-                    video.requestFullscreen();
+                return;
 
-                }
+            }
 
+            await document.documentElement
+                .requestFullscreen();
 
-            },
-
-            YouTubeSelectors.video
-
-        );
-
+        });
 
     }
 
