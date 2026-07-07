@@ -43,3 +43,5 @@ export * from "./handlers/ClearQueueHandler";
 export * from "./handlers/PlayQueueItemHandler";
 
 export * from "./handlers/ShuffleQueueHandler";
+
+export * from "./handlers/RepeatModeHandler";

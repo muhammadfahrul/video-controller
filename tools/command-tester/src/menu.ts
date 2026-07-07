@@ -34,8 +34,6 @@ export async function selectCommand() {
 
                 "OPEN_VIDEO",
 
-                "EXIT",
-
                 "FULLSCREEN",
                 
                 "EXIT_FULLSCREEN",
@@ -50,7 +48,15 @@ export async function selectCommand() {
 
                 "PLAY_QUEUE_ITEM",
 
-                "SHUFFLE_QUEUE"
+                "SHUFFLE_QUEUE",
+
+                "REPEAT_OFF",
+
+                "REPEAT_ONE",
+
+                "REPEAT_ALL",
+
+                "EXIT"
 
             ]
 

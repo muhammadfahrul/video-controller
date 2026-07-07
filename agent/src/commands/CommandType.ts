@@ -35,4 +35,10 @@ export enum CommandType {
     PLAY_QUEUE_ITEM = "PLAY_QUEUE_ITEM",
 
     SHUFFLE_QUEUE = "SHUFFLE_QUEUE",
+
+    REPEAT_OFF = "REPEAT_OFF",
+
+    REPEAT_ONE = "REPEAT_ONE",
+
+    REPEAT_ALL = "REPEAT_ALL"
 }

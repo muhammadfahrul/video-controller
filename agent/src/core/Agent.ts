@@ -45,6 +45,8 @@ import {
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
+import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
+import { RepeatMode } from "../queue/RepeatMode";
 
 
 export class Agent {
@@ -293,6 +295,30 @@ export class Agent {
             CommandType.SHUFFLE_QUEUE,
             new ShuffleQueueHandler(
                 this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.REPEAT_OFF,
+            new RepeatModeHandler(
+                this.queue,
+                RepeatMode.OFF
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.REPEAT_ONE,
+            new RepeatModeHandler(
+                this.queue,
+                RepeatMode.ONE
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.REPEAT_ALL,
+            new RepeatModeHandler(
+                this.queue,
+                RepeatMode.ALL
             )
         );
     }

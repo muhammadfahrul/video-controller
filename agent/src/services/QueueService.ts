@@ -1,8 +1,12 @@
+import { RepeatMode } from "../queue/RepeatMode";
+
 export class QueueService {
 
     private items: QueueItem[] = [];
 
     private currentIndex = -1;
+
+    private repeatMode = RepeatMode.OFF;
 
     public add(
         item: QueueItem
@@ -34,41 +38,110 @@ export class QueueService {
 
     }
 
-    next() {
+    public next() {
 
         if (
-
-            this.currentIndex + 1 >=
-
-            this.items.length
-
+            this.items.length === 0
         ) {
 
             return undefined;
+
+        }
+
+        if (
+            this.repeatMode ===
+            RepeatMode.ONE
+        ) {
+
+            return this.items[
+                this.currentIndex
+            ];
 
         }
 
         this.currentIndex++;
 
-        return this.current();
+        if (
+            this.currentIndex >=
+            this.items.length
+        ) {
+
+            if (
+                this.repeatMode ===
+                RepeatMode.ALL
+            ) {
+
+                this.currentIndex = 0;
+
+            } else {
+
+                this.currentIndex =
+                    this.items.length - 1;
+
+                return undefined;
+
+            }
+
+        }
+
+        return this.items[
+            this.currentIndex
+        ];
 
     }
 
-    previous() {
+    public previous() {
 
         if (
-
-            this.currentIndex <= 0
-
+            this.items.length === 0
         ) {
 
             return undefined;
 
         }
 
+        // REPEAT_ONE
+        if (
+            this.repeatMode ===
+            RepeatMode.ONE
+        ) {
+
+            return this.items[
+                this.currentIndex
+            ];
+
+        }
+
         this.currentIndex--;
 
-        return this.current();
+        // Sudah melewati item pertama
+        if (
+            this.currentIndex < 0
+        ) {
+
+            if (
+                this.repeatMode ===
+                RepeatMode.ALL
+            ) {
+
+                // Lompat ke item terakhir
+                this.currentIndex =
+                    this.items.length - 1;
+
+            } else {
+
+                // Tetap di item pertama
+                this.currentIndex = 0;
+
+                return undefined;
+
+            }
+
+        }
+
+        return this.items[
+            this.currentIndex
+        ];
 
     }
 
@@ -184,6 +257,20 @@ export class QueueService {
                 item =>
                     item.id === current.id
             );
+
+    }
+
+    public setRepeatMode(
+        mode: RepeatMode
+    ) {
+
+        this.repeatMode = mode;
+
+    }
+
+    public getRepeatMode() {
+
+        return this.repeatMode;
 
     }
 }
