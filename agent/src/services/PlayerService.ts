@@ -85,6 +85,7 @@ export class PlayerService {
             "PlayerService.setVolume",
             value
         );
+        
         await this.player.setVolume(value);
 
     }
@@ -118,6 +119,10 @@ export class PlayerService {
     }
 
     public async fullscreen() {
+
+        console.log(
+            "PlayerService.fullscreen"
+        );
 
         await this.player.fullscreen();
 

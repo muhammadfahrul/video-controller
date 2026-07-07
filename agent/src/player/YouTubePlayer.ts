@@ -235,6 +235,10 @@ export class YouTubePlayer {
 
     public async fullscreen() {
 
+        console.log(
+            "YouTubePlayer.fullscreen"
+        );
+        
         await this.dom.fullscreen();
 
     }

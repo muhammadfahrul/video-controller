@@ -31,9 +31,6 @@ export class SocketClient {
         commandRouter: CommandRouter
     ) {
 
-        console.log("SocketClient constructor");
-        console.log("CommandRouter =", commandRouter);
-
         this.commandRouter = commandRouter;
 
     }

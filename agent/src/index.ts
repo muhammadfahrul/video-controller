@@ -5,7 +5,8 @@ import {
  CommandType,
  PlayHandler,
  PauseHandler,
- VolumeHandler
+ VolumeHandler,
+ FullscreenHandler
 } from "./commands";
 
 
@@ -70,52 +71,20 @@ async function bootstrap(){
 
     if(first){
 
-
         await player.open(
             first.videoId
         );
-
 
         await player.play();
 
 
     }
 
-    // const dispatcher =
-    //     new CommandDispatcher();
+    await player.fullscreen();
 
+    await player.setVolume(50);
 
-    // dispatcher.register(
-    //     CommandType.PLAY,
-    //     new PlayHandler(player)
-    // );
-
-
-    // dispatcher.register(
-    //     CommandType.PAUSE,
-    //     new PauseHandler(player)
-    // );
-
-
-    // dispatcher.register(
-    //     CommandType.VOLUME,
-    //     new VolumeHandler(player)
-    // );
-
-    // await dispatcher.dispatch({
-
-    //     type:CommandType.VOLUME,
-
-    //     volume:50
-
-    // });
-
-
-    // await dispatcher.dispatch({
-
-    //     type:CommandType.PLAY
-
-    // });
+    await player.play();
 }
 
 
