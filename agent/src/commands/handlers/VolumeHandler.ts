@@ -17,6 +17,11 @@ implements CommandHandler {
         command: CommandPayload
     ): Promise<void>{
 
+        console.log(
+            "VolumeHandler.execute",
+            command
+        );
+
 
         if(command.volume === undefined){
 

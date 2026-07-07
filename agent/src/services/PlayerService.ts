@@ -70,6 +70,10 @@ export class PlayerService {
         value:number
     ){
 
+        console.log(
+            "PlayerService.setVolume",
+            value
+        );
         await this.player.setVolume(value);
 
     }

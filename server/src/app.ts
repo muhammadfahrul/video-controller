@@ -1,47 +1,14 @@
 import express from "express";
 import cors from "cors";
 
+export function createApp() {
 
-export function createApp(){
+    const app = express();
 
+    app.use(cors());
 
-    const app =
-        express();
-
-
-
-    app.use(
-        cors()
-    );
-
-
-    app.use(
-        express.json()
-    );
-
-
-
-    app.get(
-        "/health",
-        (req,res)=>{
-
-
-            res.json({
-
-                status:"ok",
-
-                timestamp:
-                    Date.now()
-
-            });
-
-
-        }
-    );
-
-
+    app.use(express.json());
 
     return app;
-
 
 }

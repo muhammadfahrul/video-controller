@@ -20,23 +20,14 @@ export class CommandRouter {
 
 
 
-    async handle(
-        command:CommandPayload
-    ){
+    async handle(command: CommandPayload) {
 
+        console.log("=== COMMAND ROUTER ===");
+        console.log(command);
 
-        console.log(
-            "Executing command",
-            command
-        );
+        await this.commandService.execute(command);
 
-
-
-        await this.commandService.execute(
-            command
-        );
-
-
+        console.log("=== COMMAND ROUTER DONE ===");
     }
 
 

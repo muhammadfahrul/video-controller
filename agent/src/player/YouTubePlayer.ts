@@ -88,6 +88,10 @@ export class YouTubePlayer {
         volume: number
     ): Promise<void> {
 
+        console.log(
+            "YouTubePlayer.setVolume",
+            volume
+        );
 
         await this.dom.setVolume(volume);
 
@@ -97,6 +101,9 @@ export class YouTubePlayer {
 
     public async getStatus(): Promise<PlayerStatus> {
 
+        console.log(
+            "Calling page.evaluate"
+        );
         const status =
             await this.page.evaluate(() => {
 

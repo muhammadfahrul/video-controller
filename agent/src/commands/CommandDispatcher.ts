@@ -42,7 +42,11 @@ export class CommandDispatcher {
         command:CommandPayload
     ):Promise<void>{
 
-
+        console.log(
+            "Dispatching",
+            command.type
+        );
+        
         const handler =
             this.handlers.get(
                 command.type

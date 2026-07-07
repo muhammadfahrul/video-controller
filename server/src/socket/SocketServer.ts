@@ -14,10 +14,6 @@ import {
 
 
 import {
-    AgentRegistry
-} from "../services/AgentRegistry";
-
-import {
     AgentManager
 } from "../services/AgentManager";
 
@@ -35,9 +31,12 @@ export class SocketServer {
 
 
     constructor(
-        server:HttpServer
+        server: HttpServer,
+        manager: AgentManager
     ){
 
+        this.manager =
+            manager;
 
         this.io =
             new Server(
@@ -51,14 +50,7 @@ export class SocketServer {
                 }
             );
 
-
-        this.manager =
-            new AgentManager();
-
-
-
         this.setup();
-
 
     }
 
@@ -122,20 +114,11 @@ export class SocketServer {
                     data=>{
 
 
-                        const agent =
-                            this.manager
+                        this.manager
                             .getRegistry()
                             .updateHeartbeat(
                                 data.id
                             );
-
-
-                        if(agent){
-
-                            agent.lastHeartbeat =
-                                Date.now();
-
-                        }
 
 
                     }
@@ -147,12 +130,16 @@ export class SocketServer {
                     "disconnect",
                     ()=>{
 
-
                         console.log(
                             "Socket disconnected",
                             socket.id
                         );
 
+                        this.manager
+                            .getRegistry()
+                            .removeBySocket(
+                                socket.id
+                            );
 
                     }
                 );
@@ -173,9 +160,9 @@ export class SocketServer {
 
 
         const agent =
-            this.registry.get(
-                agentId
-            );
+            this.manager
+                .getRegistry()
+                .get(agentId);
 
 
         if(!agent){
@@ -199,17 +186,19 @@ export class SocketServer {
 
     }
 
-    getManager(){
-
-        return this.manager;
-
-    }
-
-    getAgents(){
-
+    public getAgents() {
         return this.manager
             .getRegistry()
             .getAll();
+    }
+
+    public getManager() {
+        return this.manager;
+    }
+
+    public getIO() {
+
+        return this.io;
 
     }
 }

@@ -26,17 +26,15 @@ export class SocketClient {
 
 
     constructor(
+        private readonly serverUrl: string,
+        private readonly identity: AgentIdentity,
+        commandRouter: CommandRouter
+    ) {
 
-        private readonly serverUrl:string,
+        console.log("SocketClient constructor");
+        console.log("CommandRouter =", commandRouter);
 
-        private readonly identity:AgentIdentity,
-
-        commandRouter:CommandRouter
-
-    ){
-
-        this.commandRouter =
-            commandRouter;
+        this.commandRouter = commandRouter;
 
     }
 
@@ -73,12 +71,23 @@ export class SocketClient {
 
         this.socket.on(
             "command",
-            async(command)=>{
+            async (command) => {
 
+                console.log("Received command", command);
 
-                await this.commandRouter
-                    ?.handle(command);
+                console.log("Router:", this.commandRouter);
 
+                try {
+
+                    await this.commandRouter?.handle(command);
+
+                    console.log("Command finished");
+
+                } catch (err) {
+
+                    console.error("Command error", err);
+
+                }
 
             }
         );

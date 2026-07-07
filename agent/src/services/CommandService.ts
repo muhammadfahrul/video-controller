@@ -14,14 +14,13 @@ export class CommandService {
 
 
 
-    async execute(
-        command:CommandPayload
-    ){
+    async execute(command: CommandPayload) {
 
-        await this.dispatcher.dispatch(
-            command
-        );
+        console.log("=== COMMAND SERVICE ===");
 
+        await this.dispatcher.dispatch(command);
+
+        console.log("=== COMMAND SERVICE DONE ===");
     }
 
 
