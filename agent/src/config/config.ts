@@ -1,5 +1,13 @@
 export const config = {
-    youtubeHome: "https://www.youtube.com",
+
     headless: false,
-    kiosk: true
+
+    youtubeHome: "https://www.youtube.com",
+
+    browserArgs: [
+
+        "--start-maximized"
+
+    ]
+
 };

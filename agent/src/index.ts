@@ -1,11 +1,15 @@
-import { BrowserManager } from "./browser/BrowserManager";
+import { Agent } from "./agent/Agent";
 
 async function main() {
 
-    const browser = new BrowserManager();
+    const agent = new Agent();
 
-    await browser.start();
+    await agent.start();
+
+    const youtube = agent.getYouTube();
+
+    await youtube.open("dQw4w9WgXcQ");
 
 }
 
-main();
+main().catch(console.error);
