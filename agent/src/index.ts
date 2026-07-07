@@ -102,20 +102,20 @@ async function bootstrap(){
         new VolumeHandler(player)
     );
 
-    await dispatcher.dispatch({
+    // await dispatcher.dispatch({
 
-        type:CommandType.VOLUME,
+    //     type:CommandType.VOLUME,
 
-        volume:50
+    //     volume:50
 
-    });
+    // });
 
 
-    await dispatcher.dispatch({
+    // await dispatcher.dispatch({
 
-        type:CommandType.PLAY
+    //     type:CommandType.PLAY
 
-    });
+    // });
 }
 
 
