@@ -128,6 +128,28 @@ async function main() {
 
         }
 
+        if (command === "REMOVE_QUEUE") {
+
+            const answer =
+                await inquirer.prompt([
+
+                    {
+
+                        type: "input",
+
+                        name: "id",
+
+                        message: "Queue ID"
+
+                    }
+
+                ]);
+
+            payload.id =
+                answer.id;
+
+        }
+
         console.log();
 
         console.log(

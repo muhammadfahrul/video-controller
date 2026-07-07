@@ -10,4 +10,6 @@ export interface CommandPayload {
 
     title?: string;
 
+    id?: number;
+
 }

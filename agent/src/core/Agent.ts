@@ -36,7 +36,9 @@ import {
     OpenVideoHandler,
     NextHandler,
     PreviousHandler,
-    AddQueueHandler
+    AddQueueHandler,
+    RemoveQueueHandler,
+    ClearQueueHandler
 } from "../commands";
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
@@ -259,6 +261,20 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.ADD_QUEUE,
             new AddQueueHandler(
+                this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.REMOVE_QUEUE,
+            new RemoveQueueHandler(
+                this.queue
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.CLEAR_QUEUE,
+            new ClearQueueHandler(
                 this.queue
             )
         );

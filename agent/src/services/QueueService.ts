@@ -84,4 +84,37 @@ export class QueueService {
 
     }
 
+    public remove(id: string): boolean {
+
+        const index = this.items.findIndex(
+            item => item.id === id
+        );
+
+        if (index === -1) {
+            return false;
+        }
+
+        this.items.splice(index, 1);
+
+        if (this.currentIndex > index) {
+            this.currentIndex--;
+        } else if (this.currentIndex >= this.items.length) {
+            this.currentIndex = this.items.length - 1;
+        }
+
+        if (this.items.length === 0) {
+            this.currentIndex = -1;
+        }
+
+        return true;
+    }
+
+    public clear() {
+
+        this.items = [];
+
+        this.currentIndex = -1;
+
+    }
+
 }

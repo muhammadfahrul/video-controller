@@ -27,4 +27,8 @@ export enum CommandType {
     TOGGLE_FULLSCREEN = "TOGGLE_FULLSCREEN",
 
     ADD_QUEUE = "ADD_QUEUE",
+
+    REMOVE_QUEUE = "REMOVE_QUEUE",
+
+    CLEAR_QUEUE = "CLEAR_QUEUE",
 }
