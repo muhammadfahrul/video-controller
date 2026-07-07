@@ -32,7 +32,8 @@ import {
     SeekHandler,
     MuteHandler,
     UnmuteHandler,
-    StopHandler
+    StopHandler,
+    OpenVideoHandler
 } from "../commands";
 
 
@@ -201,6 +202,13 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.STOP,
             new StopHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.OPEN_VIDEO,
+            new OpenVideoHandler(
                 this.player!
             )
         );

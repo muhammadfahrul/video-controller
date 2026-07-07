@@ -40,6 +40,17 @@ export class PlayerService {
 
     }
 
+    public async openVideo(
+        videoId: string
+    ) {
+
+        await this.open(
+            videoId
+        );
+
+        await this.play();
+
+    }
 
 
     async play(){

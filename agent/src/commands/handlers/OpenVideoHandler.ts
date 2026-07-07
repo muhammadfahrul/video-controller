@@ -1,39 +1,43 @@
-import { CommandHandler } from "./CommandHandler";
-import { CommandPayload } from "../CommandPayload";
-import { PlayerService } from "../../services/PlayerService";
+import {
+    CommandHandler,
+    CommandPayload
+} from "../types";
 
+import {
+    PlayerService
+} from "../../services/PlayerService";
 
 export class OpenVideoHandler
-implements CommandHandler {
-
+    implements CommandHandler {
 
     constructor(
-        private readonly player: PlayerService
-    ){}
 
+        private readonly player:
+            PlayerService
 
+    ) {}
 
     async execute(
-        command:CommandPayload
-    ):Promise<void>{
+        command: CommandPayload
+    ) {
 
+        if (!command.videoId) {
 
-        if(!command.videoId){
-
-            return;
+            throw new Error(
+                "videoId is required"
+            );
 
         }
 
+        console.log(
+            "OpenVideoHandler.execute",
+            command
+        );
 
-        await this.player.open(
+        await this.player.openVideo(
             command.videoId
         );
 
-
-        await this.player.play();
-
-
     }
-
 
 }
