@@ -15,3 +15,5 @@ export * from "./handlers/PauseHandler";
 export * from "./handlers/VolumeHandler";
 
 export * from "./handlers/OpenVideoHandler";
+
+export * from "./handlers/SeekHandler";

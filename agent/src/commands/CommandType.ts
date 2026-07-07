@@ -8,6 +8,8 @@ export enum CommandType {
 
     VOLUME = "VOLUME",
 
+    SEEK = "SEEK",
+
     OPEN_VIDEO = "OPEN_VIDEO"
 
 }

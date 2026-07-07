@@ -94,41 +94,27 @@ export class YouTubeDOM {
 
 
     public async seek(
-        seconds:number
-    ): Promise<void> {
-
+        seconds: number
+    ) {
 
         await this.page.evaluate(
 
-            ({selector, seconds}) => {
-
+            (time) => {
 
                 const video =
-                    document.querySelector(
-                        selector
-                    ) as HTMLVideoElement | null;
+                    document.querySelector("video") as HTMLVideoElement | null;
 
-
-
-                if(video){
-
-                    video.currentTime = seconds;
-
+                if (!video) {
+                    throw new Error("Video element not found");
                 }
 
+                video.currentTime = time;
 
             },
 
-            {
-                selector:
-                    YouTubeSelectors.video,
-
-                seconds
-
-            }
+            seconds
 
         );
-
 
     }
 

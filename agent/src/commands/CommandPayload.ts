@@ -9,4 +9,6 @@ export interface CommandPayload {
 
     volume?: number;
 
+    seek?: number;
+
 }

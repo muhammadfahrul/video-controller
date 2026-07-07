@@ -28,7 +28,8 @@ import {
     CommandType,
     PlayHandler,
     PauseHandler,
-    VolumeHandler
+    VolumeHandler,
+    SeekHandler
 } from "../commands";
 
 
@@ -171,6 +172,13 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.VOLUME,
             new VolumeHandler(this.player)
+        );
+
+        this.commandDispatcher.register(
+            CommandType.SEEK,
+            new SeekHandler(
+                this.player
+            )
         );
 
     }

@@ -201,10 +201,12 @@ export class YouTubePlayer {
     }
 
     public async seek(
-        seconds:number
-    ):Promise<void>{
+        seconds: number
+    ) {
 
-        await this.dom.seek(seconds);
+        await this.dom.seek(
+            seconds
+        );
 
     }
 

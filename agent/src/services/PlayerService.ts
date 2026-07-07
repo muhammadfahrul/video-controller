@@ -78,5 +78,15 @@ export class PlayerService {
 
     }
 
+    public async seek(
+        seconds: number
+    ) {
+
+        await this.player.seek(
+            seconds
+        );
+
+    }
+
 
 }
