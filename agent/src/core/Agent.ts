@@ -29,7 +29,10 @@ import {
     PlayHandler,
     PauseHandler,
     VolumeHandler,
-    SeekHandler
+    SeekHandler,
+    MuteHandler,
+    UnmuteHandler,
+    StopHandler
 } from "../commands";
 
 
@@ -181,6 +184,26 @@ export class Agent {
             )
         );
 
+        this.commandDispatcher.register(
+            CommandType.MUTE,
+            new MuteHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.UNMUTE,
+            new UnmuteHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.STOP,
+            new StopHandler(
+                this.player!
+            )
+        );
     }
 
     public getSocketClient() {

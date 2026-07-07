@@ -212,17 +212,22 @@ export class YouTubePlayer {
 
 
 
-    public async mute():Promise<void>{
+    public async mute() {
 
         await this.dom.mute();
 
     }
 
-
-
-    public async unmute():Promise<void>{
+    public async unmute() {
 
         await this.dom.unmute();
+
+    }
+
+
+    public async stop() {
+
+        await this.dom.stop();
 
     }
 

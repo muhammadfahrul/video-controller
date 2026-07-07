@@ -88,5 +88,22 @@ export class PlayerService {
 
     }
 
+    public async mute() {
+
+        await this.player.mute();
+
+    }
+
+    public async unmute() {
+
+        await this.player.unmute();
+
+    }
+
+    public async stop() {
+
+        await this.player.stop();
+
+    }
 
 }

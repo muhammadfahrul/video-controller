@@ -17,3 +17,9 @@ export * from "./handlers/VolumeHandler";
 export * from "./handlers/OpenVideoHandler";
 
 export * from "./handlers/SeekHandler";
+
+export * from "./handlers/MuteHandler";
+
+export * from "./handlers/UnmuteHandler";
+
+export * from "./handlers/StopHandler";

@@ -30,6 +30,8 @@ export async function selectCommand() {
 
                 "MUTE",
 
+                "UNMUTE",
+
                 "OPEN_VIDEO",
 
                 "EXIT"

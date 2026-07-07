@@ -172,70 +172,77 @@ export class YouTubeDOM {
 
 
 
-    public async mute():Promise<void>{
+    public async mute() {
 
+        await this.page.evaluate(() => {
 
-        await this.page.evaluate(
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
 
-            selector=>{
+            if (!video) {
 
+                throw new Error(
+                    "Video not found"
+                );
 
-                const video =
-                    document.querySelector(
-                        selector
-                    ) as HTMLVideoElement | null;
+            }
 
+            video.muted = true;
 
-                if(video){
+        });
 
-                    video.muted = true;
+    }
 
-                }
+    public async unmute() {
 
+        await this.page.evaluate(() => {
 
-            },
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
 
-            YouTubeSelectors.video
+            if (!video) {
 
-        );
+                throw new Error(
+                    "Video not found"
+                );
 
+            }
+
+            video.muted = false;
+
+        });
 
     }
 
 
+    public async stop() {
 
+        await this.page.evaluate(() => {
 
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
 
-    public async unmute():Promise<void>{
+            if (!video) {
 
+                throw new Error(
+                    "Video not found"
+                );
 
-        await this.page.evaluate(
+            }
 
-            selector=>{
+            video.pause();
 
+            video.currentTime = 0;
 
-                const video =
-                    document.querySelector(
-                        selector
-                    ) as HTMLVideoElement | null;
-
-
-                if(video){
-
-                    video.muted = false;
-
-                }
-
-
-            },
-
-            YouTubeSelectors.video
-
-        );
-
+        });
 
     }
-
 
 
 
