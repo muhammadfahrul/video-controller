@@ -12,6 +12,25 @@ import {
  QueueService
 } from "../services/QueueService";
 
+import {
+    SocketClient,
+    AgentIdentityProvider,
+    HeartbeatService,
+    CommandRouter
+} from "../network";
+
+import {
+    CommandService
+} from "../services";
+
+import {
+    CommandDispatcher,
+    CommandType,
+    PlayHandler,
+    PauseHandler,
+    VolumeHandler
+} from "../commands";
+
 
 export class Agent {
 
@@ -27,6 +46,19 @@ export class Agent {
     private queue:
         QueueService;
 
+    private socketClient?:
+        SocketClient;
+
+
+    private heartbeat?:
+        HeartbeatService;
+
+    private commandRouter?:
+        CommandRouter;
+
+    private commandDispatcher:
+        CommandDispatcher;
+
 
 
     constructor(){
@@ -40,6 +72,41 @@ export class Agent {
         this.queue =
             new QueueService();
 
+        const identity =
+            new AgentIdentityProvider()
+            .get();
+
+
+
+        this.socketClient =
+            new SocketClient(
+                "http://localhost:3000",
+                identity
+            );
+
+        const commandService =
+            new CommandService(
+                this.commandDispatcher
+            );
+
+        this.commandDispatcher =
+            new CommandDispatcher();
+
+        this.commandDispatcher.register(
+
+            CommandType.PLAY,
+
+            new PlayHandler(
+                this.player
+            )
+
+        );
+
+
+        this.commandRouter =
+            new CommandRouter(
+                commandService
+            );
 
     }
 
@@ -57,6 +124,21 @@ export class Agent {
             new PlayerService(
                 this.browser.getPage()
             );
+
+        this.registerCommands();
+
+        this.socketClient
+            .connect();
+
+
+
+        this.heartbeat =
+            new HeartbeatService(
+                this.socketClient
+            );
+
+
+        this.heartbeat.start();
 
 
     }
@@ -85,6 +167,45 @@ export class Agent {
     getQueue(){
 
         return this.queue;
+
+    }
+
+
+    private registerCommands(){
+
+
+        this.commandDispatcher.register(
+
+            CommandType.PLAY,
+
+            new PlayHandler(
+                this.player!
+            )
+
+        );
+
+
+        this.commandDispatcher.register(
+
+            CommandType.PAUSE,
+
+            new PauseHandler(
+                this.player!
+            )
+
+        );
+
+
+        this.commandDispatcher.register(
+
+            CommandType.VOLUME,
+
+            new VolumeHandler(
+                this.player!
+            )
+
+        );
+
 
     }
 

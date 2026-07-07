@@ -17,6 +17,10 @@ import {
     AgentRegistry
 } from "../services/AgentRegistry";
 
+import {
+    AgentManager
+} from "../services/AgentManager";
+
 
 
 export class SocketServer {
@@ -25,8 +29,8 @@ export class SocketServer {
     private io:Server;
 
 
-    private registry:
-        AgentRegistry;
+    private manager:
+        AgentManager;
 
 
 
@@ -48,8 +52,8 @@ export class SocketServer {
             );
 
 
-        this.registry =
-            new AgentRegistry();
+        this.manager =
+            new AgentManager();
 
 
 
@@ -87,19 +91,22 @@ export class SocketServer {
 
 
 
-                        this.registry.register({
+                        this.manager
+                        .getRegistry()
+                        .register({
 
                             id:data.id,
 
-                            socketId:
-                                socket.id,
+                            socketId:socket.id,
 
                             name:data.name,
 
-                            status:
-                                "ONLINE",
+                            status:"ONLINE",
 
                             lastHeartbeat:
+                                Date.now(),
+
+                            connectedAt:
                                 Date.now()
 
                         });
@@ -116,7 +123,9 @@ export class SocketServer {
 
 
                         const agent =
-                            this.registry.get(
+                            this.manager
+                            .getRegistry()
+                            .updateHeartbeat(
                                 data.id
                             );
 
@@ -190,5 +199,17 @@ export class SocketServer {
 
     }
 
+    getManager(){
 
+        return this.manager;
+
+    }
+
+    getAgents(){
+
+        return this.manager
+            .getRegistry()
+            .getAll();
+
+    }
 }

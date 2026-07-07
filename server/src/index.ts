@@ -1,33 +1,46 @@
-import {
-    createApp
-} from "./app";
+import { createServer } from "http";
 
+import { createApp } from "./app";
 
-import {
-    createServer
-} from "http";
-
-
-import {
-    SocketServer
-} from "./socket/SocketServer";
+import { SocketServer } from "./socket/SocketServer";
 
 
 const PORT = 3000;
 
 
+// Buat app dulu
 const app =
     createApp();
 
 
+// HTTP server menggunakan Express
 const httpServer =
     createServer(app);
 
 
+// Socket.IO attach ke HTTP server yang sama
+const socketServer =
+    new SocketServer(
+        httpServer
+    );
 
-new SocketServer(
-    httpServer
+app.get(
+    "/agents",
+    (req,res)=>{
+
+
+        res.json(
+            socketServer.getAgents()
+        );
+
+
+    }
 );
+
+
+// Ambil manager
+const manager =
+    socketServer.getManager();
 
 
 
@@ -37,7 +50,7 @@ httpServer.listen(
 
 
         console.log(
-            `Server running ${PORT}`
+            `Server running on ${PORT}`
         );
 
 

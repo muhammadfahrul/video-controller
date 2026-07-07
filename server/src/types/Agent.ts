@@ -1,3 +1,16 @@
+export type AgentStatus =
+
+    | "ONLINE"
+
+    | "OFFLINE"
+
+    | "PLAYING"
+
+    | "PAUSED";
+
+
+
+
 export interface AgentInfo {
 
 
@@ -10,10 +23,13 @@ export interface AgentInfo {
     name:string;
 
 
-    status:string;
+    status:AgentStatus;
 
 
     lastHeartbeat:number;
+
+
+    connectedAt:number;
 
 
 }

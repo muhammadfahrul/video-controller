@@ -15,28 +15,102 @@ export class AgentRegistry {
         agent:AgentInfo
     ){
 
-
         this.agents.set(
             agent.id,
             agent
         );
 
-
     }
 
 
 
-    remove(
+
+    updateHeartbeat(
         id:string
     ){
 
 
-        this.agents.delete(
-            id
-        );
+        const agent =
+            this.agents.get(id);
+
+
+
+        if(!agent){
+
+            return;
+
+        }
+
+
+
+        agent.lastHeartbeat =
+            Date.now();
+
+
+
+        if(agent.status==="OFFLINE"){
+
+            agent.status="ONLINE";
+
+        }
 
 
     }
+
+
+
+
+
+    updateStatus(
+        id:string,
+        status:AgentInfo["status"]
+    ){
+
+
+        const agent =
+            this.agents.get(id);
+
+
+
+        if(agent){
+
+            agent.status =
+                status;
+
+        }
+
+
+    }
+
+
+
+
+
+    removeBySocket(
+        socketId:string
+    ){
+
+
+        for(
+            const [id,agent]
+            of this.agents
+        ){
+
+
+            if(agent.socketId===socketId){
+
+
+                this.agents.delete(id);
+
+
+            }
+
+
+        }
+
+
+    }
+
 
 
 
@@ -44,24 +118,21 @@ export class AgentRegistry {
         id:string
     ){
 
-
         return this.agents.get(id);
 
-
     }
+
+
 
 
 
     getAll(){
 
-
         return Array.from(
             this.agents.values()
         );
 
-
     }
-
 
 
 }
