@@ -40,7 +40,9 @@ export async function selectCommand() {
                 
                 "EXIT_FULLSCREEN",
 
-                "TOGGLE_FULLSCREEN"
+                "TOGGLE_FULLSCREEN",
+
+                "ADD_QUEUE"
 
             ]
 

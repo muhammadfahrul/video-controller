@@ -4,11 +4,17 @@ export class QueueService {
 
     private currentIndex = -1;
 
-    add(item: QueueItem) {
+    public add(
+        item: QueueItem
+    ) {
 
-        this.items.push(item);
+        this.items.push(
+            item
+        );
 
-        if (this.currentIndex === -1) {
+        if (
+            this.currentIndex === -1
+        ) {
 
             this.currentIndex = 0;
 
@@ -66,9 +72,15 @@ export class QueueService {
 
     }
 
-    getAll() {
+    public size() {
 
-        return this.items;
+        return this.items.length;
+
+    }
+
+    public getAll() {
+
+        return [...this.items];
 
     }
 

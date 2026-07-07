@@ -11,4 +11,6 @@ export interface CommandPayload {
 
     seek?: number;
 
+    title?: string;
+
 }

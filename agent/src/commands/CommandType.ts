@@ -25,4 +25,6 @@ export enum CommandType {
     EXIT_FULLSCREEN = "EXIT_FULLSCREEN",
 
     TOGGLE_FULLSCREEN = "TOGGLE_FULLSCREEN",
+
+    ADD_QUEUE = "ADD_QUEUE",
 }

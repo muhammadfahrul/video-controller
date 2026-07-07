@@ -8,4 +8,6 @@ export interface CommandPayload {
 
     videoId?: string;
 
+    title?: string;
+
 }

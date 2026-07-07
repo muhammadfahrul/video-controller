@@ -35,7 +35,8 @@ import {
     StopHandler,
     OpenVideoHandler,
     NextHandler,
-    PreviousHandler
+    PreviousHandler,
+    AddQueueHandler
 } from "../commands";
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
@@ -252,6 +253,13 @@ export class Agent {
             CommandType.TOGGLE_FULLSCREEN,
             new ToggleFullscreenHandler(
                 this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.ADD_QUEUE,
+            new AddQueueHandler(
+                this.queue
             )
         );
     }

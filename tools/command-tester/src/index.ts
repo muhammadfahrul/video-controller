@@ -97,6 +97,37 @@ async function main() {
 
         }
 
+        if (command === "ADD_QUEUE") {
+
+            const answer =
+                await inquirer.prompt([
+
+                    {
+
+                        type: "input",
+
+                        name: "videoId",
+
+                        message: "Video ID"
+
+                    },
+
+                    {
+                        type: "input",
+                        name: "title",
+                        message: "Title"
+                    }
+
+                ]);
+
+            payload.videoId =
+                answer.videoId;
+
+            payload.title =
+                answer.title;
+
+        }
+
         console.log();
 
         console.log(

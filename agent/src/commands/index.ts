@@ -33,3 +33,5 @@ export * from "./handlers/FullscreenHandler";
 export * from "./handlers/ExitFullscreenHandler";
 
 export * from "./handlers/ToggleFullscreenHandler";
+
+export * from "./handlers/AddQueueHandler";
