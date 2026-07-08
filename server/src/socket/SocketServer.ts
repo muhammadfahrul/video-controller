@@ -65,8 +65,19 @@ export class SocketServer {
 
 
                 console.log(
-                    "Socket connected",
-                    socket.id
+                    "[CONNECT]",
+                    socket.id,
+                    socket.handshake.query
+                );
+
+                socket.emit(
+
+                    "agents:update",
+
+                    this.manager
+                        .getRegistry()
+                        .getAll()
+
                 );
 
 
@@ -83,25 +94,28 @@ export class SocketServer {
 
 
 
-                        this.manager
-                        .getRegistry()
-                        .register({
+                        const registry =
+                            this.manager.getRegistry();
 
-                            id:data.id,
+                        registry.register({
 
-                            socketId:socket.id,
+                            id: data.id,
 
-                            name:data.name,
+                            socketId: socket.id,
 
-                            status:"ONLINE",
+                            name: data.name,
 
-                            lastHeartbeat:
-                                Date.now(),
+                            status: "ONLINE",
 
-                            connectedAt:
-                                Date.now()
+                            lastHeartbeat: Date.now(),
+
+                            connectedAt: Date.now()
 
                         });
+
+                        this.broadcastAgents(
+                            registry.getAll()
+                        );
 
 
                     }
@@ -114,11 +128,16 @@ export class SocketServer {
                     data=>{
 
 
-                        this.manager
-                            .getRegistry()
-                            .updateHeartbeat(
-                                data.id
-                            );
+                        const registry =
+                            this.manager.getRegistry();
+
+                        registry.updateHeartbeat(
+                            data.id
+                        );
+
+                        this.broadcastAgents(
+                            registry.getAll()
+                        );
 
 
                     }
@@ -135,13 +154,55 @@ export class SocketServer {
                             socket.id
                         );
 
-                        this.manager
-                            .getRegistry()
-                            .removeBySocket(
-                                socket.id
-                            );
+                        const registry =
+                            this.manager.getRegistry();
+
+                        registry.removeBySocket(
+                            socket.id
+                        );
+
+                        this.broadcastAgents(
+                            registry.getAll()
+                        );
 
                     }
+                );
+
+
+                socket.on(
+
+                    SocketEvents.PLAYER_COMMAND,
+
+                    command => {
+
+                        console.log(
+
+                            "[SERVER] Player Command",
+
+                            command
+
+                        );
+
+                        try {
+
+                            this.sendCommand(
+
+                                command.agentId,
+
+                                command
+
+                            );
+
+                        }
+
+                        catch (err) {
+
+                            console.error(err);
+
+                        }
+
+                    }
+
                 );
 
 
@@ -158,6 +219,13 @@ export class SocketServer {
         command:any
     ){
 
+        console.log(
+
+            "[SERVER] Send Command",
+
+            command
+
+        );
 
         const agent =
             this.manager
@@ -199,6 +267,26 @@ export class SocketServer {
     public getIO() {
 
         return this.io;
+
+    }
+
+    public broadcastAgents(
+        agents: unknown
+    ) {
+
+        console.log(
+            "Broadcast ->",
+            JSON.stringify(
+                agents,
+                null,
+                2
+            )
+        );
+
+        this.io.emit(
+            "agents:update",
+            agents
+        );
 
     }
 }

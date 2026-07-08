@@ -18,7 +18,25 @@ import {
 
 import ControlButton from "./ControlButton";
 
+import {
+
+    playerCommandService
+
+} from "../../../services";
+
+import {
+
+    useAppStore
+
+} from "../../../store/appStore";
+
 export default function PlayerControls() {
+
+    const {
+
+        agent
+
+    } = useAppStore();
 
     return (
 
@@ -62,6 +80,30 @@ export default function PlayerControls() {
                     label="Play"
 
                     variant="primary"
+
+                    onClick={() => {
+
+                        console.log(
+
+                            "[UI] Play clicked"
+
+                        );
+
+                        console.log(
+
+                            "[UI] Agent",
+
+                            agent
+
+                        );
+
+                        playerCommandService.play(
+
+                            agent.id
+
+                        );
+
+                    }}
 
                 />
 

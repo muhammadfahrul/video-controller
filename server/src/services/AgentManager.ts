@@ -49,38 +49,34 @@ export class AgentManager {
 
 
 
-    private checkHeartbeat(){
+    private checkHeartbeat() {
 
+        const now = Date.now();
 
-        const now =
-            Date.now();
+        let changed = false;
 
+        for (const agent of this.registry.getAll()) {
 
+            const diff = now - agent.lastHeartbeat;
 
-        for(
-            const agent
-            of this.registry.getAll()
-        ){
+            if (
+                diff > 15000 &&
+                agent.status !== "OFFLINE"
+            ) {
 
+                agent.status = "OFFLINE";
 
-            const diff =
-                now -
-                agent.lastHeartbeat;
-
-
-
-            if(diff > 15000){
-
-
-                agent.status =
-                    "OFFLINE";
-
+                changed = true;
 
             }
 
-
         }
 
+        if (changed) {
+
+            // nanti dipanggil callback
+
+        }
 
     }
 

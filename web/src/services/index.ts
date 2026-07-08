@@ -13,3 +13,15 @@ export * from "./ApiService";
 export * from "./socket";
 
 export * from "./agent";
+
+export * from "./player";
+
+import {
+
+    PlayerCommandService
+
+} from "./player";
+
+export const playerCommandService =
+
+    new PlayerCommandService();

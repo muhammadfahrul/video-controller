@@ -55,6 +55,12 @@ export class PlayerService {
 
     async play(){
 
+        console.log(
+
+            "[PLAYER] play()"
+
+        );
+        
         await this.player.play();
 
     }

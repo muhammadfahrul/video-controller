@@ -17,7 +17,11 @@ export enum SocketEvents {
 
 
     AGENT_STATUS =
-        "agent:status"
+        "agent:status",
 
+
+
+    PLAYER_COMMAND =
+        "player:command"
 
 }

@@ -17,6 +17,11 @@ implements CommandHandler {
         command: CommandPayload
     ):Promise<void>{
 
+        console.log(
+
+            "[PLAY HANDLER]"
+
+        );
 
         await this.player.play();
 

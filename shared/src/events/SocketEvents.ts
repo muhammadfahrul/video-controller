@@ -4,10 +4,12 @@ export const SocketEvents = {
 
     AGENT_HEARTBEAT: "agent:heartbeat",
 
-    COMMAND: "command",
+    COMMAND: "agent:command",
 
-    STATUS: "status",
+    STATUS: "agent:status",
 
-    ERROR: "error"
+    ERROR: "agent:error",
+
+    PLAYER_COMMAND: "player:command"
 
 } as const;

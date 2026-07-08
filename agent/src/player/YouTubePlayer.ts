@@ -67,6 +67,12 @@ export class YouTubePlayer {
 
     public async play(): Promise<void> {
 
+        console.log(
+
+            "[YouTube] play()"
+
+        );
+        
         await this.dom.play();
 
         this.state = PlayerState.PLAYING;

@@ -39,7 +39,17 @@ import {
 } from "../services";
 import { useAppStore } from "../store/appStore";
 
+import { useAgent } from "../hooks/useAgent";
+
+import {
+
+    playerCommandService
+
+} from "../services";
+
 export default function HomePage(){
+
+    useAgent();
 
     const [
 
@@ -96,6 +106,8 @@ export default function HomePage(){
         loadAgent
 
     } = useAppStore();
+
+    console.log(agent);
 
     useEffect(() => {
 
@@ -159,6 +171,16 @@ export default function HomePage(){
         }
 
         load();
+
+        setTimeout(() => {
+
+            playerCommandService.play(
+
+                "windows-agent-01"
+
+            );
+
+        }, 3000);
 
 
         socketService.connect();

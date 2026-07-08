@@ -8,11 +8,19 @@ export class SocketService {
 
     connect() {
 
-        if (this.socket?.connected) {
+        if (this.socket) {
+
+            console.log(
+                "[Socket] Already initialized"
+            );
 
             return;
 
         }
+
+        console.log(
+            "[Socket] Creating socket"
+        );
 
         this.socket = io(env.apiUrl, {
 
@@ -23,11 +31,11 @@ export class SocketService {
         this.socket.on("connect", () => {
 
             console.log(
-
                 "[Socket] Connected",
+            );
 
+            console.log(
                 this.socket?.id
-
             );
 
         });
@@ -50,22 +58,32 @@ export class SocketService {
 
         this.socket?.disconnect();
 
+        this.socket = undefined;
     }
 
     on<T>(
-
         event: string,
-
         callback: (payload: T) => void
-
     ) {
 
+        console.log(
+            "[Socket] Register",
+            event
+        );
+
         this.socket?.on(
-
             event,
+            (payload: T) => {
 
-            callback
+                console.log(
+                    "[Socket] Receive",
+                    event,
+                    payload
+                );
 
+                callback(payload);
+
+            }
         );
 
     }
