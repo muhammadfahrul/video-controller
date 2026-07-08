@@ -30,13 +30,21 @@ import {
 
 } from "../../../store/appStore";
 
+import {
+
+    usePlayerControls
+
+} from "../../../hooks/usePlayerControls";
+
 export default function PlayerControls() {
 
     const {
 
-        agent
+        play,
 
-    } = useAppStore();
+        pause
+
+    } = usePlayerControls();
 
     return (
 
@@ -81,29 +89,7 @@ export default function PlayerControls() {
 
                     variant="primary"
 
-                    onClick={() => {
-
-                        console.log(
-
-                            "[UI] Play clicked"
-
-                        );
-
-                        console.log(
-
-                            "[UI] Agent",
-
-                            agent
-
-                        );
-
-                        playerCommandService.play(
-
-                            agent.id
-
-                        );
-
-                    }}
+                    onClick={play}
 
                 />
 
@@ -112,6 +98,8 @@ export default function PlayerControls() {
                     icon={<Pause size={22}/>}
 
                     label="Pause"
+
+                    onClick={pause}
 
                 />
 
