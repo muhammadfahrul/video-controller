@@ -19,6 +19,25 @@ from "../features/queue/components/QueuePanel";
 import PlayerControls
 from "../features/player/components/PlayerControls";
 
+import {
+
+    useEffect
+
+} from "react";
+
+import {
+
+    apiService
+
+} from "../services";
+
+import {
+
+    socketService
+
+} from "../services";
+import { useAppStore } from "../store/appStore";
+
 export default function HomePage(){
 
     const [
@@ -67,6 +86,43 @@ export default function HomePage(){
 
     ];
 
+    const {
+
+        agent,
+
+        setAgent
+
+    } = useAppStore();
+
+    useEffect(() => {
+
+        setAgent({
+
+            id:"windows-agent-01",
+
+            name:"Windows Player",
+
+            online:true,
+
+            lastHeartbeat:Date.now()
+
+        });
+
+        apiService
+            .get("/api/agents")
+            .then(console.log)
+            .catch(console.error);
+
+        socketService.connect();
+
+        return () => {
+
+            socketService.disconnect();
+
+        };
+
+    }, []);
+
     return(
 
         <div
@@ -79,13 +135,21 @@ export default function HomePage(){
 
                 agent={{
 
-                    id:"windows-agent-01",
+                    id:agent.id,
 
-                    name:"Windows Player",
+                    name:agent.name,
 
-                    status:"ONLINE",
+                    status:
 
-                    lastHeartbeat:Date.now()
+                        agent.online
+
+                        ? "ONLINE"
+
+                        : "OFFLINE",
+
+                    lastHeartbeat:
+
+                        agent.lastHeartbeat
 
                 }}
 
