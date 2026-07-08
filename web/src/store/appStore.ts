@@ -50,6 +50,10 @@ interface AppStore {
         value: Partial<SearchState>
     ): void;
 
+    loadAgent(
+        value: AgentState
+    ): void;
+
 }
 
 export const useAppStore =
@@ -142,6 +146,13 @@ create<AppStore>((set)=>({
 
             }
 
-        }))
+        })),
 
+    loadAgent:(value)=>
+
+        set({
+
+            agent:value
+
+        }),
 }));

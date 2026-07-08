@@ -11,3 +11,5 @@ export const apiService =
 export * from "./ApiService";
 
 export * from "./socket";
+
+export * from "./agent";

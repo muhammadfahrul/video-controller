@@ -27,6 +27,7 @@ import {
 
 import {
 
+    agentService,
     apiService
 
 } from "../services";
@@ -90,7 +91,9 @@ export default function HomePage(){
 
         agent,
 
-        setAgent
+        setAgent,
+
+        loadAgent
 
     } = useAppStore();
 
@@ -112,6 +115,51 @@ export default function HomePage(){
             .get("/api/agents")
             .then(console.log)
             .catch(console.error);
+
+        async function load() {
+
+            try {
+
+                const agents =
+
+                    await agentService.list();
+
+                if (agents.length === 0) {
+
+                    return;
+
+                }
+
+                const agent = agents[0];
+
+                loadAgent({
+
+                    id: agent.id,
+
+                    name: agent.name,
+
+                    online:
+
+                        agent.status === "ONLINE",
+
+                    lastHeartbeat:
+
+                        agent.lastHeartbeat
+
+                });
+
+            }
+
+            catch (err) {
+
+                console.error(err);
+
+            }
+
+        }
+
+        load();
+
 
         socketService.connect();
 
@@ -143,9 +191,9 @@ export default function HomePage(){
 
                         agent.online
 
-                        ? "ONLINE"
+                            ? "ONLINE"
 
-                        : "OFFLINE",
+                            : "OFFLINE",
 
                     lastHeartbeat:
 
