@@ -19,6 +19,9 @@ from "../features/queue/components/QueuePanel";
 import PlayerControls
 from "../features/player/components/PlayerControls";
 
+import PlayerProgress
+from "../features/player/components/PlayerProgress";
+
 import {
 
     useEffect
@@ -271,6 +274,8 @@ export default function HomePage(){
             />
 
             <PlayerControls />
+
+            <PlayerProgress />
 
             <PlayerStatus />
 
