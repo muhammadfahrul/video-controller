@@ -14,6 +14,7 @@ import {
 } from "./CommandRouter";
 import { PlayerSnapshot } from "../types/PlayerSnapshot";
 import { SocketEvents } from "../socket/SocketEvents";
+import { QueueSnapshot } from "../types/QueueSnapshot";
 
 
 
@@ -135,6 +136,23 @@ export class SocketClient {
         this.socket.emit(
 
             SocketEvents.PLAYER_STATE,
+
+            snapshot
+
+        );
+
+    }
+
+
+    public sendQueueState(
+
+        snapshot: QueueSnapshot
+
+    ) {
+
+        this.socket.emit(
+
+            SocketEvents.QUEUE_STATE,
 
             snapshot
 

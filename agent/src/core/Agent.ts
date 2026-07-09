@@ -78,6 +78,8 @@ export class Agent {
 
     private playerStateTimer?: NodeJS.Timeout;
 
+    private queueStateTimer?: NodeJS.Timeout;
+
 
 
     constructor() {
@@ -138,6 +140,8 @@ export class Agent {
         this.heartbeat.start();
 
         this.startPlayerStateSync();
+
+        this.startQueueSync();
 
     }
 
@@ -403,4 +407,32 @@ export class Agent {
 
     }
 
+
+    private startQueueSync() {
+
+        this.queueStateTimer =
+
+            setInterval(
+
+                () => {
+
+                    const snapshot =
+
+                        this.queue.getSnapshot();
+
+                    this.socketClient
+
+                        ?.sendQueueState(
+
+                            snapshot
+
+                        );
+
+                },
+
+                1000
+
+            );
+
+    }
 }

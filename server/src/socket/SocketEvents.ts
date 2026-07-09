@@ -28,6 +28,10 @@ export enum SocketEvents {
 
     PLAYER_STATE = "player:state",
 
-    PLAYER_UPDATE = "player:update"
+    PLAYER_UPDATE = "player:update",    
+
+    QUEUE_STATE = "queue:state",
+
+    QUEUE_UPDATE = "queue:update"
 
 }

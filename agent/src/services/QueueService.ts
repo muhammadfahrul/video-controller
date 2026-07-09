@@ -1,4 +1,5 @@
 import { RepeatMode } from "../queue/RepeatMode";
+import { QueueSnapshot } from "../types/QueueSnapshot";
 
 export class QueueService {
 
@@ -271,6 +272,34 @@ export class QueueService {
     public getRepeatMode() {
 
         return this.repeatMode;
+
+    }
+
+    public getCurrentIndex() {
+
+        return this.currentIndex;
+
+    }
+
+    public isShuffleEnabled() {
+
+        return false;
+
+    }
+
+    public getSnapshot(): QueueSnapshot {
+
+        return {
+
+            items: this.getAll(),
+
+            currentIndex: this.getCurrentIndex(),
+
+            repeat: this.getRepeatMode(),
+
+            shuffle: this.isShuffleEnabled()
+
+        };
 
     }
 }

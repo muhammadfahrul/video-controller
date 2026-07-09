@@ -232,6 +232,32 @@ export class SocketServer {
 
                 );
 
+                socket.on(
+
+                    SocketEvents.QUEUE_STATE,
+
+                    (snapshot) => {
+
+                        console.log(
+
+                            "[SERVER] Queue",
+
+                            snapshot
+
+                        );
+
+                        this.io.emit(
+
+                            SocketEvents.QUEUE_UPDATE,
+
+                            snapshot
+
+                        );
+
+                    }
+
+                );
+
 
             }
         );
