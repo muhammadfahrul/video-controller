@@ -4,6 +4,12 @@ import {
     YouTubePlayer
 } from "../player";
 
+import {
+
+    PlayerSnapshot
+
+} from "../types/PlayerSnapshot";
+
 
 export class PlayerService {
 
@@ -143,6 +149,14 @@ export class PlayerService {
     public async toggleFullscreen() {
 
         await this.player.toggleFullscreen();
+
+    }
+
+    public async getSnapshot()
+    : Promise<PlayerSnapshot> {
+
+        return await this.player
+            .getSnapshot();
 
     }
 

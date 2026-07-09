@@ -22,6 +22,10 @@ export enum SocketEvents {
 
 
     PLAYER_COMMAND =
-        "player:command"
+        "player:command",
+
+
+
+    PLAYER_STATE = "player:state"
 
 }

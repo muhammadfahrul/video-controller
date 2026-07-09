@@ -85,6 +85,16 @@ async function bootstrap(){
     await player.setVolume(50);
 
     await player.play();
+
+    setInterval(async () => {
+
+        console.log(
+
+            await player.getSnapshot()
+
+        );
+
+    }, 1000);
 }
 
 

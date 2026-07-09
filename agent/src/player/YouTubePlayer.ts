@@ -8,6 +8,7 @@ import { PlayerEventPayload } from "./PlayerEventPayload";
 import {
     PlayerEventListener
 } from "./PlayerEventListener";
+import { PlayerSnapshot } from "../types/PlayerSnapshot";
 
 
 export class YouTubePlayer {
@@ -297,6 +298,75 @@ export class YouTubePlayer {
 
         );
 
+
+    }
+
+    public async getSnapshot(): Promise<PlayerSnapshot> {
+
+        return await this.page.evaluate(() => {
+
+            const player =
+                document.querySelector(
+                    ".html5-video-player"
+                ) as any;
+
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
+
+            const playing =
+                !!video &&
+                !video.paused &&
+                !video.ended;
+
+            const currentTime =
+                video?.currentTime ?? 0;
+
+            const duration =
+                video?.duration ?? 0;
+
+            const muted =
+                video?.muted ?? false;
+
+            const volume =
+                Math.round(
+                    (video?.volume ?? 0) * 100
+                );
+
+            const fullscreen =
+                !!document.fullscreenElement;
+
+            const url =
+                window.location.href;
+
+            const match =
+                url.match(
+                    /[?&]v=([^&]+)/i
+                );
+
+            const videoId =
+                match?.[1];
+
+            return {
+
+                playing,
+
+                currentTime,
+
+                duration,
+
+                volume,
+
+                muted,
+
+                fullscreen,
+
+                videoId
+
+            };
+
+        });
 
     }
 }
