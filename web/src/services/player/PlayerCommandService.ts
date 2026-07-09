@@ -232,4 +232,32 @@ export class PlayerCommandService {
 
     }
 
+    mute(
+        agentId: string
+    ) {
+
+        this.emit({
+
+            agentId,
+
+            type: "MUTE"
+
+        });
+
+    }
+
+    unmute(
+        agentId: string
+    ) {
+
+        this.emit({
+
+            agentId,
+
+            type: "UNMUTE"
+
+        });
+
+    }
+
 }

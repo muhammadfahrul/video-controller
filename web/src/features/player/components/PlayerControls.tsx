@@ -126,6 +126,36 @@ export default function PlayerControls() {
 
     }
 
+    function handleMute() {
+
+        if (!agent.id) {
+
+            return;
+
+        }
+
+        if (player.muted) {
+
+            playerCommandService.unmute(
+
+                agent.id
+
+            );
+
+        }
+
+        else {
+
+            playerCommandService.mute(
+
+                agent.id
+
+            );
+
+        }
+
+    }
+
     return (
 
         <section
@@ -298,6 +328,8 @@ export default function PlayerControls() {
                             : "Mute"
 
                     }
+
+                    onClick={handleMute}
 
                 />
 
