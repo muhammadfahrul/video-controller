@@ -16,7 +16,9 @@ export function usePlayer() {
 
     const {
 
-        setPlayer
+        setPlayer,
+
+        setQueue
 
     } = useAppStore();
 
@@ -36,11 +38,21 @@ export function usePlayer() {
 
                 );
 
-                setPlayer(
+                if (payload.player) {                    
+                    setPlayer(
+    
+                        payload.player
+    
+                    );
+                }
 
-                    payload.player
+                if (payload.queue) {
+                    setQueue(
 
-                );
+                        payload.queue
+
+                    );
+                }
 
             }
 

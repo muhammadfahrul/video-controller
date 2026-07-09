@@ -383,13 +383,24 @@ export class Agent {
 
                     }
 
-                    const snapshot =
-                        await this.player.getSnapshot();
+                    const playerSnapshot =
+
+                        await this.player
+                            .getSnapshot();
+
+                    const queueSnapshot =
+
+                        this.queue
+                            .getSnapshot();
 
                     this.socketClient
-                        .sendPlayerState(
-                            snapshot
-                        );
+                        .sendPlayerState({
+
+                            player: playerSnapshot,
+
+                            queue: queueSnapshot
+
+                        });
 
                 }
 

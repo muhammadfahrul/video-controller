@@ -1,4 +1,5 @@
 import { PlayerState } from "./PlayerState";
+import { QueueSnapshot } from "./QueueSnapshot";
 
 export type AgentStatus =
 
@@ -25,5 +26,7 @@ export interface AgentInfo {
     connectedAt: number;
 
     player?: PlayerState;
+
+    queue?: QueueSnapshot;
 
 }

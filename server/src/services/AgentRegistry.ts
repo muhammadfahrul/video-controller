@@ -7,6 +7,10 @@ import {
     PlayerState
 } from "../types/PlayerState";
 
+import {
+    AgentSnapshot
+} from "../types/AgentSnapshot";
+
 
 export class AgentRegistry {
 
@@ -140,11 +144,11 @@ export class AgentRegistry {
     }
 
 
-    updatePlayerState(
+    updateSnapshot(
 
         id: string,
 
-        player: PlayerState
+        snapshot: AgentSnapshot
 
     ) {
 
@@ -158,7 +162,13 @@ export class AgentRegistry {
 
         }
 
-        agent.player = player;
+        agent.player =
+
+            snapshot.player;
+
+        agent.queue =
+
+            snapshot.queue;
 
     }
 

@@ -16,7 +16,11 @@ import { PlayerSnapshot } from "../types/PlayerSnapshot";
 import { SocketEvents } from "../socket/SocketEvents";
 import { QueueSnapshot } from "../types/QueueSnapshot";
 
+import {
 
+    AgentSnapshot
+
+} from "../types/AgentSnapshot";
 
 export class SocketClient {
 
@@ -130,14 +134,22 @@ export class SocketClient {
     }
 
     public sendPlayerState(
-        snapshot: PlayerSnapshot
+        state: AgentSnapshot
     ): void {
+
+        console.log(
+
+            "[Agent Snapshot]",
+
+            state
+
+        );
 
         this.socket.emit(
 
             SocketEvents.PLAYER_STATE,
 
-            snapshot
+            state
 
         );
 

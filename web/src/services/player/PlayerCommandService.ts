@@ -274,4 +274,44 @@ export class PlayerCommandService {
 
     }
 
+    removeQueue(
+
+        agentId: string,
+
+        id: string
+
+    ): void {
+
+        this.emit({
+
+            agentId,
+
+            type: "REMOVE_QUEUE",
+
+            id
+
+        });
+
+    }
+
+
+    playQueueItem(
+
+        agentId: string,
+
+        id: string
+
+    ): void {
+
+        this.emit({
+
+            agentId,
+
+            type: "PLAY_QUEUE_ITEM",
+
+            id
+
+        });
+
+    }
 }

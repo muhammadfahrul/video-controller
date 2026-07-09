@@ -205,27 +205,55 @@ export class SocketServer {
 
                 );
 
-
                 socket.on(
 
                     SocketEvents.PLAYER_STATE,
 
-                    (state) => {
+                    (payload) => {
+
+                        const registry =
+
+                            this.manager.getRegistry();
+
+                        const agent =
+
+                            registry
+                                .getAll()
+                                .find(
+                                    item =>
+                                        item.socketId === socket.id
+                                );
+
+                        if (!agent) {
+
+                            return;
+
+                        }
+
+                        registry.updateSnapshot(
+                            agent.id,
+                            payload
+                        );
 
                         console.log(
+                            "[SERVER] Agent Snapshot",
+                            JSON.stringify(
+                                registry.get(agent.id),
+                                null,
+                                2
+                            )
+                        );
 
-                            "[SERVER] PlayerState",
-
-                            state
-
+                        this.broadcastAgents(
+                            registry.getAll()
                         );
 
                         this.io.emit(
-
                             SocketEvents.PLAYER_UPDATE,
-
-                            state
-
+                            {
+                                agentId: agent.id,
+                                ...payload
+                            }
                         );
 
                     }
@@ -251,93 +279,6 @@ export class SocketServer {
                             SocketEvents.QUEUE_UPDATE,
 
                             snapshot
-
-                        );
-
-                    }
-
-                );
-
-                socket.on(
-
-                    SocketEvents.PLAYER_STATE,
-
-                    (payload) => {
-
-                        const registry =
-                            this.manager.getRegistry();
-
-                        registry.updatePlayerState(
-
-                            payload.agentId,
-
-                            payload.player
-
-                        );
-
-                        this.io.emit(
-
-                            SocketEvents.PLAYER_UPDATE,
-
-                            payload
-
-                        );
-
-                    }
-
-                );
-
-                socket.on(
-
-                    SocketEvents.PLAYER_STATE,
-
-                    (payload) => {
-
-                        const registry =
-                            this.manager.getRegistry();
-
-                        const agent =
-                            registry.getAll().find(
-
-                                item =>
-
-                                    item.socketId === socket.id
-
-                            );
-
-                        if (!agent) {
-
-                            return;
-
-                        }
-
-                        registry.updatePlayerState(
-
-                            agent.id,
-
-                            payload
-
-                        );
-
-                        console.log(
-
-                            "[SERVER] Player Update",
-
-                            payload
-
-                        );
-
-                        this.io.emit(
-
-                            SocketEvents.PLAYER_UPDATE,
-
-                            {
-
-                                agentId: agent.id,
-
-                                player: payload
-
-                            }
 
                         );
 

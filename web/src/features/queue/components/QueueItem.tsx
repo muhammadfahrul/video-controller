@@ -1,6 +1,8 @@
 import {
 
-    Trash2
+    Trash2,
+
+    Play
 
 } from "lucide-react";
 
@@ -17,43 +19,33 @@ interface Props {
 
     active: boolean;
 
+    onPlay(): void;
+
+    onRemove(): void;
+
 }
 
 export default function QueueItemCard({
 
     item,
 
-    active
+    active,
+
+    onPlay,
+
+    onRemove
 
 }: Props) {
 
     return (
 
         <Card
-            className={`
-                transition-all
-                ${
-                    active && (
-
-                        <span
-                            className="
-                                mb-2
-                                inline-block
-                                rounded-full
-                                bg-red-600
-                                px-2
-                                py-1
-                                text-xs
-                                font-semibold
-                                text-white
-                            "
-                        >
-                            NOW PLAYING
-                        </span>
-
-                    )
-                }
-            `}
+            className="
+                cursor-pointer
+                transition
+                hover:scale-[1.01]
+            "
+            onClick={onPlay}
         >
 
             <img
@@ -78,16 +70,57 @@ export default function QueueItemCard({
                 "
             >
 
-                <h3
+                <div
                     className="
-                        truncate
-                        font-semibold
+                        flex
+                        items-center
+                        gap-2
                     "
                 >
 
-                    {item.title}
+                    <h3
+                        className="
+                            flex-1
+                            truncate
+                            font-semibold
+                        "
+                    >
 
-                </h3>
+                        {item.title}
+
+                    </h3>
+
+                    {
+
+                        active && (
+
+                            <span
+                                className="
+                                    flex
+                                    items-center
+                                    gap-1
+                                    rounded-full
+                                    bg-red-500
+                                    px-2
+                                    py-1
+                                    text-[10px]
+                                    font-semibold
+                                    text-white
+                                    animate-pulse
+                                "
+                            >
+
+                                <Play size={10} />
+
+                                NOW
+
+                            </span>
+
+                        )
+
+                    }
+
+                </div>
 
                 <p
                     className="
@@ -114,6 +147,14 @@ export default function QueueItemCard({
             </div>
 
             <button
+                onClick={(e)=>{
+
+                    e.stopPropagation();
+
+                    onRemove();
+
+                }}
+
                 className="
                     self-start
                     rounded-lg

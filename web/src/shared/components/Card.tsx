@@ -1,4 +1,9 @@
-import type { ReactNode } from "react";
+import type {
+
+    ReactNode
+
+} from "react";
+
 
 interface Props {
 
@@ -6,19 +11,28 @@ interface Props {
 
     className?: string;
 
+    onClick?(): void;
+
 }
+
 
 export default function Card({
 
     children,
 
-    className = ""
+    className = "",
+
+    onClick
 
 }: Props) {
+
 
     return (
 
         <div
+
+            onClick={onClick}
+
             className={`
                 rounded-2xl
                 border
@@ -28,6 +42,7 @@ export default function Card({
                 shadow-sm
                 ${className}
             `}
+
         >
 
             {children}

@@ -8,9 +8,15 @@ import type {
 } from "../types/QueueItem";
 import { useAppStore } from "../../../store/appStore";
 
+import {
+    playerCommandService
+} from "../../../services";
+
 export default function QueuePanel() {
 
     const {
+
+        agent,
 
         queue
 
@@ -79,7 +85,7 @@ export default function QueuePanel() {
 
                     {
 
-                        queue.items.map((item, index) =>
+                        queue.items.map((item,index)=>
 
                             <QueueItemCard
 
@@ -88,10 +94,34 @@ export default function QueuePanel() {
                                 item={item}
 
                                 active={
-
                                     index === queue.currentIndex
-
                                 }
+
+                                onPlay={()=>{
+
+                                    playerCommandService
+                                        .playQueueItem(
+
+                                            agent.id,
+
+                                            item.id
+
+                                        );
+
+                                }}
+
+                                onRemove={()=>{
+
+                                    playerCommandService
+                                        .removeQueue(
+
+                                            agent.id,
+
+                                            item.id
+
+                                        );
+
+                                }}
 
                             />
 
