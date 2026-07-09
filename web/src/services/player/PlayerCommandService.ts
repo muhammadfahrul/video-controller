@@ -132,6 +132,20 @@ export class PlayerCommandService {
 
     }
 
+    exitFullscreen(
+        agentId: string
+    ) {
+
+        this.emit({
+
+            agentId,
+
+            type: "EXIT_FULLSCREEN"
+
+        });
+
+    }
+
     volume(
 
         agentId: string,

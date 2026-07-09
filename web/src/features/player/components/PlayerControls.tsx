@@ -156,6 +156,36 @@ export default function PlayerControls() {
 
     }
 
+    function handleFullscreen() {
+
+        if (!agent.id) {
+
+            return;
+
+        }
+
+        if (player.fullscreen) {
+
+            playerCommandService.exitFullscreen(
+
+                agent.id
+
+            );
+
+        }
+
+        else {
+
+            playerCommandService.fullscreen(
+
+                agent.id
+
+            );
+
+        }
+
+    }
+
     return (
 
         <section
@@ -354,6 +384,8 @@ export default function PlayerControls() {
                             : "Fullscreen"
 
                     }
+
+                    onClick={handleFullscreen}
 
                 />
 
