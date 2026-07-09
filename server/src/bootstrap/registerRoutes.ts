@@ -4,6 +4,8 @@ import { ServiceContainer } from "../container/ServiceContainer";
 
 import { createApiRouter } from "../routes/api";
 
+import searchRoutes from "../routes/SearchRoutes";
+
 export function registerRoutes(
     app: Express,
     container: ServiceContainer
@@ -24,5 +26,10 @@ export function registerRoutes(
 
         }
     );
+
+    app.use(
+        "/api/search",
+        searchRoutes
+    )
 
 }
