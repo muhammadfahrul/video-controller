@@ -274,44 +274,105 @@ export class PlayerCommandService {
 
     }
 
-    removeQueue(
+    playQueueItem(
 
-        agentId: string,
+        agentId:string,
 
-        id: string
+        queueId:string
 
-    ): void {
+    ){
 
         this.emit({
 
             agentId,
 
-            type: "REMOVE_QUEUE",
+            type:"PLAY_QUEUE_ITEM",
 
-            id
+            id:queueId
 
         });
 
     }
 
 
-    playQueueItem(
 
-        agentId: string,
+    removeQueue(
 
-        id: string
+        agentId:string,
 
-    ): void {
+        queueId:string
+
+    ){
 
         this.emit({
 
             agentId,
 
-            type: "PLAY_QUEUE_ITEM",
+            type:"REMOVE_QUEUE",
 
-            id
+            id:queueId
+
+        });
+
+    }
+
+
+
+    clearQueue(
+
+        agentId:string
+
+    ){
+
+        this.emit({
+
+            agentId,
+
+            type:"CLEAR_QUEUE"
+
+        });
+
+    }
+
+
+
+    shuffleQueue(
+
+        agentId:string
+
+    ){
+
+        this.emit({
+
+            agentId,
+
+            type:"SHUFFLE_QUEUE"
+
+        });
+
+    }
+
+
+
+    repeat(
+
+        agentId:string,
+
+        mode:string
+
+    ){
+
+        this.emit({
+
+            agentId,
+
+            type:"REPEAT_" + mode
 
         });
 
     }
 }
+
+export const playerCommandService =
+
+    new PlayerCommandService();

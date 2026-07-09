@@ -181,4 +181,34 @@ export class AgentRegistry {
             ?.player;
 
     }
+
+    public updatePlayerState(
+
+        id:string,
+
+        player:PlayerState
+
+    ){
+
+        const agent =
+            this.agents.get(id);
+
+
+        if(!agent){
+
+            console.log(
+                "Agent not found",
+                id
+            );
+
+            return;
+
+        }
+
+
+        agent.player =
+            player;
+
+
+    }
 }

@@ -47,7 +47,7 @@ async function bootstrap(){
 
         id:"2",
 
-        videoId:"M7lc1UVf-VE",
+        videoId:"yPYZpwSpKmA",
 
         title:
             "Video kedua",

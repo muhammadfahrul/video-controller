@@ -80,6 +80,12 @@ export class Agent {
 
     private queueStateTimer?: NodeJS.Timeout;
 
+    private identity:
+    {
+        id:string;
+        name:string;
+    };
+
 
 
     constructor() {
@@ -103,14 +109,14 @@ export class Agent {
                 commandService
             );
 
-        const identity =
+        this.identity =
             new AgentIdentityProvider()
                 .get();
 
         this.socketClient =
             new SocketClient(
                 "http://localhost:3000",
-                identity,
+                this.identity,
                 this.commandRouter
             );
 
@@ -403,6 +409,16 @@ export class Agent {
 
         }
 
+        if(
+            this.queueStateTimer
+        ){
+
+            clearInterval(
+                this.queueStateTimer
+            );
+
+        }
+
     }
 
 
@@ -436,9 +452,16 @@ export class Agent {
                     this.socketClient
                         .sendPlayerState({
 
-                            player: playerSnapshot,
+                            agentId:
+                                this.identity.id,
 
-                            queue: queueSnapshot
+
+                            player:
+                                playerSnapshot,
+
+
+                            queue:
+                                queueSnapshot
 
                         });
 

@@ -12,6 +12,9 @@ import {
     playerCommandService
 } from "../../../services";
 
+import QueueToolbar
+from "./QueueToolbar";
+
 export default function QueuePanel() {
 
     const {
@@ -66,6 +69,8 @@ export default function QueuePanel() {
                 </span>
 
             </div>
+
+            <QueueToolbar/>
 
             {
 

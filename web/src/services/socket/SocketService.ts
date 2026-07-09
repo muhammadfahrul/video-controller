@@ -123,3 +123,6 @@ export class SocketService {
     }
 
 }
+
+export const socketService =
+    new SocketService();

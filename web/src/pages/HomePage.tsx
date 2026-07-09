@@ -57,6 +57,7 @@ import {
 } from "../hooks/usePlayer";
 import PlayerStatus from "../features/player/components/PlayerStatus";
 import { useQueue } from "../hooks/useQueue";
+import ProgressBar from "../features/player/components/ProgressBar"
 
 export default function HomePage(){
 
@@ -272,6 +273,8 @@ export default function HomePage(){
             <QueuePanel />
 
             <PlayerControls />
+
+            <ProgressBar />
 
             <PlayerProgress />
 

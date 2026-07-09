@@ -1,17 +1,29 @@
-import type {
+export interface QueueItem {
 
-    QueueItem
+    id:string;
 
-} from "../../features/queue/types/QueueItem";
+    videoId:string;
+
+    title:string;
+
+    thumbnail:string;
+
+    channel:string;
+
+    duration:string;
+
+}
+
+
 
 export interface QueueState {
 
-    items: QueueItem[];
+    items:QueueItem[];
 
-    currentIndex: number;
+    currentIndex:number;
 
-    repeat: string;
+    repeat:string;
 
-    shuffle: boolean;
+    shuffle:boolean;
 
 }

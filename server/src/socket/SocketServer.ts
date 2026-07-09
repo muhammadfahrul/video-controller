@@ -209,52 +209,50 @@ export class SocketServer {
 
                     SocketEvents.PLAYER_STATE,
 
-                    (payload) => {
+                    (payload)=>{
 
-                        const registry =
-
-                            this.manager.getRegistry();
-
-                        const agent =
-
-                            registry
-                                .getAll()
-                                .find(
-                                    item =>
-                                        item.socketId === socket.id
-                                );
-
-                        if (!agent) {
-
-                            return;
-
-                        }
-
-                        registry.updateSnapshot(
-                            agent.id,
-                            payload
-                        );
 
                         console.log(
-                            "[SERVER] Agent Snapshot",
+
+                            "[SERVER] Player State",
+
+                            payload
+
+                        );
+
+
+                        const registry =
+                            this.manager
+                                .getRegistry();
+
+                        console.log(
                             JSON.stringify(
-                                registry.get(agent.id),
+                                registry.getAll(),
                                 null,
                                 2
                             )
                         );
 
-                        this.broadcastAgents(
-                            registry.getAll()
+
+
+                        registry.updatePlayerState(
+
+                            payload.agentId,
+
+                            payload.player
+
                         );
 
+
+
                         this.io.emit(
+
                             SocketEvents.PLAYER_UPDATE,
-                            {
-                                agentId: agent.id,
-                                ...payload
-                            }
+
+                            payload
+
                         );
+
 
                     }
 
