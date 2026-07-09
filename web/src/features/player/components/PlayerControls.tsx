@@ -82,6 +82,20 @@ export default function PlayerControls() {
 
     }
 
+    let volumeText = "";
+
+    if (player.muted) {
+
+        volumeText = "Muted";
+
+    }
+
+    else {
+
+        volumeText = `Volume ${player.volume}%`;
+
+    }
+
     function handlePlayPause() {
 
         if (!agent.id) {
@@ -152,6 +166,42 @@ export default function PlayerControls() {
                 <span>
 
                     {statusText}
+
+                </span>
+
+            </div>
+
+            <div
+                className="
+                    flex
+                    items-center
+                    gap-2
+                    text-sm
+                    text-gray-600
+                "
+            >
+
+                <span>
+
+                    {
+
+                        player.muted
+
+                            ?
+
+                            "🔇"
+
+                            :
+
+                            "🔊"
+
+                    }
+
+                </span>
+
+                <span>
+
+                    {volumeText}
 
                 </span>
 
