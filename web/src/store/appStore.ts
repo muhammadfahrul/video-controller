@@ -90,9 +90,15 @@ create<AppStore>((set)=>({
 
     },
 
-    queue:{
+    queue: {
 
-        items:[]
+        items: [],
+
+        currentIndex: -1,
+
+        repeat: "OFF",
+
+        shuffle: false
 
     },
 

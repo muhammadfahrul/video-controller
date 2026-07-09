@@ -56,10 +56,12 @@ import {
 
 } from "../hooks/usePlayer";
 import PlayerStatus from "../features/player/components/PlayerStatus";
+import { useQueue } from "../hooks/useQueue";
 
 export default function HomePage(){
 
     useAgent();
+    useQueue();
     usePlayer();
 
     const [
@@ -267,11 +269,7 @@ export default function HomePage(){
 
             />
 
-            <QueuePanel
-
-                items={queue}
-
-            />
+            <QueuePanel />
 
             <PlayerControls />
 

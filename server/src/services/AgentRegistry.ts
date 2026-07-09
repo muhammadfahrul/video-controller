@@ -3,6 +3,11 @@ import {
 } from "../types/Agent";
 
 
+import {
+    PlayerState
+} from "../types/PlayerState";
+
+
 export class AgentRegistry {
 
 
@@ -135,4 +140,35 @@ export class AgentRegistry {
     }
 
 
+    updatePlayerState(
+
+        id: string,
+
+        player: PlayerState
+
+    ) {
+
+        const agent =
+
+            this.agents.get(id);
+
+        if (!agent) {
+
+            return;
+
+        }
+
+        agent.player = player;
+
+    }
+
+    public getPlayerState(
+        id: string
+    ) {
+
+        return this.agents
+            .get(id)
+            ?.player;
+
+    }
 }

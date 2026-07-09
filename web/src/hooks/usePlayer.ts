@@ -1,8 +1,4 @@
-import {
-
-    useEffect
-
-} from "react";
+import { useEffect } from "react";
 
 import {
 
@@ -16,12 +12,6 @@ import {
 
 } from "../store/appStore";
 
-import type {
-
-    PlayerSnapshot
-
-} from "../types/player/PlayerSnapshot";
-
 export function usePlayer() {
 
     const {
@@ -32,21 +22,25 @@ export function usePlayer() {
 
     useEffect(() => {
 
-        socketService.on<PlayerSnapshot>(
+        socketService.on(
 
             "player:update",
 
-            (snapshot) => {
+            (payload: any) => {
 
                 console.log(
 
                     "[PWA] player:update",
 
-                    snapshot
+                    payload
 
                 );
 
-                setPlayer(snapshot);
+                setPlayer(
+
+                    payload.player
+
+                );
 
             }
 

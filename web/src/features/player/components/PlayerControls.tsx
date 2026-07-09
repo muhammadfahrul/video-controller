@@ -52,9 +52,41 @@ export default function PlayerControls() {
 
     const {
 
-        player
+        player,
+
+        agent
 
     } = useAppStore();
+
+    function handlePlayPause() {
+
+        if (!agent.id) {
+
+            return;
+
+        }
+
+        if (player.playing) {
+
+            playerCommandService.pause(
+
+                agent.id
+
+            );
+
+        }
+
+        else {
+
+            playerCommandService.play(
+
+                agent.id
+
+            );
+
+        }
+
+    }
 
     return (
 
@@ -91,37 +123,41 @@ export default function PlayerControls() {
 
                 />
 
-                {
+                <ControlButton
 
-                    player.playing ? (
+                    icon={
 
-                        <ControlButton
+                        player.playing
 
-                            icon={<Pause size={22}/>}
+                            ?
 
-                            label="Pause"
+                            <Pause size={22}/>
 
-                            onClick={pause}
+                            :
 
-                        />
+                            <Play size={22}/>
 
-                    ) : (
+                    }
 
-                        <ControlButton
+                    label={
 
-                            icon={<Play size={22}/>}
+                        player.playing
 
-                            label="Play"
+                            ?
 
-                            variant="primary"
+                            "Pause"
 
-                            onClick={play}
+                            :
 
-                        />
+                            "Play"
 
-                    )
+                    }
 
-                }
+                    variant="primary"
+
+                    onClick={handlePlayPause}
+
+                />
 
                 <ControlButton
 

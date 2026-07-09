@@ -6,18 +6,15 @@ import type {
     QueueItem
 
 } from "../types/QueueItem";
+import { useAppStore } from "../../../store/appStore";
 
-interface Props {
+export default function QueuePanel() {
 
-    items: QueueItem[];
+    const {
 
-}
+        queue
 
-export default function QueuePanel({
-
-    items
-
-}: Props) {
+    } = useAppStore();
 
     return (
 
@@ -58,7 +55,7 @@ export default function QueuePanel({
                     "
                 >
 
-                    {items.length}
+                    {queue.items.length}
 
                 </span>
 
@@ -66,7 +63,7 @@ export default function QueuePanel({
 
             {
 
-                items.length === 0
+                queue.items.length === 0
 
                 ?
 
@@ -82,13 +79,19 @@ export default function QueuePanel({
 
                     {
 
-                        items.map(item=>
+                        queue.items.map((item, index) =>
 
                             <QueueItemCard
 
                                 key={item.id}
 
                                 item={item}
+
+                                active={
+
+                                    index === queue.currentIndex
+
+                                }
 
                             />
 

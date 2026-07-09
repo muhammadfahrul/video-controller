@@ -1,3 +1,5 @@
+import { PlayerState } from "./PlayerState";
+
 export type AgentStatus =
 
     | "ONLINE"
@@ -8,28 +10,20 @@ export type AgentStatus =
 
     | "PAUSED";
 
-
-
-
 export interface AgentInfo {
 
+    id: string;
 
-    id:string;
+    socketId: string;
 
+    name: string;
 
-    socketId:string;
+    status: AgentStatus;
 
+    lastHeartbeat: number;
 
-    name:string;
+    connectedAt: number;
 
-
-    status:AgentStatus;
-
-
-    lastHeartbeat:number;
-
-
-    connectedAt:number;
-
+    player?: PlayerState;
 
 }

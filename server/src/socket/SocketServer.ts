@@ -258,6 +258,93 @@ export class SocketServer {
 
                 );
 
+                socket.on(
+
+                    SocketEvents.PLAYER_STATE,
+
+                    (payload) => {
+
+                        const registry =
+                            this.manager.getRegistry();
+
+                        registry.updatePlayerState(
+
+                            payload.agentId,
+
+                            payload.player
+
+                        );
+
+                        this.io.emit(
+
+                            SocketEvents.PLAYER_UPDATE,
+
+                            payload
+
+                        );
+
+                    }
+
+                );
+
+                socket.on(
+
+                    SocketEvents.PLAYER_STATE,
+
+                    (payload) => {
+
+                        const registry =
+                            this.manager.getRegistry();
+
+                        const agent =
+                            registry.getAll().find(
+
+                                item =>
+
+                                    item.socketId === socket.id
+
+                            );
+
+                        if (!agent) {
+
+                            return;
+
+                        }
+
+                        registry.updatePlayerState(
+
+                            agent.id,
+
+                            payload
+
+                        );
+
+                        console.log(
+
+                            "[SERVER] Player Update",
+
+                            payload
+
+                        );
+
+                        this.io.emit(
+
+                            SocketEvents.PLAYER_UPDATE,
+
+                            {
+
+                                agentId: agent.id,
+
+                                player: payload
+
+                            }
+
+                        );
+
+                    }
+
+                );
+
 
             }
         );
