@@ -58,6 +58,30 @@ export default function PlayerControls() {
 
     } = useAppStore();
 
+    let statusText = "Offline";
+
+    let statusColor = "bg-gray-400";
+
+    if (agent.online) {
+
+        if (player.playing) {
+
+            statusText = "Playing";
+
+            statusColor = "bg-green-500";
+
+        }
+
+        else {
+
+            statusText = "Paused";
+
+            statusColor = "bg-yellow-500";
+
+        }
+
+    }
+
     function handlePlayPause() {
 
         if (!agent.id) {
@@ -106,6 +130,32 @@ export default function PlayerControls() {
                 Player Controls
 
             </h2>
+
+            <div
+                className="
+                    flex
+                    items-center
+                    gap-2
+                    text-sm
+                "
+            >
+
+                <span
+                    className={`
+                        h-3
+                        w-3
+                        rounded-full
+                        ${statusColor}
+                    `}
+                />
+
+                <span>
+
+                    {statusText}
+
+                </span>
+
+            </div>
 
             <div
                 className="
