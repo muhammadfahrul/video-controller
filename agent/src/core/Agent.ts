@@ -128,6 +128,46 @@ export class Agent {
                 this.browser.getPage()
             );
 
+        this.player.setOnEnded(()=>{
+
+
+            console.log(
+                "[AGENT] Video ended"
+            );
+
+
+            const next =
+                this.queue.next();
+
+
+            if(!next){
+
+                console.log(
+                    "[QUEUE] No next item"
+                );
+
+                return;
+
+            }
+
+
+            console.log(
+
+                "[QUEUE] Playing next",
+
+                next.title
+
+            );
+
+
+            this.player!
+                .openVideo(
+                    next.videoId
+                );
+
+
+        });
+
         this.registerCommands();
 
         this.socketClient!.connect();

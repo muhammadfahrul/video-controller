@@ -17,6 +17,8 @@ export class PlayerService {
     private player:
         YouTubePlayer;
 
+    private onEnded?: () => void;
+
 
 
     constructor(
@@ -160,4 +162,16 @@ export class PlayerService {
 
     }
 
+    public setOnEnded(
+        callback:()=>void
+    ){
+
+        this.onEnded =
+            callback;
+
+        this.player.setOnEnded(
+            callback
+        );
+
+    }
 }

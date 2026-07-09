@@ -18,6 +18,10 @@ export class YouTubePlayer {
 
     private state: PlayerState = PlayerState.IDLE;
 
+    private onEnded?:()=>void;
+
+    private endedListenerAttached = false;
+
 
     constructor(
         private readonly page: Page
@@ -50,6 +54,7 @@ export class YouTubePlayer {
             }
         );
 
+        await this.setupEndedListener();
 
         await this.dom.waitUntilReady();
 
@@ -365,6 +370,108 @@ export class YouTubePlayer {
                 videoId
 
             };
+
+        });
+
+    }
+
+    public setOnEnded(
+        callback:()=>void
+    ){
+
+        this.onEnded =
+            callback;
+
+
+    }
+
+    private async setupEndedListener(){
+
+        if(this.endedListenerAttached){
+
+            return;
+
+        }
+
+
+        this.endedListenerAttached = true;
+
+
+        await this.page.exposeFunction(
+
+            "youtubeEnded",
+
+            ()=>{
+
+                console.log(
+                    "[YOUTUBE] ended"
+                );
+
+                this.onEnded?.();
+
+            }
+
+        );
+
+
+        await this.page.evaluate(()=>{
+
+
+            const interval =
+                setInterval(()=>{
+
+
+                    const video =
+                        document.querySelector(
+                            "video"
+                        );
+
+
+                    if(!video){
+
+                        return;
+
+                    }
+
+
+                    if(
+                        (video as any)
+                            .dataset
+                            .endedAttached
+                    ){
+
+                        return;
+
+                    }
+
+
+                    (video as any)
+                        .dataset
+                        .endedAttached =
+                        "true";
+
+
+                    video.addEventListener(
+
+                        "ended",
+
+                        ()=>{
+
+                            // @ts-ignore
+                            window.youtubeEnded();
+
+                        }
+
+                    );
+
+
+                    console.log(
+                        "[YOUTUBE] ended listener attached"
+                    );
+
+
+                },1000);
+
 
         });
 

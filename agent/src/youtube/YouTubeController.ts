@@ -20,6 +20,8 @@ export class YouTubeController extends EventEmitter {
             }
         );
 
+        await this.setupEndedListener();
+
         await this.page.waitForSelector("video");
 
         this.emit(PlayerEvent.READY);
