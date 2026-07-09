@@ -72,15 +72,21 @@ create<AppStore>((set)=>({
 
     },
 
-    player:{
+    player: {
 
-        playing:false,
+        playing: false,
 
-        volume:50,
+        volume: 50,
 
-        muted:false,
+        muted: false,
 
-        fullscreen:false
+        fullscreen: false,
+
+        currentTime: 0,
+
+        duration: 0,
+
+        videoId: undefined
 
     },
 

@@ -12,7 +12,11 @@ import {
 
     VolumeX,
 
-    Maximize2
+    Volume2,
+
+    Maximize2,
+
+    Minimize2
 
 } from "lucide-react";
 
@@ -45,6 +49,12 @@ export default function PlayerControls() {
         pause
 
     } = usePlayerControls();
+
+    const {
+
+        player
+
+    } = useAppStore();
 
     return (
 
@@ -81,27 +91,37 @@ export default function PlayerControls() {
 
                 />
 
-                <ControlButton
+                {
 
-                    icon={<Play size={22}/>}
+                    player.playing ? (
 
-                    label="Play"
+                        <ControlButton
 
-                    variant="primary"
+                            icon={<Pause size={22}/>}
 
-                    onClick={play}
+                            label="Pause"
 
-                />
+                            onClick={pause}
 
-                <ControlButton
+                        />
 
-                    icon={<Pause size={22}/>}
+                    ) : (
 
-                    label="Pause"
+                        <ControlButton
 
-                    onClick={pause}
+                            icon={<Play size={22}/>}
 
-                />
+                            label="Play"
+
+                            variant="primary"
+
+                            onClick={play}
+
+                        />
+
+                    )
+
+                }
 
                 <ControlButton
 
@@ -123,17 +143,49 @@ export default function PlayerControls() {
 
                 <ControlButton
 
-                    icon={<VolumeX size={22}/>}
+                    icon={
 
-                    label="Mute"
+                        player.muted
+
+                            ? <VolumeX size={22}/>
+
+                            : <Volume2 size={22}/>
+
+                    }
+
+                    label={
+
+                        player.muted
+
+                            ? "Unmute"
+
+                            : "Mute"
+
+                    }
 
                 />
 
                 <ControlButton
 
-                    icon={<Maximize2 size={22}/>}
+                    icon={
 
-                    label="Fullscreen"
+                        player.fullscreen
+
+                            ? <Minimize2 size={22}/>
+
+                            : <Maximize2 size={22}/>
+
+                    }
+
+                    label={
+
+                        player.fullscreen
+
+                            ? "Exit"
+
+                            : "Fullscreen"
+
+                    }
 
                 />
 

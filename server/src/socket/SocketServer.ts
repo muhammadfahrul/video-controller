@@ -10,7 +10,7 @@ import {
 
 import {
     SocketEvents
-} from "./events";
+} from "./SocketEvents";
 
 
 import {
@@ -200,6 +200,33 @@ export class SocketServer {
                             console.error(err);
 
                         }
+
+                    }
+
+                );
+
+
+                socket.on(
+
+                    SocketEvents.PLAYER_STATE,
+
+                    (state) => {
+
+                        console.log(
+
+                            "[SERVER] PlayerState",
+
+                            state
+
+                        );
+
+                        this.io.emit(
+
+                            SocketEvents.PLAYER_UPDATE,
+
+                            state
+
+                        );
 
                     }
 

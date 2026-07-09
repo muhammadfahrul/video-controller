@@ -47,9 +47,17 @@ import {
 
 } from "../services";
 
+import {
+
+    usePlayer
+
+} from "../hooks/usePlayer";
+import PlayerStatus from "../features/player/components/PlayerStatus";
+
 export default function HomePage(){
 
     useAgent();
+    usePlayer();
 
     const [
 
@@ -103,11 +111,15 @@ export default function HomePage(){
 
         setAgent,
 
-        loadAgent
+        loadAgent,
+        
+        player
 
     } = useAppStore();
 
     console.log(agent);
+
+    console.log(player);
 
     useEffect(() => {
 
@@ -259,6 +271,8 @@ export default function HomePage(){
             />
 
             <PlayerControls />
+
+            <PlayerStatus />
 
         </div>
 

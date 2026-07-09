@@ -1,16 +1,16 @@
-export interface PlayerState {
+export interface PlayerSnapshot {
 
     playing: boolean;
+
+    currentTime: number;
+
+    duration: number;
 
     volume: number;
 
     muted: boolean;
 
     fullscreen: boolean;
-
-    currentTime: number;
-
-    duration: number;
 
     videoId?: string;
 

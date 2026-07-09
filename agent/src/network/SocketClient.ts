@@ -12,6 +12,8 @@ import {
 import {
     CommandRouter
 } from "./CommandRouter";
+import { PlayerSnapshot } from "../types/PlayerSnapshot";
+import { SocketEvents } from "../socket/SocketEvents";
 
 
 
@@ -123,6 +125,20 @@ export class SocketClient {
             }
         );
 
+
+    }
+
+    public sendPlayerState(
+        snapshot: PlayerSnapshot
+    ): void {
+
+        this.socket.emit(
+
+            SocketEvents.PLAYER_STATE,
+
+            snapshot
+
+        );
 
     }
 

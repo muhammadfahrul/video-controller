@@ -76,6 +76,8 @@ export class Agent {
     private commandDispatcher:
         CommandDispatcher;
 
+    private playerStateTimer?: NodeJS.Timeout;
+
 
 
     constructor() {
@@ -134,6 +136,8 @@ export class Agent {
             );
 
         this.heartbeat.start();
+
+        this.startPlayerStateSync();
 
     }
 
@@ -340,6 +344,62 @@ export class Agent {
         this.heartbeat?.stop();
 
         await this.browser.stop();
+
+        if (
+
+            this.playerStateTimer
+
+        ) {
+
+            clearInterval(
+
+                this.playerStateTimer
+
+            );
+
+        }
+
+    }
+
+
+    private startPlayerStateSync() {
+
+        this.playerStateTimer = setInterval(
+
+            async () => {
+
+                try {
+
+                    if (
+                        !this.player ||
+                        !this.socketClient
+                    ) {
+
+                        return;
+
+                    }
+
+                    const snapshot =
+                        await this.player.getSnapshot();
+
+                    this.socketClient
+                        .sendPlayerState(
+                            snapshot
+                        );
+
+                }
+
+                catch (err) {
+
+                    console.error(err);
+
+                }
+
+            },
+
+            1000
+
+        );
 
     }
 
