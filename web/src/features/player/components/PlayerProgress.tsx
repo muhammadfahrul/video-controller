@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "../../../store/appStore";
+import {
+
+    playerCommandService
+
+} from "../../../services";
 
 export default function PlayerProgress() {
 
     const {
 
-        player
+        player,
+
+        agent
 
     } = useAppStore();
 
@@ -33,11 +40,13 @@ export default function PlayerProgress() {
 
     ]);
 
-    const handleSeek = () => {
+    const handleSeek = async () => {
 
         if (
 
-            player.duration <= 0
+            player.duration <= 0 ||
+
+            !agent.id
 
         ) {
 
@@ -53,13 +62,20 @@ export default function PlayerProgress() {
 
             100;
 
-        console.log(
+        try {
 
-            "Seek",
+            await playerCommandService.seek(
+                agent.id,
+                seconds
+            );
 
-            seconds
+        }
 
-        );
+        catch (err) {
+
+            console.error(err);
+
+        }
 
     };
 
