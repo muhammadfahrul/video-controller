@@ -13,6 +13,13 @@ import {
 
 } from "../../../services/player";
 
+import {
+
+    Play,
+    Plus
+
+} from "lucide-react";
+
 interface Props{
 
     result:
@@ -36,21 +43,55 @@ export default function SearchResultCard({
 
         if (!agent.id) {
 
-            console.warn(
-                "No agent selected."
-            );
-
             return;
 
         }
-
-        console.log("Result", result)
 
         playerCommandService.openVideo(
 
             agent.id,
 
             result.videoId
+
+        );
+
+    };
+
+    const addQueue = () => {
+
+        if (!agent.id) {
+
+            return;
+
+        }
+
+        playerCommandService.addQueue(
+
+            agent.id,
+
+            {
+
+                videoId:
+
+                    result.videoId,
+
+                title:
+
+                    result.title,
+
+                channel:
+
+                    result.channel,
+
+                thumbnail:
+
+                    result.thumbnail,
+
+                duration:
+
+                    result.duration
+
+            }
 
         );
 
@@ -117,7 +158,9 @@ export default function SearchResultCard({
 
                 <div
                     className="
-                        mt-3
+                        mt-4
+                        flex
+                        gap-2
                     "
                 >
 
@@ -126,12 +169,14 @@ export default function SearchResultCard({
                         onClick={play}
 
                         className="
+                            flex
+                            items-center
+                            gap-2
                             rounded-lg
                             bg-red-600
-                            px-4
+                            px-3
                             py-2
                             text-sm
-                            font-semibold
                             text-white
                             transition
                             hover:bg-red-700
@@ -139,7 +184,33 @@ export default function SearchResultCard({
 
                     >
 
-                        ▶ Play
+                        <Play size={16} />
+
+                        Play
+
+                    </button>
+
+                    <button
+
+                        onClick={addQueue}
+                        
+                        className="
+                            flex
+                            items-center
+                            gap-2
+                            rounded-lg
+                            border
+                            px-3
+                            py-2
+                            text-sm
+                            transition
+                            hover:bg-gray-100
+                        "
+                    >
+
+                        <Plus size={16} />
+
+                        Queue
 
                     </button>
 

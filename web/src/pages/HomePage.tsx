@@ -92,6 +92,22 @@ export default function HomePage(){
 
     ] = useState<SearchResult[]>([]);
 
+    const [
+
+        loading,
+
+        setLoading
+
+    ] = useState(false);
+
+    const [
+
+        error,
+
+        setError
+
+    ] = useState("");
+
     const queue = [
 
         {
@@ -158,6 +174,10 @@ export default function HomePage(){
 
         try {
 
+            setLoading(true);
+
+            setError("");
+
             const response =
 
                 await searchService.search(
@@ -166,27 +186,23 @@ export default function HomePage(){
 
                 );
 
-            console.log(
+            setResults(response);
 
-                response
+        }
 
-            );
+        catch {
 
-            setResults(
+            setError(
 
-                response
+                "Search failed"
 
             );
 
         }
 
-        catch (err) {
+        finally {
 
-            console.error(
-
-                err
-
-            );
+            setLoading(false);
 
         }
 
@@ -317,6 +333,74 @@ export default function HomePage(){
                 onSearch={search}
 
             />
+
+            {
+
+                loading && (
+
+                    <div
+                        className="
+                            rounded-xl
+                            bg-gray-100
+                            p-4
+                            text-center
+                        "
+                    >
+
+                        Searching...
+
+                    </div>
+
+                )
+
+            }
+
+            {
+
+                !loading &&
+
+                results.length === 0 &&
+
+                keyword && (
+
+                    <div
+                        className="
+                            rounded-xl
+                            border
+                            p-6
+                            text-center
+                            text-gray-500
+                        "
+                    >
+
+                        No videos found
+
+                    </div>
+
+                )
+
+            }
+
+            {
+
+                error && (
+
+                    <div
+                        className="
+                            rounded-xl
+                            bg-red-100
+                            p-4
+                            text-red-600
+                        "
+                    >
+
+                        {error}
+
+                    </div>
+
+                )
+
+            }
 
             {
 

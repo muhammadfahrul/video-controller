@@ -235,11 +235,11 @@ export class SocketServer {
 
 
 
-                        registry.updatePlayerState(
+                        registry.updateSnapshot(
 
                             payload.agentId,
 
-                            payload.player
+                            payload
 
                         );
 

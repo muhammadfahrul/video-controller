@@ -65,7 +65,7 @@ export default function PlayerStatus() {
 
                 {
 
-                    player.duration.toFixed(1)
+                    (player.duration ?? 0).toFixed(1)
 
                 }
 

@@ -142,7 +142,7 @@ export default function PlayerProgress() {
 
                 <span>
 
-                    {player.duration.toFixed(1)} s
+                    {(player.duration ?? 0).toFixed(1)} s
 
                 </span>
 

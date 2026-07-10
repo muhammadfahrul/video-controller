@@ -469,6 +469,15 @@ export class Agent {
 
                 catch (err) {
 
+                    if (
+                        err instanceof Error &&
+                        err.message.includes("Execution context was destroyed")
+                    ) {
+
+                        // Halaman sedang berpindah, lewati siklus ini.
+                        return;
+                    }
+
                     console.error(err);
 
                 }

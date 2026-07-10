@@ -39,11 +39,23 @@ export function usePlayer() {
                 );
 
                 if (payload.player) {                    
-                    setPlayer(
-    
-                        payload.player
-    
-                    );
+                    setPlayer({
+
+                        playing: payload.player?.playing ?? false,
+
+                        duration: payload.player?.duration ?? 0,
+
+                        currentTime: payload.player?.currentTime ?? 0,
+
+                        volume: payload.player?.volume ?? 50,
+
+                        muted: payload.player?.muted ?? false,
+
+                        fullscreen: payload.player?.fullscreen ?? false,
+
+                        videoId: payload.player?.videoId
+
+                    });
                 }
 
                 if (payload.queue) {

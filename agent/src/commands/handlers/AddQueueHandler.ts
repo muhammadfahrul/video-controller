@@ -26,11 +26,11 @@ implements CommandHandler {
     ) {
 
         if (
-            !command.videoId
+            !command.item
         ) {
 
             throw new Error(
-                "videoId is required"
+                "item is required"
             );
 
         }
@@ -40,11 +40,19 @@ implements CommandHandler {
             id: randomUUID(),
 
             videoId:
-                command.videoId,
+                command.item.videoId,
 
             title:
-                command.title ??
-                "Unknown",
+                command.item.title,
+
+            channel:
+                command.item.channel,
+
+            thumbnail:
+                command.item.thumbnail,
+
+            duration:
+                command.item.duration,
 
             addedAt:
                 Date.now()

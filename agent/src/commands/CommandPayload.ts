@@ -1,9 +1,11 @@
 import { CommandType } from "./CommandType";
-
+import { QueueItemPayload } from "./QueueItemPayload";
 
 export interface CommandPayload {
 
     type: CommandType;
+
+    agentId?: string;
 
     videoId?: string;
 
@@ -11,6 +13,10 @@ export interface CommandPayload {
 
     seek?: number;
 
-    title?: string;
+    id?: string;
+
+    repeatMode?: string;
+
+    item?: QueueItemPayload;
 
 }

@@ -10,6 +10,12 @@ import type {
 
 } from "./PlayerCommand";
 
+import type {
+
+    QueueItem
+
+} from "../../features/queue/types/QueueItem";
+
 export class PlayerCommandService {
 
     private emit(
@@ -210,7 +216,7 @@ export class PlayerCommandService {
 
         agentId: string,
 
-        videoId: string
+        item: QueueItem
 
     ): void {
 
@@ -220,7 +226,7 @@ export class PlayerCommandService {
 
             type: "ADD_QUEUE",
 
-            videoId
+            item
 
         });
 

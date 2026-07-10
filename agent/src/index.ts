@@ -43,29 +43,13 @@ async function bootstrap(){
 
 
 
-    queue.add({
-
-        id:"2",
-
-        videoId:"yPYZpwSpKmA",
-
-        title:
-            "Video kedua",
-
-        addedAt:
-            Date.now()
-
-    });
-
-
-
     const player =
         agent.getPlayer();
 
 
 
     const first =
-        queue.next();
+        queue.current();
 
 
 
@@ -85,16 +69,6 @@ async function bootstrap(){
     await player.setVolume(50);
 
     await player.play();
-
-    setInterval(async () => {
-
-        console.log(
-
-            await player.getSnapshot()
-
-        );
-
-    }, 1000);
 }
 
 

@@ -1,4 +1,4 @@
-export interface QueueItem {
+export interface QueueItemPayload {
 
     videoId: string;
 
