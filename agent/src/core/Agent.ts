@@ -187,6 +187,14 @@ export class Agent {
 
         this.registerCommands();
 
+        await this.queue.load();
+
+        console.log(
+            "[QUEUE] Restored",
+            this.queue.size(),
+            "items"
+        );
+
         this.socketClient!.connect();
 
         this.heartbeat =

@@ -29,22 +29,6 @@ async function bootstrap(){
 
 
 
-    queue.add({
-
-        id:"1",
-
-        videoId:"dQw4w9WgXcQ",
-
-        title:
-            "Video pertama",
-
-        addedAt:
-            Date.now()
-
-    });
-
-
-
     const player =
         agent.getPlayer();
 

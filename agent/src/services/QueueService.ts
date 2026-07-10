@@ -1,5 +1,6 @@
 import { RepeatMode } from "../queue/RepeatMode";
 import { QueueRepository } from "../repositories/QueueRepository";
+import { QueuePersistence } from "../types/QueuePersistence";
 import { QueueSnapshot } from "../types/QueueSnapshot";
 
 export class QueueService {
@@ -339,6 +340,39 @@ export class QueueService {
             shuffle: this.isShuffleEnabled()
 
         });
+
+    }
+
+    public restore(
+        snapshot: QueuePersistence
+    ) {
+
+        this.items = [...snapshot.items];
+
+        this.currentIndex =
+            snapshot.currentIndex;
+
+        this.repeatMode =
+            snapshot.repeat;
+
+    }
+
+    public async load() {
+
+        const snapshot =
+            await this.repository.load();
+
+        this.restore(snapshot);
+
+        console.log(
+
+            "[QUEUE] Loaded",
+
+            snapshot.items.length,
+
+            "items"
+
+        );
 
     }
 }
