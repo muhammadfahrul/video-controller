@@ -186,7 +186,7 @@ export class PlayerCommandService {
 
     }
 
-    playVideo(
+    openVideo(
 
         agentId: string,
 
@@ -198,7 +198,7 @@ export class PlayerCommandService {
 
             agentId,
 
-            type: "PLAY_VIDEO",
+            type: "OPEN_VIDEO",
 
             videoId
 
@@ -221,26 +221,6 @@ export class PlayerCommandService {
             type: "ADD_QUEUE",
 
             videoId
-
-        });
-
-    }
-
-    repeat(
-
-        agentId: string,
-
-        repeatMode: string
-
-    ): void {
-
-        this.emit({
-
-            agentId,
-
-            type: "REPEAT",
-
-            repeatMode
 
         });
 

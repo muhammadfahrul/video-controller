@@ -58,6 +58,17 @@ import {
 import PlayerStatus from "../features/player/components/PlayerStatus";
 import { useQueue } from "../hooks/useQueue";
 import ProgressBar from "../features/player/components/ProgressBar"
+import type {
+
+    SearchResult
+
+} from "../features/search/types/SearchResult";
+
+import {
+
+    searchService
+
+} from "../services/search";
 
 export default function HomePage(){
 
@@ -71,7 +82,15 @@ export default function HomePage(){
 
         setKeyword
 
-    ]=useState("");
+    ] = useState("");
+
+    const [
+
+        results,
+
+        setResults
+
+    ] = useState<SearchResult[]>([]);
 
     const queue = [
 
@@ -126,6 +145,52 @@ export default function HomePage(){
     console.log(agent);
 
     console.log(player);
+
+    const search = async () => {
+
+        if (!keyword.trim()) {
+
+            setResults([]);
+
+            return;
+
+        }
+
+        try {
+
+            const response =
+
+                await searchService.search(
+
+                    keyword
+
+                );
+
+            console.log(
+
+                response
+
+            );
+
+            setResults(
+
+                response
+
+            );
+
+        }
+
+        catch (err) {
+
+            console.error(
+
+                err
+
+            );
+
+        }
+
+    };
 
     useEffect(() => {
 
@@ -249,26 +314,37 @@ export default function HomePage(){
 
                 onChange={setKeyword}
 
-            />
-
-            <SearchResultCard
-
-                result={{
-
-                    id:"1",
-
-                    title:"Rick Astley - Never Gonna Give You Up",
-
-                    channel:"RickAstleyVEVO",
-
-                    duration:"3:32",
-
-                    thumbnail:
-                    "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
-
-                }}
+                onSearch={search}
 
             />
+
+            {
+
+                results.map(
+
+                    result => (
+
+                        <SearchResultCard
+
+                            key={
+
+                                result.videoId
+
+                            }
+
+                            result={
+
+                                result
+
+                            }
+
+                        />
+
+                    )
+
+                )
+
+            }
 
             <QueuePanel />
 

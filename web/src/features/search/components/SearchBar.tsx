@@ -9,8 +9,10 @@ interface Props {
     value: string;
 
     onChange(
-        value:string
-    ):void;
+        value: string
+    ): void;
+
+    onSearch(): void;
 
 }
 
@@ -18,7 +20,9 @@ export default function SearchBar({
 
     value,
 
-    onChange
+    onChange,
+
+    onSearch
 
 }:Props){
 
@@ -45,13 +49,23 @@ export default function SearchBar({
 
                 value={value}
 
-                onChange={e=>
+                onChange={e =>
 
                     onChange(
                         e.target.value
                     )
 
                 }
+
+                onKeyDown={e => {
+
+                    if (e.key === "Enter") {
+
+                        onSearch();
+
+                    }
+
+                }}
 
                 placeholder="Search YouTube..."
 
@@ -68,6 +82,30 @@ export default function SearchBar({
                 "
 
             />
+
+            <button
+
+                onClick={onSearch}
+
+                className="
+                    absolute
+                    right-2
+                    top-1/2
+                    -translate-y-1/2
+                    rounded-lg
+                    bg-red-600
+                    px-4
+                    py-2
+                    text-sm
+                    text-white
+                    hover:bg-red-700
+                "
+
+            >
+
+                Search
+
+            </button>
 
         </div>
 

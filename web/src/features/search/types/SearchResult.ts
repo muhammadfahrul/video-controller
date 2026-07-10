@@ -1,6 +1,6 @@
 export interface SearchResult {
 
-    id: string;
+    videoId: string;
 
     title: string;
 

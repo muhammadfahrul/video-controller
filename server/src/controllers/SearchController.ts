@@ -32,7 +32,7 @@ export class SearchController {
 
                 String(
 
-                    req.query.q ?? ""
+                    req.query.keyword ?? ""
 
                 );
 
