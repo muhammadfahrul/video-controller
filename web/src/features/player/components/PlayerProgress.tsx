@@ -24,13 +24,15 @@ export default function PlayerProgress() {
 
         }
 
-        return (
+        const progress =
 
-            player.currentTime /
+            player.duration > 0
 
-            player.duration
+                ? (player.currentTime / player.duration) * 100
 
-        ) * 100;
+                : 0;
+
+        return progress;
 
     }, [
 
@@ -136,7 +138,7 @@ export default function PlayerProgress() {
 
                 <span>
 
-                    {player.currentTime.toFixed(1)} s
+                    {(player.currentTime ?? 0).toFixed(1)} s
 
                 </span>
 

@@ -8,6 +8,8 @@ import {
  VolumeHandler,
  FullscreenHandler
 } from "./commands";
+import { QueueRepository } from "./repositories/QueueRepository";
+import { RepeatMode } from "./queue/RepeatMode";
 
 
 async function bootstrap(){
@@ -69,6 +71,28 @@ async function bootstrap(){
     await player.setVolume(50);
 
     await player.play();
+
+    const repository =
+
+    new QueueRepository();
+
+    const queue2 =
+
+        await repository.load();
+
+    console.log(queue2);
+
+    await repository.save({
+
+        items: [],
+
+        currentIndex: -1,
+
+        repeat: RepeatMode.OFF,
+
+        shuffle: false
+
+    });
 }
 
 

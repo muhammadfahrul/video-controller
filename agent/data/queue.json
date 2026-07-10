@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "1",
+      "videoId": "dQw4w9WgXcQ",
+      "title": "Video pertama",
+      "addedAt": 1783701909688
+    },
+    {
+      "id": "2c48a9dd-1004-4e1c-8b38-019a7cda50f4",
+      "videoId": "B1Qw2PR_L4A",
+      "title": "Modern Reggae Covers of Trending Hits 2026 🌴 Chilled Vibes Playlist Full Album",
+      "channel": "Reggais Music",
+      "thumbnail": "https://i.ytimg.com/vi/B1Qw2PR_L4A/hqdefault.jpg",
+      "duration": "1:24:15",
+      "addedAt": 1783701938148
+    }
+  ],
+  "currentIndex": 0,
+  "repeat": "OFF",
+  "shuffle": false
+}

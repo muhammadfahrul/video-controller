@@ -47,6 +47,7 @@ import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandle
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { RepeatMode } from "../queue/RepeatMode";
+import { QueueRepository } from "../repositories/QueueRepository";
 
 
 export class Agent {
@@ -95,6 +96,16 @@ export class Agent {
 
         this.queue =
             new QueueService();
+
+        const repository =
+
+            new QueueRepository();
+
+        this.queue =
+
+            new QueueService(
+                repository
+            );
 
         this.commandDispatcher =
             new CommandDispatcher();

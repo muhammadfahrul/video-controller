@@ -1,15 +1,22 @@
 import { RepeatMode } from "../queue/RepeatMode";
+import { QueueRepository } from "../repositories/QueueRepository";
 import { QueueSnapshot } from "../types/QueueSnapshot";
 
 export class QueueService {
 
+    constructor(
+
+        private readonly repository: QueueRepository
+
+    ) {}
+    
     private items: QueueItem[] = [];
 
     private currentIndex = -1;
 
     private repeatMode = RepeatMode.OFF;
 
-    public add(
+    public async add(
         item: QueueItem
     ) {
 
@@ -25,6 +32,8 @@ export class QueueService {
 
         }
 
+        await this.persist();
+
     }
 
     current() {
@@ -39,7 +48,7 @@ export class QueueService {
 
     }
 
-    public next() {
+    public async next() {
 
         if (
             this.items.length === 0
@@ -85,13 +94,15 @@ export class QueueService {
 
         }
 
+        await this.persist();
+
         return this.items[
             this.currentIndex
         ];
 
     }
 
-    public previous() {
+    public async previous() {
 
         if (
             this.items.length === 0
@@ -140,6 +151,8 @@ export class QueueService {
 
         }
 
+        await this.persist();
+
         return this.items[
             this.currentIndex
         ];
@@ -158,7 +171,7 @@ export class QueueService {
 
     }
 
-    public remove(id: string): boolean {
+    public async remove(id: string): boolean {
 
         const index = this.items.findIndex(
             item => item.id === id
@@ -180,18 +193,22 @@ export class QueueService {
             this.currentIndex = -1;
         }
 
+        await this.persist();
+
         return true;
     }
 
-    public clear() {
+    public async clear() {
 
         this.items = [];
 
         this.currentIndex = -1;
 
+        await this.persist();
+
     }
 
-    public playById(
+    public async playById(
         id: string
     ) {
 
@@ -211,13 +228,15 @@ export class QueueService {
         this.currentIndex =
             index;
 
+        await this.persist();
+
         return this.items[
             index
         ];
 
     }
 
-    public shuffle() {
+    public async shuffle() {
 
         if (this.items.length <= 1) {
             return;
@@ -259,13 +278,17 @@ export class QueueService {
                     item.id === current.id
             );
 
+        await this.persist();
+
     }
 
-    public setRepeatMode(
+    public async setRepeatMode(
         mode: RepeatMode
     ) {
 
         this.repeatMode = mode;
+
+        await this.persist();
 
     }
 
@@ -300,6 +323,22 @@ export class QueueService {
             shuffle: this.isShuffleEnabled()
 
         };
+
+    }
+
+    private async persist() {
+
+        await this.repository.save({
+
+            items: this.items,
+
+            currentIndex: this.currentIndex,
+
+            repeat: this.repeatMode,
+
+            shuffle: this.isShuffleEnabled()
+
+        });
 
     }
 }

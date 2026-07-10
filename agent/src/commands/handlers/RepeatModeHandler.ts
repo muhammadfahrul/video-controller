@@ -28,7 +28,7 @@ implements CommandHandler {
         command: CommandPayload
     ) {
 
-        this.queue.setRepeatMode(
+        await this.queue.setRepeatMode(
             this.mode
         );
 

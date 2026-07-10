@@ -30,7 +30,7 @@ implements CommandHandler {
         }
 
         const removed =
-            this.queue.remove(
+            await this.queue.remove(
                 command.id
             );
 

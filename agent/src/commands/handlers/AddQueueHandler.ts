@@ -35,7 +35,7 @@ implements CommandHandler {
 
         }
 
-        this.queue.add({
+        await this.queue.add({
 
             id: randomUUID(),
 

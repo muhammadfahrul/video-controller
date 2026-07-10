@@ -57,7 +57,7 @@ export default function PlayerStatus() {
 
                 {
 
-                    player.currentTime.toFixed(1)
+                    (player.currentTime ?? 0).toFixed(1)
 
                 }
 

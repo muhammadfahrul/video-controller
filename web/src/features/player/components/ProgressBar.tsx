@@ -160,6 +160,16 @@ function formatTime(
     seconds:number
 ){
 
+    if (
+
+        !Number.isFinite(seconds)
+
+    ) {
+
+        return "00:00";
+
+    }
+
     const min =
         Math.floor(
             seconds / 60

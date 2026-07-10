@@ -21,7 +21,7 @@ implements CommandHandler {
         command: CommandPayload
     ) {
 
-        this.queue.shuffle();
+        await this.queue.shuffle();
 
         console.log(
             "Queue shuffled"

@@ -37,7 +37,7 @@ implements CommandHandler {
         }
 
         const item =
-            this.queue.playById(
+            await this.queue.playById(
                 command.id
             );
 

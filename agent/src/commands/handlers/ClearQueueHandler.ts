@@ -21,7 +21,7 @@ implements CommandHandler {
         command: CommandPayload
     ) {
 
-        this.queue.clear();
+        await this.queue.clear();
 
         console.log(
             "Queue cleared"
