@@ -186,6 +186,16 @@ export default function PlayerControls() {
 
     }
 
+    function handleStop() {
+        if (!agent.id) {
+
+            return;
+            
+        }
+        
+        playerCommandService.stop(agent.id)
+    }
+
     return (
 
         <section
@@ -326,6 +336,8 @@ export default function PlayerControls() {
                     label="Stop"
 
                     variant="danger"
+
+                    onClick={handleStop}
 
                 />
 

@@ -9,7 +9,7 @@ import {
     PlayerSnapshot
 
 } from "../types/PlayerSnapshot";
-
+import { PlayerRepository } from "../repositories/PlayerRepository";
 
 export class PlayerService {
 
@@ -17,12 +17,17 @@ export class PlayerService {
     private player:
         YouTubePlayer;
 
+    private restoredSnapshot?: PlayerSnapshot;
+
+    private restoring = false;
+
     private onEnded?: () => void;
 
 
 
     constructor(
-        page:Page
+        page:Page,
+        private readonly repository: PlayerRepository
     ){
 
         this.player =
@@ -39,12 +44,35 @@ export class PlayerService {
     }
 
 
+    private async persist() {
+
+        if (this.restoring) {
+
+            return;
+
+        }
+
+        const snapshot =
+
+            await this.getSnapshot();
+
+        await this.repository.save({
+
+            player: snapshot
+
+        });
+
+    }
+
+
 
     async open(
         videoId:string
     ){
 
         await this.player.open(videoId);
+
+        await this.persist();
 
     }
 
@@ -71,6 +99,8 @@ export class PlayerService {
         
         await this.player.play();
 
+        await this.persist();
+
     }
 
 
@@ -78,6 +108,8 @@ export class PlayerService {
     async pause(){
 
         await this.player.pause();
+
+        await this.persist();
 
     }
 
@@ -87,7 +119,7 @@ export class PlayerService {
         value:number
     ){
 
-        await this.player.setVolume(value);
+        await this.setVolume(value);
 
     }
 
@@ -102,6 +134,8 @@ export class PlayerService {
         
         await this.player.setVolume(value);
 
+        await this.persist();
+
     }
 
     public async seek(
@@ -112,11 +146,15 @@ export class PlayerService {
             seconds
         );
 
+        await this.persist();
+
     }
 
     public async mute() {
 
         await this.player.mute();
+
+        await this.persist();
 
     }
 
@@ -124,11 +162,15 @@ export class PlayerService {
 
         await this.player.unmute();
 
+        await this.persist();
+
     }
 
     public async stop() {
 
         await this.player.stop();
+
+        await this.persist();
 
     }
 
@@ -140,17 +182,23 @@ export class PlayerService {
 
         await this.player.fullscreen();
 
+        await this.persist();
+
     }
 
     public async exitFullscreen() {
 
         await this.player.exitFullscreen();
 
+        await this.persist();
+
     }
 
     public async toggleFullscreen() {
 
         await this.player.toggleFullscreen();
+
+        await this.persist();
 
     }
 
@@ -172,6 +220,205 @@ export class PlayerService {
         this.player.setOnEnded(
             callback
         );
+
+    }
+
+    public async loadSnapshot() {
+
+        const data =
+
+            await this.repository.load();
+
+        this.restoredSnapshot =
+
+            data.player;
+
+        return this.restoredSnapshot;
+
+    }
+
+    public getRestoredSnapshot() {
+
+        return this.restoredSnapshot;
+
+    }
+
+    public async restoreLastVideo() {
+
+        const snapshot =
+
+            this.getRestoredSnapshot();
+
+        if (
+
+            !snapshot ||
+
+            !snapshot.videoId
+
+        ) {
+
+            return false;
+
+        }
+
+        this.restoring = true;
+
+        try {
+
+            await this.open(
+
+                snapshot.videoId
+
+            );
+
+        }
+
+        finally {
+
+            this.restoring = false;
+
+        }
+
+        return true;
+
+    }
+
+    public isRestoring() {
+
+        return this.restoring;
+
+    }
+
+    public async restorePosition() {
+
+        const snapshot =
+
+            this.getRestoredSnapshot();
+
+        if (
+
+            !snapshot ||
+
+            snapshot.currentTime <= 0
+
+        ) {
+
+            return;
+
+        }
+
+        console.log(
+
+            "[PLAYER] Restore position",
+
+            snapshot.currentTime
+
+        );
+
+        await this.seek(
+
+            snapshot.currentTime
+
+        );
+
+    }
+
+    public async restorePlaybackState() {
+
+        const snapshot =
+
+            this.getRestoredSnapshot();
+
+        if (!snapshot) {
+
+            return;
+
+        }
+
+        if (snapshot.playing) {
+
+            console.log(
+
+                "[PLAYER] Restore playback"
+
+            );
+
+            await this.play();
+
+        }
+
+    }
+
+
+    public async restoreVolume() {
+
+        const snapshot =
+
+            this.getRestoredSnapshot();
+
+        if (!snapshot) {
+
+            return;
+
+        }
+
+        await this.setVolume(
+
+            snapshot.volume
+
+        );
+
+    }
+
+
+    public async restoreMute() {
+
+        const snapshot =
+
+            this.getRestoredSnapshot();
+
+        if (!snapshot) {
+
+            return;
+
+        }
+
+        if (snapshot.muted) {
+
+            await this.mute();
+
+        } else {
+
+            await this.unmute();
+
+        }
+
+    }
+
+
+    public async restore() {
+
+        this.restoring = true;
+
+        try {
+
+            await this.restoreLastVideo();
+
+            await this.restorePosition();
+
+            await this.restoreVolume();
+
+            await this.restoreMute();
+
+            await this.restorePlaybackState();
+
+        }
+
+        finally {
+
+            this.restoring = false;
+
+        }
 
     }
 }

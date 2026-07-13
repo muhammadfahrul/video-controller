@@ -17,6 +17,8 @@ export class QueueService {
 
     private repeatMode = RepeatMode.OFF;
 
+    private shuffleEnabled = false;
+
     public async add(
         item: QueueItem
     ) {
@@ -243,6 +245,8 @@ export class QueueService {
             return;
         }
 
+        this.shuffleEnabled = true
+
         const current =
             this.items[this.currentIndex];
 
@@ -307,7 +311,7 @@ export class QueueService {
 
     public isShuffleEnabled() {
 
-        return false;
+        return this.shuffleEnabled;
 
     }
 
@@ -349,11 +353,32 @@ export class QueueService {
 
         this.items = [...snapshot.items];
 
-        this.currentIndex =
-            snapshot.currentIndex;
+        if (
+
+            snapshot.currentIndex >= 0 &&
+
+            snapshot.currentIndex < snapshot.items.length
+
+        ) {
+
+            this.currentIndex =
+                snapshot.currentIndex;
+
+        }
+        else {
+
+            this.currentIndex =
+                snapshot.items.length > 0
+                    ? 0
+                    : -1;
+
+        }
 
         this.repeatMode =
             snapshot.repeat;
+
+        this.shuffleEnabled =
+            snapshot.shuffle;
 
     }
 

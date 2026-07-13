@@ -48,6 +48,7 @@ import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHa
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { RepeatMode } from "../queue/RepeatMode";
 import { QueueRepository } from "../repositories/QueueRepository";
+import { PlayerRepository } from "../repositories/PlayerRepository";
 
 
 export class Agent {
@@ -59,6 +60,9 @@ export class Agent {
 
     private player?:
         PlayerService;
+
+    private playerRepository =
+        new PlayerRepository();
 
 
     private queue:
@@ -142,8 +146,23 @@ export class Agent {
 
         this.player =
             new PlayerService(
-                this.browser.getPage()
+                this.browser.getPage(),
+                this.playerRepository
             );
+
+        const saved =
+
+            await this.player.loadSnapshot();
+
+        console.log(
+
+            "[PLAYER RESTORE]",
+
+            saved
+
+        );
+
+        await this.player.restore()
 
         this.player.setOnEnded(()=>{
 
@@ -205,6 +224,8 @@ export class Agent {
         this.heartbeat.start();
 
         this.startPlayerStateSync();
+
+        this.sendCurrentQueue();
 
         this.startQueueSync();
 
@@ -535,6 +556,22 @@ export class Agent {
                 1000
 
             );
+
+    }
+
+    private sendCurrentQueue() {
+
+        if (!this.socketClient) {
+
+            return;
+
+        }
+
+        this.socketClient.sendQueueState(
+
+            this.queue.getSnapshot()
+
+        );
 
     }
 }
