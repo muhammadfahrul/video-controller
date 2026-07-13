@@ -69,6 +69,7 @@ import {
     searchService
 
 } from "../services/search";
+import VolumeSlider from "../features/player/components/VolumeSlider";
 
 export default function HomePage(){
 
@@ -433,6 +434,32 @@ export default function HomePage(){
             <QueuePanel />
 
             <PlayerControls />
+
+            <VolumeSlider
+
+                value={player.volume}
+
+                disabled={!agent.online}
+
+                onChange={(value) => {
+
+                    if (!agent.id) {
+
+                        return;
+
+                    }
+
+                    playerCommandService.volume(
+
+                        agent.id,
+
+                        value
+
+                    );
+
+                }}
+
+            />
 
             <ProgressBar />
 
