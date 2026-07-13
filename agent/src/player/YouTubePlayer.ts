@@ -20,8 +20,7 @@ export class YouTubePlayer {
 
     private onEnded?:()=>void;
 
-    private endedListenerAttached = false;
-
+    private navigating = false;
 
     constructor(
         private readonly page: Page
@@ -40,38 +39,47 @@ export class YouTubePlayer {
 
     public async open(videoId: string): Promise<void> {
 
-        this.state = PlayerState.LOADING;
+        this.navigating = true;
 
-        LoggerService.info(
-            `Opening YouTube video ${videoId}`
-        );
+        try {
 
+            this.state = PlayerState.LOADING;
 
-        await this.page.goto(
-            `https://www.youtube.com/watch?v=${videoId}`,
-            {
-                waitUntil: "domcontentloaded"
-            }
-        );
+            LoggerService.info(
+                `Opening YouTube video ${videoId}`
+            );
 
-        await this.setupEndedListener();
+            await this.page.goto(
+                `https://www.youtube.com/watch?v=${videoId}`,
+                {
+                    waitUntil: "networkidle"
+                }
+            );
 
-        await this.dom.waitUntilReady();
+            await this.dom.waitUntilReady();
 
-        await this.attachEvents();
+            await this.setupEndedListener();
 
+            await this.attachEvents();
 
-        this.state = PlayerState.READY;
+            this.state = PlayerState.READY;
 
+            LoggerService.info(
+                "YouTube player ready."
+            );
 
-        LoggerService.info(
-            "YouTube player ready."
-        );
+        } finally {
+
+            this.navigating = false;
+
+        }
 
     }
 
 
     public async play(): Promise<void> {
+
+        this.ensureReady();
 
         console.log(
 
@@ -89,6 +97,8 @@ export class YouTubePlayer {
 
     public async pause(): Promise<void> {
 
+        this.ensureReady();
+
         await this.dom.pause();
 
         this.state = PlayerState.PAUSED;
@@ -100,6 +110,8 @@ export class YouTubePlayer {
         volume: number
     ): Promise<void> {
 
+        this.ensureReady();
+        
         console.log(
             "YouTubePlayer.setVolume",
             volume
@@ -216,6 +228,8 @@ export class YouTubePlayer {
         seconds: number
     ) {
 
+        this.ensureReady();
+
         await this.dom.seek(
             seconds
         );
@@ -226,11 +240,15 @@ export class YouTubePlayer {
 
     public async mute() {
 
+        this.ensureReady();
+
         await this.dom.mute();
 
     }
 
     public async unmute() {
+
+        this.ensureReady();
 
         await this.dom.unmute();
 
@@ -239,6 +257,8 @@ export class YouTubePlayer {
 
     public async stop() {
 
+        this.ensureReady();
+
         await this.dom.stop();
 
     }
@@ -246,6 +266,8 @@ export class YouTubePlayer {
 
 
     public async fullscreen() {
+
+        this.ensureReady();
 
         console.log(
             "YouTubePlayer.fullscreen"
@@ -257,11 +279,15 @@ export class YouTubePlayer {
 
     public async exitFullscreen() {
 
+        this.ensureReady();
+
         await this.dom.exitFullscreen();
 
     }
 
     public async toggleFullscreen() {
+
+        this.ensureReady();
 
         await this.dom.toggleFullscreen();
 
@@ -308,70 +334,120 @@ export class YouTubePlayer {
 
     public async getSnapshot(): Promise<PlayerSnapshot> {
 
-        return await this.page.evaluate(() => {
-
-            const player =
-                document.querySelector(
-                    ".html5-video-player"
-                ) as any;
-
-            const video =
-                document.querySelector(
-                    "video"
-                ) as HTMLVideoElement | null;
-
-            const playing =
-                !!video &&
-                !video.paused &&
-                !video.ended;
-
-            const currentTime =
-                video?.currentTime ?? 0;
-
-            const duration =
-                video?.duration ?? 0;
-
-            const muted =
-                video?.muted ?? false;
-
-            const volume =
-                Math.round(
-                    (video?.volume ?? 0) * 100
-                );
-
-            const fullscreen =
-                !!document.fullscreenElement;
-
-            const url =
-                window.location.href;
-
-            const match =
-                url.match(
-                    /[?&]v=([^&]+)/i
-                );
-
-            const videoId =
-                match?.[1];
+        if (this.navigating) {
 
             return {
 
-                playing,
+                playing: false,
 
-                currentTime,
+                currentTime: 0,
 
-                duration,
+                duration: 0,
 
-                volume,
+                volume: 0,
 
-                muted,
+                muted: false,
 
-                fullscreen,
+                fullscreen: false,
 
-                videoId
+                videoId: undefined
 
             };
 
-        });
+        }
+
+        try {
+            return await this.page.evaluate(() => {
+
+                const player =
+                    document.querySelector(
+                        ".html5-video-player"
+                    ) as any;
+
+                const video =
+                    document.querySelector(
+                        "video"
+                    ) as HTMLVideoElement | null;
+
+                const playing =
+                    !!video &&
+                    !video.paused &&
+                    !video.ended;
+
+                const currentTime =
+                    video?.currentTime ?? 0;
+
+                const duration =
+                    video?.duration ?? 0;
+
+                const muted =
+                    video?.muted ?? false;
+
+                const volume =
+                    Math.round(
+                        (video?.volume ?? 0) * 100
+                    );
+
+                const fullscreen =
+                    !!document.fullscreenElement;
+
+                const url =
+                    window.location.href;
+
+                const match =
+                    url.match(
+                        /[?&]v=([^&]+)/i
+                    );
+
+                const videoId =
+                    match?.[1];
+
+                return {
+
+                    playing,
+
+                    currentTime,
+
+                    duration,
+
+                    volume,
+
+                    muted,
+
+                    fullscreen,
+
+                    videoId
+
+                };
+
+            });
+        } catch (error) {
+            console.warn(
+
+                "[PLAYER] Snapshot skipped",
+
+                error
+
+            );
+
+            return {
+
+                playing: false,
+
+                currentTime: 0,
+
+                duration: 0,
+
+                volume: 0,
+
+                muted: false,
+
+                fullscreen: false,
+
+                videoId: undefined
+
+            };
+        }
 
     }
 
@@ -386,16 +462,6 @@ export class YouTubePlayer {
     }
 
     private async setupEndedListener(){
-
-        if(this.endedListenerAttached){
-
-            return;
-
-        }
-
-
-        this.endedListenerAttached = true;
-
 
         await this.page.exposeFunction(
 
@@ -414,66 +480,65 @@ export class YouTubePlayer {
         );
 
 
-        await this.page.evaluate(()=>{
+        await this.page.waitForSelector(
+            "video"
+        );
 
+        await this.page.evaluate(() => {
 
-            const interval =
-                setInterval(()=>{
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
 
+            if (!video) {
+                return;
+            }
 
-                    const video =
-                        document.querySelector(
-                            "video"
-                        );
+            if (
+                video.dataset.endedAttached === "true"
+            ) {
+                return;
+            }
 
+            video.dataset.endedAttached =
+                "true";
 
-                    if(!video){
-
-                        return;
-
-                    }
-
-
-                    if(
-                        (video as any)
-                            .dataset
-                            .endedAttached
-                    ){
-
-                        return;
-
-                    }
-
-
-                    (video as any)
-                        .dataset
-                        .endedAttached =
-                        "true";
-
-
-                    video.addEventListener(
-
-                        "ended",
-
-                        ()=>{
-
-                            // @ts-ignore
-                            window.youtubeEnded();
-
-                        }
-
-                    );
-
+            video.addEventListener(
+                "ended",
+                () => {
 
                     console.log(
-                        "[YOUTUBE] ended listener attached"
+                        "[DOM] video ended"
                     );
 
+                    // @ts-ignore
+                    window.youtubeEnded();
 
-                },1000);
+                    console.log(
+                        "[NODE] youtubeEnded"
+                    );
 
+                }
+            );
+
+            console.log(
+                "[YOUTUBE] ended listener attached"
+            );
 
         });
+
+    }
+
+    private ensureReady() {
+
+        if (this.navigating) {
+
+            throw new Error(
+                "Player is navigating."
+            );
+
+        }
 
     }
 }

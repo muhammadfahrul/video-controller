@@ -18,8 +18,6 @@ import { PlayerEventPayload } from "./PlayerEventPayload";
 
 export class YouTubeDOM {
 
-    private eventsAttached = false;
-
     constructor(
         private readonly page: Page
     ) {}
@@ -343,13 +341,6 @@ export class YouTubeDOM {
     ): Promise<void> {
 
 
-        if(this.eventsAttached){
-
-            return;
-
-        }
-
-
         await this.page.exposeFunction(
             "playerEventCallback",
             callback
@@ -458,9 +449,6 @@ export class YouTubeDOM {
             `,
             YouTubeSelectors.video
         );
-
-
-        this.eventsAttached = true;
 
     }
 

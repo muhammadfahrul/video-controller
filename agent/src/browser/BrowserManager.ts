@@ -47,6 +47,10 @@ export class BrowserManager {
 
         this.browser = await this.launcher.launch(config.browser);
 
+        console.log(
+            await this.browser.version()
+        );
+
         this.context = await this.browser.newContext({
 
             viewport: config.browser.viewport
@@ -54,6 +58,64 @@ export class BrowserManager {
         });
 
         this.page = await this.context.newPage();
+
+        this.page.on("console", msg => {
+
+            console.log(
+
+                "[PAGE]",
+
+                msg.type(),
+
+                msg.text()
+
+            );
+
+        });
+
+        this.page.on("pageerror", err => {
+
+            console.error(
+
+                "[PAGE ERROR]",
+
+                err
+
+            );
+
+        });
+
+        this.page.on("requestfailed", request => {
+
+            console.warn(
+
+                "[REQUEST FAILED]",
+
+                request.url(),
+
+                request.failure()?.errorText
+
+            );
+
+        });
+
+        this.page.on("response", response => {
+
+            if (response.status() >= 400) {
+
+                console.warn(
+
+                    "[HTTP]",
+
+                    response.status(),
+
+                    response.url()
+
+                );
+
+            }
+
+        });
 
         this.registerEvents();
 

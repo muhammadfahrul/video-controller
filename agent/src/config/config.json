@@ -1,7 +1,7 @@
 {
   "browser": {
     "headless": false,
-    "channel": null,
+    "channel": "chrome",
     "args": [
       "--start-maximized"
     ],

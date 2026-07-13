@@ -16,7 +16,7 @@ export class YouTubeController extends EventEmitter {
         await this.page.goto(
             `https://www.youtube.com/watch?v=${videoId}`,
             {
-                waitUntil: "domcontentloaded"
+                waitUntil: "networkidle"
             }
         );
 
