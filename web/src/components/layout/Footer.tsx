@@ -15,7 +15,7 @@ export default function Footer() {
             "
         >
 
-            Server: Disconnected
+            Remote Video Player
 
         </footer>
 

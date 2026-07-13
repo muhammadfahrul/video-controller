@@ -463,9 +463,9 @@ export default function HomePage(){
 
             <ProgressBar />
 
-            <PlayerProgress />
+            {/* <PlayerProgress /> */}
 
-            <PlayerStatus />
+            {/* <PlayerStatus /> */}
 
         </div>
 

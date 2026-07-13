@@ -33,12 +33,12 @@ export default function Header() {
                         text-gray-500
                     "
                 >
-                    Remote YouTube Player
+                    Remote Video Player
                 </p>
 
             </div>
 
-            <div
+            {/* <div
                 className="
                     flex
                     items-center
@@ -64,7 +64,7 @@ export default function Header() {
                     Offline
                 </span>
 
-            </div>
+            </div> */}
 
         </header>
 
