@@ -164,19 +164,16 @@ export class Agent {
 
         await this.player.restore()
 
-        this.player.setOnEnded(()=>{
-
+        this.player.setOnEnded(async () => {
 
             console.log(
                 "[AGENT] Video ended"
             );
 
-
             const next =
-                this.queue.next();
+                await this.queue.next();
 
-
-            if(!next){
+            if (!next) {
 
                 console.log(
                     "[QUEUE] No next item"
@@ -186,7 +183,6 @@ export class Agent {
 
             }
 
-
             console.log(
 
                 "[QUEUE] Playing next",
@@ -195,12 +191,10 @@ export class Agent {
 
             );
 
-
-            this.player!
+            await this.player!
                 .openVideo(
                     next.videoId
                 );
-
 
         });
 

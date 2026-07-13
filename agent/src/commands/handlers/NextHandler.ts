@@ -34,7 +34,7 @@ export class NextHandler
         );
 
         const item =
-            this.queue.next();
+            await this.queue.next();
 
         if (!item) {
 
@@ -45,6 +45,16 @@ export class NextHandler
             return;
 
         }
+
+        console.log(
+
+            "[QUEUE] Next:",
+
+            item.title,
+
+            item.videoId
+
+        );
 
         await this.player.openVideo(
             item.videoId

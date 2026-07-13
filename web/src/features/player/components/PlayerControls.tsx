@@ -196,6 +196,26 @@ export default function PlayerControls() {
         playerCommandService.stop(agent.id)
     }
 
+    function handleNext() {
+        if (!agent.id) {
+
+            return;
+            
+        }
+        
+        playerCommandService.next(agent.id)
+    }
+
+    function handlePrev() {
+        if (!agent.id) {
+
+            return;
+            
+        }
+        
+        playerCommandService.previous(agent.id)
+    }
+
     return (
 
         <section
@@ -291,6 +311,8 @@ export default function PlayerControls() {
 
                     label="Prev"
 
+                    onClick={handlePrev}
+
                 />
 
                 <ControlButton
@@ -346,6 +368,8 @@ export default function PlayerControls() {
                     icon={<SkipForward size={22}/>}
 
                     label="Next"
+
+                    onClick={handleNext}
 
                 />
 
