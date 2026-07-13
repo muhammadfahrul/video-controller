@@ -69,7 +69,7 @@ export default function QueueItemCard({
 
                 className="
                     h-16
-                    w-24
+                    w-100
                     rounded-lg
                     object-cover
                 "

@@ -109,7 +109,7 @@ export default function SearchResultCard({
 
                 className="
                     h-20
-                    w-32
+                    w-100
                     rounded-lg
                     object-cover
                 "
