@@ -17,6 +17,8 @@ interface Props {
         | "secondary"
         | "danger";
 
+    disabled: boolean;
+
 }
 
 export default function ControlButton({
@@ -27,7 +29,9 @@ export default function ControlButton({
 
     onClick,
 
-    variant = "secondary"
+    variant = "secondary",
+
+    disabled = false
 
 }: Props) {
 
@@ -61,6 +65,8 @@ export default function ControlButton({
                 transition
                 ${styles[variant]}
             `}
+
+            disabled={disabled}
 
         >
 

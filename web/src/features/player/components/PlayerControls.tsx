@@ -96,6 +96,8 @@ export default function PlayerControls() {
 
     }
 
+    const disabled = !agent.online;
+
     function handlePlayPause() {
 
         if (!agent.id) {
@@ -313,6 +315,8 @@ export default function PlayerControls() {
 
                     onClick={handlePrev}
 
+                    disabled={disabled}
+
                 />
 
                 <ControlButton
@@ -349,6 +353,8 @@ export default function PlayerControls() {
 
                     onClick={handlePlayPause}
 
+                    disabled={disabled}
+
                 />
 
                 <ControlButton
@@ -361,6 +367,8 @@ export default function PlayerControls() {
 
                     onClick={handleStop}
 
+                    disabled={disabled}
+
                 />
 
                 <ControlButton
@@ -370,6 +378,8 @@ export default function PlayerControls() {
                     label="Next"
 
                     onClick={handleNext}
+
+                    disabled={disabled}
 
                 />
 
@@ -397,6 +407,8 @@ export default function PlayerControls() {
 
                     onClick={handleMute}
 
+                    disabled={disabled}
+
                 />
 
                 <ControlButton
@@ -422,6 +434,8 @@ export default function PlayerControls() {
                     }
 
                     onClick={handleFullscreen}
+
+                    disabled={disabled}
 
                 />
 
