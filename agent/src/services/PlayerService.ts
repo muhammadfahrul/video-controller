@@ -428,4 +428,16 @@ export class PlayerService {
             .getVideoSnapshot();
 
     }
+
+    public async waitUntilReady(): Promise<void> {
+
+        await this.player.waitUntilReady();
+
+    }
+
+    public async isFullscreen(): Promise<boolean> {
+
+        return await this.player.isFullscreen();
+
+    }
 }

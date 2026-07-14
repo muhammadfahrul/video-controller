@@ -547,4 +547,10 @@ export class YouTubePlayer {
         return this.dom.getVideoSnapshot();
 
     }
+
+    public async waitUntilReady(): Promise<void> {
+
+        await this.dom.waitUntilReady();
+
+    }
 }

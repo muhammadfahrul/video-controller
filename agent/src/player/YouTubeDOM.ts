@@ -26,14 +26,34 @@ export class YouTubeDOM {
 
     public async waitUntilReady(): Promise<void> {
 
-
         await this.page.waitForSelector(
-            YouTubeSelectors.video,
-            {
-                timeout: 30000
-            }
+            YouTubeSelectors.video
         );
 
+        await this.page.waitForFunction(
+
+            (selector) => {
+
+                const video =
+                    document.querySelector(
+                        selector
+                    ) as HTMLVideoElement | null;
+
+                return (
+
+                    video &&
+
+                    video.readyState >= 1 &&
+
+                    video.duration > 0
+
+                );
+
+            },
+
+            YouTubeSelectors.video
+
+        );
 
     }
 
