@@ -19,6 +19,8 @@ export class PlayerService {
 
     private restoredSnapshot?: PlayerSnapshot;
 
+    private lastHealthySnapshot?: PlayerSnapshot;
+
     private restoring = false;
 
     private onEnded?: () => void;
@@ -40,6 +42,21 @@ export class PlayerService {
     getPlayer(){
 
         return this.player;
+
+    }
+
+    private isHealthySnapshot(
+        snapshot: PlayerSnapshot
+    ): boolean {
+
+        return (
+            !!snapshot.videoId &&
+            Number.isFinite(snapshot.currentTime) &&
+            Number.isFinite(snapshot.duration) &&
+            snapshot.duration > 0 &&
+            snapshot.currentTime >= 0 &&
+            Number.isFinite(snapshot.volume)
+        );
 
     }
 
@@ -202,11 +219,30 @@ export class PlayerService {
 
     }
 
-    public async getSnapshot()
-    : Promise<PlayerSnapshot> {
+    public async getSnapshot(): Promise<PlayerSnapshot> {
 
-        return await this.player
-            .getSnapshot();
+        const snapshot =
+            await this.player.getSnapshot();
+
+        if (this.isHealthySnapshot(snapshot)) {
+
+            this.lastHealthySnapshot = snapshot;
+
+            return snapshot;
+
+        }
+
+        console.warn(
+            "[PLAYER] Invalid snapshot, using last healthy snapshot."
+        );
+
+        if (this.lastHealthySnapshot) {
+
+            return this.lastHealthySnapshot;
+
+        }
+
+        return snapshot;
 
     }
 
@@ -230,7 +266,9 @@ export class PlayerService {
             await this.repository.load();
 
         this.restoredSnapshot =
+            data.player;
 
+        this.lastHealthySnapshot =
             data.player;
 
         return this.restoredSnapshot;
@@ -438,6 +476,12 @@ export class PlayerService {
     public async isFullscreen(): Promise<boolean> {
 
         return await this.player.isFullscreen();
+
+    }
+
+    public getLastHealthySnapshot() {
+
+        return this.lastHealthySnapshot;
 
     }
 }

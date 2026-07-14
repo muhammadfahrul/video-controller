@@ -22,61 +22,6 @@ async function bootstrap(){
 
     await agent.start();
 
-
-
-    const queue =
-        agent.getQueue();
-
-
-
-    const player =
-        agent.getPlayer();
-
-
-
-    const first =
-        queue.current();
-
-
-
-    if(first){
-
-        await player.open(
-            first.videoId
-        );
-
-        await player.play();
-
-
-    }
-
-    await player.fullscreen();
-
-    await player.setVolume(50);
-
-    await player.play();
-
-    const repository =
-
-    new QueueRepository();
-
-    const queue2 =
-
-        await repository.load();
-
-    console.log(queue2);
-
-    await repository.save({
-
-        items: [],
-
-        currentIndex: -1,
-
-        repeat: RepeatMode.OFF,
-
-        shuffle: false
-
-    });
 }
 
 

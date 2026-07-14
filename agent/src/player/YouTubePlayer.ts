@@ -22,6 +22,10 @@ export class YouTubePlayer {
 
     private navigating = false;
 
+    private endedFunctionRegistered = false;
+
+    private endedListenerInitialized = false;
+
     constructor(
         private readonly page: Page
     ){
@@ -461,73 +465,48 @@ export class YouTubePlayer {
 
     }
 
-    private async setupEndedListener(){
+    private async setupEndedListener() {
+
+        if (this.endedListenerInitialized) {
+            return;
+        }
 
         await this.page.exposeFunction(
-
             "youtubeEnded",
+            () => {
 
-            ()=>{
-
-                console.log(
-                    "[YOUTUBE] ended"
-                );
+                console.log("[YOUTUBE] ended");
 
                 this.onEnded?.();
 
             }
-
         );
 
-
-        await this.page.waitForSelector(
-            "video"
-        );
+        await this.page.waitForSelector("video");
 
         await this.page.evaluate(() => {
 
             const video =
-                document.querySelector(
-                    "video"
-                ) as HTMLVideoElement | null;
+                document.querySelector("video");
 
             if (!video) {
                 return;
             }
 
-            if (
-                video.dataset.endedAttached === "true"
-            ) {
+            if (video.dataset.endedAttached === "true") {
                 return;
             }
 
-            video.dataset.endedAttached =
-                "true";
+            video.dataset.endedAttached = "true";
 
-            video.addEventListener(
-                "ended",
-                () => {
-
-                    console.log(
-                        "[DOM] video ended"
-                    );
-
-                    // @ts-ignore
-                    window.youtubeEnded();
-
-                    console.log(
-                        "[NODE] youtubeEnded"
-                    );
-
-                }
-            );
-
-            console.log(
-                "[YOUTUBE] ended listener attached"
-            );
+            video.addEventListener("ended", () => {
+                // @ts-ignore
+                window.youtubeEnded();
+            });
 
         });
 
+        this.endedListenerInitialized = true;
     }
 
     private ensureReady() {
