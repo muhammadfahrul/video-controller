@@ -23,7 +23,7 @@ export default function QueueEmpty() {
                 "
             >
 
-                Queue kosong
+                Playlist kosong
 
             </p>
 

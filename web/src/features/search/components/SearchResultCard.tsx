@@ -210,7 +210,7 @@ export default function SearchResultCard({
 
                         <Plus size={16} />
 
-                        Queue
+                        Playlist
 
                     </button>
 

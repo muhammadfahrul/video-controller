@@ -1,8 +1,4 @@
-import {
-
-    Outlet
-
-} from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
@@ -30,7 +26,7 @@ export default function MainLayout() {
                 "
             >
 
-                {/* <Header /> */}
+                <Header />
 
                 <main
                     className="
@@ -44,8 +40,7 @@ export default function MainLayout() {
 
                 </main>
 
-                {/* <Footer /> */}
-
+                <Footer />
             </div>
 
         </div>
