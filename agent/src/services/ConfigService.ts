@@ -1,4 +1,5 @@
 import config from "../config/config.json";
+import { ConfigValidator } from "../config/ConfigValidator";
 
 export interface AppConfig {
 
@@ -49,6 +50,10 @@ export class ConfigService {
     private constructor() {
 
         this.config = config as AppConfig;
+
+        ConfigValidator.validate(
+            this.config
+        );
 
     }
 

@@ -1,8 +1,10 @@
+import { BrowserChannel } from "./BrowserChannel";
+
 export interface BrowserOptions {
 
     headless: boolean;
 
-    channel?: string;
+    channel: BrowserChannel | null;
 
     args: string[];
 

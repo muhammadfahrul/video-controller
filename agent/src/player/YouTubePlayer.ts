@@ -541,4 +541,10 @@ export class YouTubePlayer {
         }
 
     }
+
+    public async getVideoSnapshot() {
+
+        return this.dom.getVideoSnapshot();
+
+    }
 }

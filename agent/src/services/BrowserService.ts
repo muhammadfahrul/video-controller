@@ -41,4 +41,9 @@ export class BrowserService {
     }
 
 
+    public getBrowserManager(): BrowserManager {
+
+        return this.browserManager;
+
+    }
 }

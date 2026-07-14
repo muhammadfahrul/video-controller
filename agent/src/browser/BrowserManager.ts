@@ -8,6 +8,7 @@ import { BrowserLauncher } from "./BrowserLauncher";
 import { BrowserState } from "./BrowserState";
 import { ConfigService } from "../services/ConfigService";
 import { LoggerService } from "../services/LoggerService";
+import { BrowserInfo } from "./BrowserInfo";
 
 export class BrowserManager {
 
@@ -20,6 +21,8 @@ export class BrowserManager {
     private page: Page | null = null;
 
     private state: BrowserState = BrowserState.STOPPED;
+
+    private browserInfo?: BrowserInfo;
 
     constructor() {
 
@@ -45,19 +48,88 @@ export class BrowserManager {
             .getInstance()
             .getConfig();
 
-        this.browser = await this.launcher.launch(config.browser);
+        // this.browser = await this.launcher.launch(config.browser);
 
-        console.log(
-            await this.browser.version()
-        );
+        // console.log(
+        //     await this.browser.version()
+        // );
 
-        this.context = await this.browser.newContext({
+        // this.context = await this.browser.newContext({
 
-            viewport: config.browser.viewport
+        //     viewport: config.browser.viewport
 
-        });
+        // });
 
-        this.page = await this.context.newPage();
+        // this.page = await this.context.newPage();
+
+        this.context =
+
+            await this.launcher.launchPersistent(
+
+                config.browser
+
+            );
+
+        const browser =
+            this.context.browser();
+
+        if (browser) {
+
+            this.browserInfo = {
+
+                name: browser.browserType().name(),
+
+                version: await browser.version(),
+
+                channel:
+                    config.browser.channel
+                    ?? "chromium",
+
+                persistent: true
+
+            };
+
+            LoggerService.info(
+
+                `Browser : ${this.browserInfo.name}`
+
+            );
+
+            LoggerService.info(
+
+                `Version : ${this.browserInfo.version}`
+
+            );
+
+            LoggerService.info(
+
+                `Channel : ${this.browserInfo.channel}`
+
+            );
+
+            LoggerService.info(
+
+                `Persistent : ${this.browserInfo.persistent}`
+
+            );
+
+        }
+
+        const pages =
+
+            this.context.pages();
+
+        if (pages.length > 0) {
+
+            this.page =
+                pages[0];
+
+        } else {
+
+            this.page =
+                await this.context.newPage();
+
+        }
 
         this.page.on("console", msg => {
 
@@ -137,7 +209,9 @@ export class BrowserManager {
 
         LoggerService.info("Closing browser...");
 
-        await this.browser.close();
+        // await this.browser.close();
+
+        await this.context?.close();
 
         this.browser = null;
 
@@ -146,6 +220,8 @@ export class BrowserManager {
         this.page = null;
 
         this.state = BrowserState.STOPPED;
+
+        this.browserInfo = undefined;
 
         LoggerService.info("Browser stopped.");
 
@@ -211,13 +287,70 @@ export class BrowserManager {
 
     private registerEvents(): void {
 
-        this.browser?.on("disconnected", () => {
+        // this.browser?.on("disconnected", () => {
 
-            LoggerService.warn("Browser disconnected.");
+        //     LoggerService.warn("Browser disconnected.");
 
-            this.state = BrowserState.ERROR;
+        //     this.state = BrowserState.ERROR;
 
-        });
+        // });
+
+        this.context.browser()?.on(
+
+            "disconnected",
+
+            () => {
+
+                LoggerService.warn(
+                    "Browser disconnected."
+                );
+
+                this.state =
+                    BrowserState.ERROR;
+
+            }
+
+        );
+
+    }
+
+    public getBrowserInfo()
+    : BrowserInfo | undefined {
+
+        return this.browserInfo;
+
+    }
+
+
+    public hasBrowser(): boolean {
+
+        return this.context !== null;
+
+    }
+
+    public hasPage(): boolean {
+
+        return this.page !== null;
+
+    }
+
+    public isPageClosed(): boolean {
+
+        if (!this.page) {
+
+            return true;
+
+        }
+
+        return this.page.isClosed();
+
+    }
+
+    public async getPageTitle()
+    : Promise<string> {
+
+        return this.getPage()
+            .title();
 
     }
 

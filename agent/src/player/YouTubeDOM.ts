@@ -452,4 +452,54 @@ export class YouTubeDOM {
 
     }
 
+    public async getVideoSnapshot()
+    : Promise<VideoSnapshot> {
+
+        return this.page.evaluate(() => {
+
+            const video =
+                document.querySelector(
+                    "video"
+                ) as HTMLVideoElement | null;
+
+            if (!video) {
+
+                return {
+
+                    exists: false,
+
+                    ready: false,
+
+                    duration: 0,
+
+                    currentTime: 0,
+
+                    ended: false
+
+                };
+
+            }
+
+            return {
+
+                exists: true,
+
+                ready:
+                    video.readyState >= 2,
+
+                duration:
+                    video.duration,
+
+                currentTime:
+                    video.currentTime,
+
+                ended:
+                    video.ended
+
+            };
+
+        });
+
+    }
+
 }

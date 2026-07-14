@@ -421,4 +421,11 @@ export class PlayerService {
         }
 
     }
+
+    public async getVideoSnapshot() {
+
+        return this.player
+            .getVideoSnapshot();
+
+    }
 }

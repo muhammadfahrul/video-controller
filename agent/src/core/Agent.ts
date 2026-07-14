@@ -49,6 +49,8 @@ import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { RepeatMode } from "../queue/RepeatMode";
 import { QueueRepository } from "../repositories/QueueRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
+import { HealthService } from "../health/HealthService";
+import { ConfigService } from "../services/ConfigService";
 
 
 export class Agent {
@@ -56,6 +58,8 @@ export class Agent {
 
     private browser:
         BrowserService;
+
+    private health?: HealthService;
 
 
     private player?:
@@ -90,7 +94,6 @@ export class Agent {
         id:string;
         name:string;
     };
-
 
 
     constructor() {
@@ -142,6 +145,12 @@ export class Agent {
 
     async start() {
 
+        const config =
+            ConfigService
+                .getInstance()
+                .getConfig();
+
+
         await this.browser.start();
 
         this.player =
@@ -149,6 +158,18 @@ export class Agent {
                 this.browser.getPage(),
                 this.playerRepository
             );
+
+        this.health = new HealthService(
+
+            this.browser.getBrowserManager(),
+
+            this.player
+
+        );
+
+        this.health.start(
+            config.health.interval
+        );
 
         const saved =
 
@@ -453,6 +474,7 @@ export class Agent {
 
         }
 
+        this.health?.stop();
     }
 
 
