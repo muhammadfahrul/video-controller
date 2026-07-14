@@ -4,8 +4,21 @@ import {
     CommandPayload
 } from "./types";
 
-const SERVER =
-    "http://localhost:3000/api/command";
+function getServerUrl() {
+    const os = require('os');
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        const iface = interfaces[name];
+        for (const info of iface) {
+            if (info.family === 'IPv4' && !info.internal) {
+                return `http://${info.address}:${process.env.PORT || 3000}/api/command`;
+            }
+        }
+    }
+    return `http://localhost:${process.env.PORT || 3000}/api/command`;
+}
+
+const SERVER = process.env.SERVER_URL || getServerUrl();
 
 export async function sendCommand(
     command: CommandPayload

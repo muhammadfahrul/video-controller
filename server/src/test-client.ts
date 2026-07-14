@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 
 const socket =
     io(
-        "http://localhost:3000"
+        `http://localhost:${process.env.PORT || 3000}`
     );
 
 

@@ -1,5 +1,6 @@
 import config from "../config/config.json";
 import { ConfigValidator } from "../config/ConfigValidator";
+import { getLocalIpAddress } from "../utils/network";
 
 export interface AppConfig {
 
@@ -72,6 +73,16 @@ export class ConfigService {
     public getConfig(): AppConfig {
 
         return this.config;
+
+    }
+
+    public getServerUrl(): string {
+
+        const ip = getLocalIpAddress();
+
+        const port = process.env.PORT || 3000;
+
+        return `http://${ip}:${port}`;
 
     }
 

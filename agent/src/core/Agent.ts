@@ -127,13 +127,23 @@ export class Agent {
                 commandService
             );
 
+        const config =
+            ConfigService
+                .getInstance()
+                .getConfig();
+
         this.identity =
             new AgentIdentityProvider()
                 .get();
 
+        const serverUrl =
+            ConfigService
+                .getInstance()
+                .getServerUrl();
+
         this.socketClient =
             new SocketClient(
-                "http://localhost:3000",
+                serverUrl,
                 this.identity,
                 this.commandRouter
             );

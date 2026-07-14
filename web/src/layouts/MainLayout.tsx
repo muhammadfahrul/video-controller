@@ -30,7 +30,7 @@ export default function MainLayout() {
                 "
             >
 
-                <Header />
+                {/* <Header /> */}
 
                 <main
                     className="
@@ -44,7 +44,7 @@ export default function MainLayout() {
 
                 </main>
 
-                <Footer />
+                {/* <Footer /> */}
 
             </div>
 

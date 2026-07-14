@@ -4,6 +4,8 @@ import type {
 
 } from "../../features/search/types/SearchResult";
 
+import { getServerUrl } from "../../utils/getServerUrl";
+
 export class SearchService {
 
     async search(
@@ -16,7 +18,7 @@ export class SearchService {
 
             await fetch(
 
-                `http://localhost:3000/api/search?keyword=${encodeURIComponent(keyword)}`
+                `${getServerUrl()}/api/search?keyword=${encodeURIComponent(keyword)}`
 
             );
 
