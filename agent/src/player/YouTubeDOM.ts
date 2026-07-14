@@ -18,6 +18,8 @@ import { PlayerEventPayload } from "./PlayerEventPayload";
 
 export class YouTubeDOM {
 
+    private callbackRegistered = false;
+
     constructor(
         private readonly page: Page
     ) {}
@@ -361,10 +363,15 @@ export class YouTubeDOM {
     ): Promise<void> {
 
 
-        await this.page.exposeFunction(
-            "playerEventCallback",
-            callback
-        );
+        if (!this.callbackRegistered) {
+
+            await this.page.exposeFunction(
+                "playerEventCallback",
+                callback
+            );
+
+            this.callbackRegistered = true;
+        }
 
 
         await this.page.evaluate(
@@ -449,17 +456,6 @@ export class YouTubeDOM {
                     function(){
 
                         sendEvent("player.end");
-
-                    }
-                );
-
-
-
-                video.addEventListener(
-                    "timeupdate",
-                    function(){
-
-                        sendEvent("player.time_update");
 
                     }
                 );
