@@ -204,6 +204,12 @@ if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
     cd "$PROJECT_ROOT/agent" && npm install
 fi
 
+# Install Playwright browsers if not exists
+if [ ! -d "$HOME/.cache/ms-playwright" ]; then
+    echo "🌐 Installing Playwright browsers..."
+    cd "$PROJECT_ROOT/agent" && npx playwright install chromium --with-deps
+fi
+
 if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
     echo "📦 Installing server dependencies..."
     cd "$PROJECT_ROOT/server" && npm install
@@ -221,6 +227,26 @@ echo "🔨 Building all services..."
 cd "$PROJECT_ROOT" && npm run build
 
 # ============================================
+# Install xvfb for headless browser
+# ============================================
+install_xvfb() {
+    echo "🔧 Installing xvfb (headless display)..."
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y xvfb
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y xorg-x11-server-Xvfb
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y xorg-x11-server-Xvfb
+    fi
+}
+
+# Check if xvfb is needed (headless server)
+if [ -z "$DISPLAY" ] && ! command -v xvfb-run &> /dev/null; then
+    install_xvfb
+fi
+
+# ============================================
 # Start all services in production mode
 # ============================================
 echo "▶️ Starting all services..."
@@ -228,8 +254,14 @@ echo "▶️ Starting all services..."
 cd "$PROJECT_ROOT/server" && npm run start &
 SERVER_PID=$!
 
-cd "$PROJECT_ROOT/agent" && npm run start &
-AGENT_PID=$!
+# Start agent with xvfb if no display
+if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
+    cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
+    AGENT_PID=$!
+else
+    cd "$PROJECT_ROOT/agent" && npm run start &
+    AGENT_PID=$!
+fi
 
 cd "$PROJECT_ROOT/web" && npm run preview:host &
 WEB_PID=$!
