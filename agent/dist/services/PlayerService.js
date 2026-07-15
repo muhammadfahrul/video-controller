@@ -42,8 +42,15 @@ class PlayerService {
         await this.persist();
     }
     async openVideo(videoId) {
+        // If empty videoId, navigate to YouTube home
+        if (!videoId) {
+            await this.player.openHome();
+            await this.fullscreen();
+            return;
+        }
         await this.open(videoId);
         await this.play();
+        await this.fullscreen();
     }
     async play() {
         console.log("[PLAYER] play()");
@@ -143,12 +150,22 @@ class PlayerService {
             snapshot.currentTime <= 0) {
             return;
         }
+        // Skip if player is not ready (no video loaded)
+        if (this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING") {
+            return;
+        }
         console.log("[PLAYER] Restore position", snapshot.currentTime);
         await this.seek(snapshot.currentTime);
     }
     async restorePlaybackState() {
         const snapshot = this.getRestoredSnapshot();
         if (!snapshot) {
+            return;
+        }
+        // Skip if player is not ready (no video loaded)
+        if (this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING") {
             return;
         }
         if (snapshot.playing) {
@@ -161,11 +178,21 @@ class PlayerService {
         if (!snapshot) {
             return;
         }
+        // Skip if player is not ready (no video loaded)
+        if (this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING") {
+            return;
+        }
         await this.setVolume(snapshot.volume);
     }
     async restoreMute() {
         const snapshot = this.getRestoredSnapshot();
         if (!snapshot) {
+            return;
+        }
+        // Skip if player is not ready (no video loaded)
+        if (this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING") {
             return;
         }
         if (snapshot.muted) {

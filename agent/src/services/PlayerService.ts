@@ -104,11 +104,20 @@ export class PlayerService {
         videoId: string
     ) {
 
+        // If empty videoId, navigate to YouTube home
+        if (!videoId) {
+            await this.player.openHome();
+            await this.fullscreen();
+            return;
+        }
+
         await this.open(
             videoId
         );
 
         await this.play();
+
+        await this.fullscreen();
 
     }
 
@@ -351,6 +360,16 @@ export class PlayerService {
 
         }
 
+        // Skip if player is not ready (no video loaded)
+        if (
+            this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING"
+        ) {
+
+            return;
+
+        }
+
         console.log(
 
             "[PLAYER] Restore position",
@@ -374,6 +393,16 @@ export class PlayerService {
             this.getRestoredSnapshot();
 
         if (!snapshot) {
+
+            return;
+
+        }
+
+        // Skip if player is not ready (no video loaded)
+        if (
+            this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING"
+        ) {
 
             return;
 
@@ -406,6 +435,16 @@ export class PlayerService {
 
         }
 
+        // Skip if player is not ready (no video loaded)
+        if (
+            this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING"
+        ) {
+
+            return;
+
+        }
+
         await this.setVolume(
 
             snapshot.volume
@@ -422,6 +461,16 @@ export class PlayerService {
             this.getRestoredSnapshot();
 
         if (!snapshot) {
+
+            return;
+
+        }
+
+        // Skip if player is not ready (no video loaded)
+        if (
+            this.player.getState() === "IDLE" ||
+            this.player.getState() === "LOADING"
+        ) {
 
             return;
 

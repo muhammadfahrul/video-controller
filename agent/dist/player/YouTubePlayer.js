@@ -63,6 +63,24 @@ class YouTubePlayer {
         await this.dom.play();
         this.state = PlayerState_1.PlayerState.PLAYING;
     }
+    async openHome() {
+        this.navigating = true;
+        try {
+            this.state = PlayerState_1.PlayerState.LOADING;
+            LoggerService_1.LoggerService.info("Opening YouTube home");
+            const youtubeHome = ConfigService_1.ConfigService.getInstance().getConfig().youtube.home;
+            await this.page.goto(youtubeHome, {
+                waitUntil: "domcontentloaded"
+            });
+            // Wait for page to load
+            await this.page.waitForTimeout(2000);
+            this.state = PlayerState_1.PlayerState.READY;
+            LoggerService_1.LoggerService.info("YouTube home ready.");
+        }
+        finally {
+            this.navigating = false;
+        }
+    }
     async pause() {
         this.ensureReady();
         await this.dom.pause();

@@ -190,6 +190,16 @@ export class Agent {
 
         await this.player.restore()
 
+        // If no saved video, open YouTube home
+        const snapshot = await this.player.getSnapshot();
+        if (!snapshot || !snapshot.videoId) {
+            console.log("[AGENT] No saved video, opening YouTube home");
+            await this.player.openVideo("");
+        }
+
+        // Enter fullscreen on startup
+        await this.player.fullscreen();
+
         this.player.setOnEnded(async () => {
 
             console.log(

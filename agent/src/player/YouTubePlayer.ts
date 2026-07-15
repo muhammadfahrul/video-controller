@@ -122,6 +122,43 @@ export class YouTubePlayer {
 
     }
 
+    public async openHome(): Promise<void> {
+
+        this.navigating = true;
+
+        try {
+
+            this.state = PlayerState.LOADING;
+
+            LoggerService.info(
+                "Opening YouTube home"
+            );
+
+            const youtubeHome = ConfigService.getInstance().getConfig().youtube.home;
+            await this.page.goto(
+                youtubeHome,
+                {
+                    waitUntil: "domcontentloaded"
+                }
+            );
+
+            // Wait for page to load
+            await this.page.waitForTimeout(2000);
+
+            this.state = PlayerState.READY;
+
+            LoggerService.info(
+                "YouTube home ready."
+            );
+
+        } finally {
+
+            this.navigating = false;
+
+        }
+
+    }
+
 
     public async pause(): Promise<void> {
 
