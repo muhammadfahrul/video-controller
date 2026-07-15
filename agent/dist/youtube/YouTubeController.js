@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.YouTubeController = void 0;
 const eventemitter3_1 = __importDefault(require("eventemitter3"));
 const PlayerEvents_1 = require("../events/PlayerEvents");
+const ConfigService_1 = require("../services/ConfigService");
 class YouTubeController extends eventemitter3_1.default {
     page;
     constructor(page) {
@@ -13,7 +14,8 @@ class YouTubeController extends eventemitter3_1.default {
         this.page = page;
     }
     async open(videoId) {
-        await this.page.goto(`https://www.youtube.com/watch?v=${videoId}`, {
+        const youtubeHome = ConfigService_1.ConfigService.getInstance().getConfig().youtube.home;
+        await this.page.goto(`${youtubeHome}/watch?v=${videoId}`, {
             waitUntil: "networkidle"
         });
         await this.setupEndedListener();

@@ -9,6 +9,7 @@ import {
     PlayerEventListener
 } from "./PlayerEventListener";
 import { PlayerSnapshot } from "../types/PlayerSnapshot";
+import { ConfigService } from "../services/ConfigService";
 
 
 export class YouTubePlayer {
@@ -72,8 +73,9 @@ export class YouTubePlayer {
                 (window.navigator as any).chrome = true;
             });
 
+            const youtubeHome = ConfigService.getInstance().getConfig().youtube.home;
             await this.page.goto(
-                `https://www.youtube.com/watch?v=${videoId}`,
+                `${youtubeHome}/watch?v=${videoId}`,
                 {
                     waitUntil: "domcontentloaded"
                 }

@@ -5,6 +5,7 @@ const YouTubeDOM_1 = require("./YouTubeDOM");
 const PlayerState_1 = require("./PlayerState");
 const LoggerService_1 = require("../services/LoggerService");
 const PlayerEventListener_1 = require("./PlayerEventListener");
+const ConfigService_1 = require("../services/ConfigService");
 class YouTubePlayer {
     page;
     dom;
@@ -40,7 +41,8 @@ class YouTubePlayer {
                 // Prevent detection
                 window.navigator.chrome = true;
             });
-            await this.page.goto(`https://www.youtube.com/watch?v=${videoId}`, {
+            const youtubeHome = ConfigService_1.ConfigService.getInstance().getConfig().youtube.home;
+            await this.page.goto(`${youtubeHome}/watch?v=${videoId}`, {
                 waitUntil: "domcontentloaded"
             });
             // Wait a bit for player to initialize

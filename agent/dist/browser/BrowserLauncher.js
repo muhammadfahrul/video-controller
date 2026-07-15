@@ -24,10 +24,9 @@ class BrowserLauncher {
         }
     }
     async launchChrome(profile, options) {
-        // Use large viewport for maximized window (null causes issues)
-        const viewport = options.viewport ?? { width: 1920, height: 1080 };
+        const viewport = options.viewport;
         return playwright_1.chromium.launchPersistentContext(profile, {
-            channel: "chrome",
+            channel: options.channel ?? "chrome",
             headless: options.headless,
             viewport: viewport,
             args: options.args,

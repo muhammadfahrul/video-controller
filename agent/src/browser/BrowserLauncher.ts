@@ -68,8 +68,7 @@ export class BrowserLauncher {
         options: BrowserOptions
     ): Promise<BrowserContext> {
 
-        // Use large viewport for maximized window (null causes issues)
-        const viewport = options.viewport ?? { width: 1920, height: 1080 };
+        const viewport = options.viewport;
 
         return chromium.launchPersistentContext(
 
@@ -77,7 +76,7 @@ export class BrowserLauncher {
 
             {
 
-                channel: "chrome",
+                channel: options.channel ?? "chrome",
 
                 headless: options.headless,
 

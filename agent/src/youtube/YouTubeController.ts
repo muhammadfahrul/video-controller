@@ -2,6 +2,7 @@ import EventEmitter from "eventemitter3";
 import { Page } from "playwright";
 import type { PlayerStatus } from "../types/PlayerStatus";
 import { PlayerEvent } from "../events/PlayerEvents";
+import { ConfigService } from "../services/ConfigService";
 
 export class YouTubeController extends EventEmitter {
 
@@ -13,8 +14,9 @@ export class YouTubeController extends EventEmitter {
 
     async open(videoId: string): Promise<void> {
 
+        const youtubeHome = ConfigService.getInstance().getConfig().youtube.home;
         await this.page.goto(
-            `https://www.youtube.com/watch?v=${videoId}`,
+            `${youtubeHome}/watch?v=${videoId}`,
             {
                 waitUntil: "networkidle"
             }
