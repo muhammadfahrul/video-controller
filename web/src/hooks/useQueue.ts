@@ -13,6 +13,28 @@ export function useQueue() {
 
     useEffect(() => {
 
+        // Listen to queue:state for initial queue state
+        socketService.on(
+
+            "queue:state",
+
+            (snapshot: QueueState) => {
+
+                console.log(
+
+                    "[PWA] queue:state",
+
+                    snapshot
+
+                );
+
+                setQueue(snapshot);
+
+            }
+
+        );
+
+        // Listen to queue:update for queue changes
         socketService.on(
 
             "queue:update",
@@ -35,11 +57,8 @@ export function useQueue() {
 
         return () => {
 
-            socketService.off(
-
-                "queue:update"
-
-            );
+            socketService.off("queue:state");
+            socketService.off("queue:update");
 
         };
 

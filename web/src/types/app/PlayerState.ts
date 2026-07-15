@@ -16,4 +16,8 @@ export interface PlayerState {
 
     videoId?: string;
 
+    channel?: string;
+
+    thumbnail?: string;
+
 }

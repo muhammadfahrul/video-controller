@@ -183,7 +183,10 @@ class YouTubePlayer {
                 volume: 0,
                 muted: false,
                 fullscreen: false,
-                videoId: undefined
+                videoId: undefined,
+                title: undefined,
+                channel: undefined,
+                thumbnail: undefined
             };
         }
         try {
@@ -201,14 +204,62 @@ class YouTubePlayer {
                 const url = window.location.href;
                 const match = url.match(/[?&]v=([^&]+)/i);
                 const videoId = match?.[1];
+                // Get title from YouTube DOM - try multiple selectors
+                // Get title and channel from YouTube Player API (works in fullscreen)
+                let titleElement = null;
+                let channelElement = null;
+                let playerApiDuration = 0;
+                try {
+                    // Try to get data from YouTube Player API
+                    const moviePlayer = document.querySelector("#movie_player");
+                    if (moviePlayer && typeof moviePlayer.getVideoData === 'function') {
+                        const videoData = moviePlayer.getVideoData();
+                        if (videoData) {
+                            titleElement = videoData.title || null;
+                            channelElement = videoData.author || null;
+                            playerApiDuration = videoData.length_seconds || 0;
+                        }
+                    }
+                }
+                catch (e) {
+                    // Fallback to DOM if Player API fails
+                }
+                // Fallback to DOM if Player API didn't work
+                if (!titleElement) {
+                    titleElement =
+                        document.querySelector("h1.ytd-watch-metadata yt-formatted-string")?.textContent ||
+                            document.querySelector(".ytp-title-link")?.textContent ||
+                            document.querySelector(".title")?.textContent ||
+                            document.querySelector("yt-formatted-string.title")?.textContent ||
+                            document.querySelector("h1")?.textContent ||
+                            null;
+                }
+                if (!channelElement) {
+                    channelElement =
+                        document.querySelector("#channel-name a")?.textContent ||
+                            document.querySelector("#owner-name a")?.textContent ||
+                            document.querySelector("ytd-channel-name a")?.textContent ||
+                            document.querySelector(".ytp-title-channel-name")?.textContent ||
+                            document.querySelector("#upload-info #channel-name")?.textContent ||
+                            null;
+                }
+                // Use duration from Player API if available, otherwise from video element
+                const finalDuration = playerApiDuration > 0 ? playerApiDuration : duration;
+                // Get thumbnail from videoId
+                const thumbnail = videoId
+                    ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`
+                    : undefined;
                 return {
                     playing,
                     currentTime,
-                    duration,
+                    duration: finalDuration,
                     volume,
                     muted,
                     fullscreen,
-                    videoId
+                    videoId,
+                    title: titleElement || undefined,
+                    channel: channelElement || undefined,
+                    thumbnail
                 };
             });
         }
@@ -221,7 +272,10 @@ class YouTubePlayer {
                 volume: 0,
                 muted: false,
                 fullscreen: false,
-                videoId: undefined
+                videoId: undefined,
+                title: undefined,
+                channel: undefined,
+                thumbnail: undefined
             };
         }
     }

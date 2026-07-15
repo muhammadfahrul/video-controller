@@ -53,7 +53,13 @@ export function usePlayer() {
 
                         fullscreen: payload.player?.fullscreen ?? false,
 
-                        videoId: payload.player?.videoId
+                        videoId: payload.player?.videoId,
+
+                        title: payload.player?.title,
+
+                        channel: payload.player?.channel,
+
+                        thumbnail: payload.player?.thumbnail
 
                     });
                 }

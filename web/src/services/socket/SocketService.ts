@@ -126,7 +126,8 @@ export class SocketService {
                         event,
                         payload
                     );
-
+                    // Debug: Log ALL events
+                    console.log("[Socket] All events - event:", event, "payload:", payload);
                     callback(payload);
 
                 }

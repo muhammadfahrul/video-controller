@@ -14,4 +14,10 @@ export interface PlayerSnapshot {
 
     videoId?: string;
 
+    title?: string;
+
+    channel?: string;
+
+    thumbnail?: string;
+
 }
