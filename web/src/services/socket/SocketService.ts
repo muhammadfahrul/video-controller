@@ -2,9 +2,17 @@ import { io, Socket } from "socket.io-client";
 
 import { env } from "../../config/env";
 
+type EventCallback = (payload: unknown) => void;
+
+interface PendingHandler {
+    event: string;
+    callback: EventCallback;
+}
+
 export class SocketService {
 
     private socket?: Socket;
+    private pendingHandlers: PendingHandler[] = [];
 
     connect() {
 
@@ -38,6 +46,9 @@ export class SocketService {
                 this.socket?.id
             );
 
+            // Register pending handlers after connection
+            this.registerPendingHandlers();
+
         });
 
         this.socket.on("disconnect", (reason) => {
@@ -51,6 +62,38 @@ export class SocketService {
             );
 
         });
+
+    }
+
+    private registerPendingHandlers() {
+
+        for (const handler of this.pendingHandlers) {
+            
+            console.log(
+                "[Socket] Register pending handler:",
+                handler.event
+            );
+
+            const originalCallback = handler.callback;
+            
+            this.socket?.on(
+                handler.event,
+                (payload: unknown) => {
+
+                    console.log(
+                        "[Socket] Receive",
+                        handler.event,
+                        payload
+                    );
+
+                    originalCallback(payload);
+
+                }
+            );
+
+        }
+
+        this.pendingHandlers = [];
 
     }
 
@@ -71,20 +114,33 @@ export class SocketService {
             event
         );
 
-        this.socket?.on(
-            event,
-            (payload: T) => {
+        // If socket is already connected, register immediately
+        if (this.socket?.connected) {
+            
+            this.socket.on(
+                event,
+                (payload: T) => {
 
-                console.log(
-                    "[Socket] Receive",
-                    event,
-                    payload
-                );
+                    console.log(
+                        "[Socket] Receive",
+                        event,
+                        payload
+                    );
 
-                callback(payload);
+                    callback(payload);
 
-            }
-        );
+                }
+            );
+
+        } else {
+            
+            // Store handler to register after connection
+            this.pendingHandlers.push({
+                event,
+                callback: callback as EventCallback
+            });
+            
+        }
 
     }
 

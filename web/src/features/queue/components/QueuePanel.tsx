@@ -16,7 +16,8 @@ export default function QueuePanel() {
 
         agent,
 
-        queue
+        queue,
+        setQueue
 
     } = useAppStore();
 
@@ -112,6 +113,17 @@ export default function QueuePanel() {
 
                                 onRemove={()=>{
 
+                                    // Optimistic update - langsung hapus item dari UI
+                                    const newItems = queue.items.filter(
+                                        i => i.id !== item.id
+                                    );
+                                    
+                                    setQueue({
+                                        ...queue,
+                                        items: newItems
+                                    });
+                                    
+                                    // Kirim perintah ke server
                                     playerCommandService
                                         .removeQueue(
 

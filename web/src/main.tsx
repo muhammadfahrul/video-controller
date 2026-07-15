@@ -20,7 +20,12 @@ import {
     registerQueueListener
 } from "./services/socket";
 
+// Register socket listeners before connecting
 registerQueueListener();
+
+// Start player state listener
+const playerListener = new PlayerStateListener();
+playerListener.start();
 
 
 
