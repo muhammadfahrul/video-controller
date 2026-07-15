@@ -53,12 +53,34 @@ export class YouTubePlayer {
                 `Opening YouTube video ${videoId}`
             );
 
+            // Add stealth script before navigation
+            await this.page.addInitScript(() => {
+                // Override navigator.webdriver
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+
+                // Override permissions
+                const originalQuery = window.navigator.permissions.query;
+                window.navigator.permissions.query = (parameters: any) => (
+                    parameters.name === 'notifications' ?
+                        Promise.resolve({ state: Notification.permission } as PermissionStatus) :
+                        originalQuery(parameters)
+                );
+
+                // Prevent detection
+                (window.navigator as any).chrome = true;
+            });
+
             await this.page.goto(
                 `https://www.youtube.com/watch?v=${videoId}`,
                 {
-                    waitUntil: "networkidle"
+                    waitUntil: "domcontentloaded"
                 }
             );
+
+            // Wait a bit for player to initialize
+            await this.page.waitForTimeout(2000);
 
             await this.dom.waitUntilReady();
 

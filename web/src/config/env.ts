@@ -1,8 +1,7 @@
+import { getServerUrl } from "../utils/getServerUrl";
+
 export const env = {
 
-    apiUrl:
-
-        import.meta.env
-            .VITE_API_URL
+    apiUrl: getServerUrl()
 
 };

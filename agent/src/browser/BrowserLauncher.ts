@@ -111,4 +111,53 @@ export class BrowserLauncher {
 
     }
 
+    private getStealthScript(): string {
+        return `
+            // Override navigator.webdriver
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission } as PermissionStatus) :
+                    originalQuery(parameters)
+            );
+
+            // Override navigator.plugins
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+
+            // Override navigator.languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en']
+            });
+
+            // Add chrome runtime
+            window.chrome = {
+                runtime: {}
+            };
+
+            // Prevent detection of Playwright
+            window.navigator.chrome = true;
+        `;
+    }
+
+    public async launchWithStealth(
+        options: BrowserOptions
+    ): Promise<BrowserContext> {
+
+        const context = await this.launchPersistent(options);
+
+        // Add stealth script to all existing pages
+        for (const page of context.pages()) {
+            await page.addInitScript(this.getStealthScript());
+        }
+
+        return context;
+    }
+
 }

@@ -11,18 +11,20 @@ export class BrowserProfile {
 
     public getPath(): string {
 
-        if (!fs.existsSync(this.profileDir)) {
+        // if (!fs.existsSync(this.profileDir)) {
 
-            fs.mkdirSync(
-                this.profileDir,
-                {
-                    recursive: true
-                }
-            );
+        //     fs.mkdirSync(
+        //         this.profileDir,
+        //         {
+        //             recursive: true
+        //         }
+        //     );
 
-        }
+        // }
 
-        return this.profileDir;
+        // return this.profileDir;
+
+        return "";
 
     }
 

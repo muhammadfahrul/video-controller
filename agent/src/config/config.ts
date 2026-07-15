@@ -8,7 +8,19 @@ export const config = {
 
         args: [
 
-            "--start-maximized"
+            "--start-maximized",
+
+            "--disable-blink-features=AutomationControlled",
+
+            "--disable-dev-shm-usage",
+
+            "--no-sandbox",
+
+            "--disable-setuid-sandbox",
+
+            "--disable-web-security",
+
+            "--disable-features=IsolateOrigins,site-per-process"
 
         ]
 

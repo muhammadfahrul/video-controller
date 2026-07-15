@@ -64,7 +64,7 @@ export class BrowserManager {
 
         this.context =
 
-            await this.launcher.launchPersistent(
+            await this.launcher.launchWithStealth(
 
                 config.browser
 
