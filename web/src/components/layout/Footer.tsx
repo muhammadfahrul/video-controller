@@ -4,6 +4,8 @@ export default function Footer() {
 
         <footer
             className="
+                hidden
+                md:block
                 border-t
                 border-gray-200
                 bg-white

@@ -30,6 +30,18 @@ socketService.connect();
 
 
 
+// Register Service Worker for PWA
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Service worker registration failed, app still works
+    });
+  });
+}
+
+
+
 // Start Player State Listener
 
 const playerStateListener =

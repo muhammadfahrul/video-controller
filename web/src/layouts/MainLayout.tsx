@@ -11,18 +11,23 @@ export default function MainLayout() {
             className="
                 min-h-screen
                 bg-gray-100
+                md:bg-gray-200
             "
         >
 
+            {/* Mobile: Full width | Tablet/Desktop: Centered container */}
             <div
                 className="
                     mx-auto
                     flex
                     min-h-screen
-                    max-w-md
                     flex-col
                     bg-gray-50
-                    shadow-xl
+                    md:max-w-2xl
+                    md:shadow-xl
+                    md:my-4
+                    md:rounded-xl
+                    md:min-h-[calc(100vh-32px)]
                 "
             >
 
