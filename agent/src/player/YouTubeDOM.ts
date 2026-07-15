@@ -330,38 +330,55 @@ export class YouTubeDOM {
 
     public async skipAd(): Promise<boolean> {
 
-        console.log("[YouTubeDOM] Attempting to skip ad...");
+        // Check for skip button directly - this is the most reliable indicator
+        const hasSkipButton = await this.page.evaluate(() => {
 
-        // First, let's check if there's an ad playing
-        const isAdPlaying = await this.page.evaluate(() => {
+            const selectors = [
+                ".ytp-ad-skip-button",
+                ".ytp-ad-skip-button-modern",
+                ".videoAdUiSkipButton",
+                ".ytp-skip-ad-button"
+            ];
 
-            const video = document.querySelector("video");
-            const adContainer = document.querySelector(".ad-showing");
-            const player = document.querySelector("#movie_player");
+            for (const sel of selectors) {
+                const btn = document.querySelector(sel) as HTMLElement | null;
+                if (btn && btn.offsetParent !== null) { // Check if visible
+                    return true;
+                }
+            }
 
-            // Check various ad indicators
-            const hasAdOverlay = !!document.querySelector(".ytp-ad-module");
-            const hasAdText = !!document.querySelector(".ytp-ad-text");
-            const isAd = adContainer !== null || hasAdOverlay || hasAdText;
-
-            console.log("[YouTubeDOM] Ad detection:", {
-                hasVideo: !!video,
-                hasAdContainer: !!adContainer,
-                hasAdOverlay,
-                hasAdText,
-                isAd
-            });
-
-            return isAd;
+            return false;
 
         });
 
-        console.log("[YouTubeDOM] Is ad playing:", isAdPlaying);
+        // If no skip button found, check for ad indicators
+        if (!hasSkipButton) {
+            
+            const isAdPlaying = await this.page.evaluate(() => {
+                
+                const player = document.querySelector("#movie_player");
+                
+                // Check various ad indicators
+                const hasAdClass = player?.classList.contains("ad-showing");
+                const hasAdOverlay = !!document.querySelector(".ytp-ad-overlay-close-button");
+                const hasAdText = !!document.querySelector(".ytp-ad-text");
+                const hasVideoAdUi = !!document.querySelector(".videoAdUi");
+                
+                // Consider as ad if multiple indicators present
+                const indicatorCount = (hasAdClass ? 1 : 0) + (hasAdOverlay ? 1 : 0) + 
+                                     (hasAdText ? 1 : 0) + (hasVideoAdUi ? 1 : 0);
+                
+                return indicatorCount >= 2;
+                
+            });
 
-        if (!isAdPlaying) {
-            console.log("[YouTubeDOM] No ad detected, skipping skip attempt");
-            return false;
+            if (!isAdPlaying) {
+                return false;
+            }
+            
         }
+
+        console.log("[YouTubeDOM] Ad detected, attempting to skip...");
 
         // Try using Playwright's click for more reliable interaction
         const skipButtonSelectors = [
@@ -443,18 +460,22 @@ export class YouTubeDOM {
 
             }
 
-            // Try the generic skip button approach
-            const allButtons = document.querySelectorAll("button");
+            // Try the generic skip button approach - but be more specific
+            const allButtons = document.querySelectorAll("button, div[role='button']");
             
             for (const btn of allButtons) {
 
-                const text = btn.textContent?.toLowerCase() || "";
+                const text = btn.textContent?.toLowerCase().trim() || "";
                 const ariaLabel = btn.getAttribute("aria-label")?.toLowerCase() || "";
+                const ariaLabelOrphan = btn.getAttribute("aria-label-orphan")?.toLowerCase() || "";
                 
-                if (text.includes("skip") || ariaLabel.includes("skip")) {
+                // Only match if it specifically says "skip" (not "skip navigation")
+                if ((text === "skip" || text.includes("skip ad") || text.includes("skip advertisement")) ||
+                    (ariaLabel.includes("skip") && !ariaLabel.includes("navigation")) ||
+                    (ariaLabelOrphan.includes("skip"))) {
                     
-                    console.log("[YouTubeDOM] Found button with 'skip' text:", text);
-                    (btn as HTMLButtonElement).click();
+                    console.log("[YouTubeDOM] Found button with 'skip' text:", text, "aria:", ariaLabel);
+                    (btn as HTMLElement).click();
                     return true;
 
                 }

@@ -29,6 +29,8 @@ class Agent {
     commandDispatcher;
     playerStateTimer;
     queueStateTimer;
+    adSkipTimer;
+    autoSkipEnabled = true;
     identity;
     constructor() {
         this.browser =
@@ -94,6 +96,7 @@ class Agent {
         this.startPlayerStateSync();
         this.sendCurrentQueue();
         this.startQueueSync();
+        this.startAutoSkipAds();
     }
     getPlayer() {
         if (!this.player) {
@@ -146,6 +149,7 @@ class Agent {
         if (this.queueStateTimer) {
             clearInterval(this.queueStateTimer);
         }
+        this.stopAutoSkipAds();
         this.health?.stop();
     }
     startPlayerStateSync() {
@@ -175,6 +179,33 @@ class Agent {
                 console.error(err);
             }
         }, 1000);
+    }
+    startAutoSkipAds() {
+        this.adSkipTimer = setInterval(async () => {
+            try {
+                if (!this.autoSkipEnabled ||
+                    !this.player) {
+                    return;
+                }
+                // Skip ad if possible
+                const skipped = await this.player.skipAd();
+                if (skipped) {
+                    console.log("[Agent] Auto-skipped ad");
+                }
+            }
+            catch (err) {
+                // Ignore errors in auto-skip
+                console.log("[Agent] Auto-skip error (ignored):", err);
+            }
+        }, 
+        // Check every 500ms for ads
+        500);
+    }
+    stopAutoSkipAds() {
+        if (this.adSkipTimer) {
+            clearInterval(this.adSkipTimer);
+            this.adSkipTimer = undefined;
+        }
     }
     startQueueSync() {
         this.queueStateTimer =

@@ -90,6 +90,10 @@ export class Agent {
 
     private queueStateTimer?: NodeJS.Timeout;
 
+    private adSkipTimer?: NodeJS.Timeout;
+
+    private autoSkipEnabled = true;
+
     private identity:
     {
         id:string;
@@ -259,6 +263,8 @@ export class Agent {
         this.sendCurrentQueue();
 
         this.startQueueSync();
+
+        this.startAutoSkipAds();
 
     }
 
@@ -497,6 +503,8 @@ export class Agent {
 
         }
 
+        this.stopAutoSkipAds();
+
         this.health?.stop();
     }
 
@@ -566,6 +574,71 @@ export class Agent {
             1000
 
         );
+
+    }
+
+
+    private startAutoSkipAds() {
+
+        this.adSkipTimer = setInterval(
+
+            async () => {
+
+                try {
+
+                    if (
+                        !this.autoSkipEnabled ||
+                        !this.player
+                    ) {
+
+                        return;
+
+                    }
+
+                    // Skip ad if possible
+                    const skipped = await this.player.skipAd();
+
+                    if (skipped) {
+
+                        console.log(
+                            "[Agent] Auto-skipped ad"
+                        );
+
+                    }
+
+                }
+
+                catch (err) {
+
+                    // Ignore errors in auto-skip
+                    console.log(
+                        "[Agent] Auto-skip error (ignored):",
+                        err
+                    );
+
+                }
+
+            },
+
+            // Check every 500ms for ads
+            500
+
+        );
+
+    }
+
+
+    private stopAutoSkipAds() {
+
+        if (this.adSkipTimer) {
+
+            clearInterval(
+                this.adSkipTimer
+            );
+
+            this.adSkipTimer = undefined;
+
+        }
 
     }
 
