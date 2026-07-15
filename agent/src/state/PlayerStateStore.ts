@@ -1,4 +1,4 @@
-import { PlayerStatus } from "@shared";
+import type { PlayerStatus } from "../types/PlayerStatus";
 
 export class PlayerStateStore {
 
