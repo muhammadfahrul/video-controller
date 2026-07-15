@@ -2,6 +2,7 @@ import PlayerControls from "../features/player/components/PlayerControls";
 // import PlayerStatus from "../features/player/components/PlayerStatus";
 import ProgressBar from "../features/player/components/ProgressBar";
 import VolumeSlider from "../features/player/components/VolumeSlider";
+import CurrentVideo from "../features/player/components/CurrentVideo";
 import { useAppStore } from "../store/appStore";
 import { playerCommandService } from "../services";
 import { useAgent } from "../hooks/useAgent";
@@ -17,6 +18,8 @@ export default function HomePage(){
     return (
 
         <div className="space-y-6">
+
+            <CurrentVideo />
 
             {/* <PlayerStatus /> */}
 

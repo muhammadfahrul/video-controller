@@ -35,12 +35,27 @@ const handleClearQueue = () => {
 
 const handleShuffleQueue = () => {
     
+    // Simpan video yang sedang diputar sebelum shuffle
+    const currentVideoId = queue.currentIndex >= 0 
+        ? queue.items[queue.currentIndex]?.videoId 
+        : null;
+    
     // Optimistic update - langsung shuffle array
     const shuffledItems = [...queue.items].sort(() => Math.random() - 0.5);
     
+    // Update currentIndex agar sesuai dengan video yang sedang diputar
+    let newCurrentIndex = -1;
+    if (currentVideoId) {
+        newCurrentIndex = shuffledItems.findIndex(
+            item => item.videoId === currentVideoId
+        );
+    }
+    
     setQueue({
         ...queue,
-        items: shuffledItems
+        items: shuffledItems,
+        currentIndex: newCurrentIndex,
+        shuffle: true
     });
     
     // Kirim perintah ke server
