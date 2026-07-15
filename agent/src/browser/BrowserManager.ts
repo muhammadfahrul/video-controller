@@ -70,6 +70,18 @@ export class BrowserManager {
 
             );
 
+        // Maximize window after launch
+        const initialPages = this.context.pages();
+        if (initialPages.length > 0) {
+            const page = initialPages[0];
+            await page.evaluate(() => {
+                if (window.screen) {
+                    window.moveTo(0, 0);
+                    window.resizeTo(window.screen.availWidth, window.screen.availHeight);
+                }
+            });
+        }
+
         const browser =
             this.context.browser();
 
@@ -115,14 +127,14 @@ export class BrowserManager {
 
         }
 
-        const pages =
+        const allContextPages =
 
             this.context.pages();
 
-        if (pages.length > 0) {
+        if (allContextPages.length > 0) {
 
             this.page =
-                pages[0];
+                allContextPages[0];
 
         } else {
 
@@ -295,22 +307,19 @@ export class BrowserManager {
 
         // });
 
-        this.context.browser()?.on(
-
-            "disconnected",
-
-            () => {
-
-                LoggerService.warn(
-                    "Browser disconnected."
-                );
-
-                this.state =
-                    BrowserState.ERROR;
-
-            }
-
-        );
+        const browser = this.context?.browser();
+        if (browser) {
+            browser.on(
+                "disconnected",
+                () => {
+                    LoggerService.warn(
+                        "Browser disconnected."
+                    );
+                    this.state =
+                        BrowserState.ERROR;
+                }
+            );
+        }
 
     }
 

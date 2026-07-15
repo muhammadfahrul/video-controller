@@ -13,14 +13,7 @@ import type {
 } from "../types/QueueItem";
 import Card from "../../../shared/components/Card";
 
-import {
-    playerCommandService
-} from "../../../services/player";
 
-
-import {
-    useAppStore
-} from "../../../store/appStore";
 
 interface Props {
 
@@ -45,10 +38,6 @@ export default function QueueItemCard({
     onRemove
 
 }: Props) {
-
-    const {
-        agent
-    }=useAppStore();
 
     return (
 

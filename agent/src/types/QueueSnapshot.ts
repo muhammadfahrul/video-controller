@@ -1,20 +1,8 @@
+import { QueueItem } from "../queue/QueueItem";
+
 export interface QueueSnapshot {
 
-    items: {
-
-        id: string;
-
-        videoId: string;
-
-        title: string;
-
-        channel: string;
-
-        duration: string;
-
-        thumbnail: string;
-
-    }[];
+    items: QueueItem[];
 
     currentIndex: number;
 

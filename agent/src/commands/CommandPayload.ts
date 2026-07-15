@@ -1,5 +1,5 @@
 import { CommandType } from "./CommandType";
-import { QueueItemPayload } from "./QueueItemPayload";
+import type { QueueItemPayload } from "../types/QueueItemPayload";
 
 export interface CommandPayload {
 

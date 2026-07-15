@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { socketService } from "../services";
 import { useAppStore } from "../store/appStore";
+import type { QueueState } from "../types/app/QueueState";
 
 export function useQueue() {
 
@@ -16,7 +17,7 @@ export function useQueue() {
 
             "queue:update",
 
-            snapshot => {
+            (snapshot: QueueState) => {
 
                 console.log(
 

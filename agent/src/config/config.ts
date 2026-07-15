@@ -1,22 +1,71 @@
-export const config = {
+export interface AppConfig {
+
+    browser: {
+
+        headless: boolean;
+
+        channel: string | null;
+
+        args: string[];
+
+        viewport?: {
+
+            width: number;
+
+            height: number;
+
+        } | null;
+
+    };
+
+    youtube: {
+
+        home: string;
+
+    };
+
+    health: {
+
+        interval: number;
+
+    };
+
+    logging: {
+
+        level: string;
+
+    };
+
+}
+
+export const config: AppConfig = {
 
     browser: {
 
         headless: false,
 
-        channel: undefined,
+        channel: null,
+
+        viewport: {
+            width: 1920,
+            height: 1080
+        },
 
         args: [
 
             "--start-maximized",
 
-            "--disable-blink-features=AutomationControlled",
+            "--kiosk",
+
+            "--window-size=1920,1080",
+
+            "--window-position=0,0",
 
             "--disable-dev-shm-usage",
 
             "--no-sandbox",
 
-            "--disable-setuid-sandbox",
+            "--disable-blink-features=AutomationControlled",
 
             "--disable-web-security",
 
@@ -29,6 +78,18 @@ export const config = {
     youtube: {
 
         home: "https://www.youtube.com"
+
+    },
+
+    health: {
+
+        interval: 5000
+
+    },
+
+    logging: {
+
+        level: "info"
 
     }
 

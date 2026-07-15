@@ -145,7 +145,7 @@ export class SocketClient {
 
         );
 
-        this.socket.emit(
+        this.socket?.emit(
 
             SocketEvents.PLAYER_STATE,
 
@@ -162,7 +162,7 @@ export class SocketClient {
 
     ) {
 
-        this.socket.emit(
+        this.socket?.emit(
 
             SocketEvents.QUEUE_STATE,
 

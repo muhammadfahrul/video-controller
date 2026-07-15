@@ -7,6 +7,8 @@ import {
     useAppStore
 } from "../../store/appStore";
 
+import type { QueueState } from "../../types/app/QueueState";
+
 
 export function registerQueueListener(){
 
@@ -15,7 +17,7 @@ export function registerQueueListener(){
 
         "queue:update",
 
-        (snapshot)=>{
+        (snapshot: QueueState) => {
 
 
             console.log(

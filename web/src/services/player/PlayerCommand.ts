@@ -2,7 +2,7 @@ export interface PlayerCommand {
 
     agentId: string;
 
-    type: 
+    type:
 
         | "PLAY"
 
@@ -22,11 +22,46 @@ export interface PlayerCommand {
 
         | "REPEAT_ONE"
 
-        | "REPEAT_ALL";
+        | "REPEAT_ALL"
+
+        | "STOP"
+
+        | "NEXT"
+
+        | "PREVIOUS"
+
+        | "FULLSCREEN"
+
+        | "EXIT_FULLSCREEN"
+
+        | "TOGGLE_FULLSCREEN"
+
+        | "VOLUME"
+
+        | "MUTE"
+
+        | "UNMUTE"
+
+        | "OPEN_VIDEO"
+
+        | "ADD_QUEUE"
+
+        | string;
 
     volume?: number;
 
     seek?: number;
+
+    position?: number;
+
+    item?: {
+        id?: string;
+        videoId: string;
+        title?: string;
+        thumbnail?: string;
+        channel?: string;
+        duration?: string;
+    };
 
     videoId?: string;
 

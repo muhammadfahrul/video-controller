@@ -1,3 +1,5 @@
+import { PlayerService } from "../services/PlayerService";
+
 export class PlayerHealthCheck {
 
     constructor(

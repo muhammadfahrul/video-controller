@@ -4,8 +4,8 @@ import {
 
 } from "react-router-dom";
 
-import Header from "../components/layout/Header";
-import Footer from "../components/layout/Footer";
+import Header from "./Header";
+import Footer from "./Footer";
 
 export default function MainLayout() {
 

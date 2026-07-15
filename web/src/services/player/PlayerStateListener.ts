@@ -7,6 +7,8 @@ import {
     useAppStore
 } from "../../store/appStore";
 
+import type { PlayerState } from "../../types/app/PlayerState";
+
 
 export class PlayerStateListener {
 
@@ -18,7 +20,7 @@ export class PlayerStateListener {
 
             "player:update",
 
-            payload=>{
+            (payload: { player: PlayerState }) => {
 
 
                 console.log(

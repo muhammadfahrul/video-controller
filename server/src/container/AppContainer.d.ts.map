@@ -1,0 +1,1 @@
+{"version":3,"file":"AppContainer.d.ts","sourceRoot":"","sources":["AppContainer.ts"],"names":[],"mappings":"AAAA,OAAO,EACH,YAAY,EACf,MAAM,wBAAwB,CAAC;AAGhC,qBAAa,YAAY;IAErB,OAAO,CAAC,YAAY,CAAC,CACJ;IAGjB,eAAe,CACX,MAAM,EAAC,YAAY;IASvB,eAAe;CAMlB"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"CommandController.d.ts","sourceRoot":"","sources":["CommandController.ts"],"names":[],"mappings":"AAAA,OAAO,EACH,OAAO,EACP,QAAQ,EACX,MAAM,SAAS,CAAC;AAGjB,OAAO,EACH,cAAc,EACjB,MAAM,4BAA4B,CAAC;AAGpC,qBAAa,iBAAiB;IAItB,OAAO,CAAC,QAAQ,CAAC,OAAO;gBAAP,OAAO,EACpB,cAAc;IAKtB,IAAI,CACA,GAAG,EAAC,OAAO,EACX,GAAG,EAAC,QAAQ;CA4BnB"}

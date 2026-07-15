@@ -101,17 +101,12 @@ export class Agent {
         this.browser =
             new BrowserService();
 
-        this.queue =
-            new QueueService();
-
-        const repository =
-
+        const queueRepository =
             new QueueRepository();
 
         this.queue =
-
             new QueueService(
-                repository
+                queueRepository
             );
 
         this.commandDispatcher =

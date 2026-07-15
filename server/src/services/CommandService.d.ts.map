@@ -1,0 +1,1 @@
+{"version":3,"file":"CommandService.d.ts","sourceRoot":"","sources":["CommandService.ts"],"names":[],"mappings":"AAAA,OAAO,EACH,YAAY,EACf,MAAM,wBAAwB,CAAC;AAGhC,qBAAa,cAAc;IAInB,OAAO,CAAC,QAAQ,CAAC,MAAM;gBAAN,MAAM,EACnB,YAAY;IAKpB,IAAI,CACA,OAAO,EAAC,MAAM,EACd,OAAO,EAAC,GAAG;CAalB"}

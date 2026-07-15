@@ -28,6 +28,30 @@ export class YouTubeController extends EventEmitter {
 
     }
 
+    private async setupEndedListener(): Promise<void> {
+
+        this.page.on("framenavigated", async () => {
+
+            await this.page.evaluate(() => {
+
+                const video = document.querySelector("video");
+
+                if (video) {
+
+                    video.addEventListener("ended", () => {
+
+                        this.emit(PlayerEvent.ENDED);
+
+                    });
+
+                }
+
+            });
+
+        });
+
+    }
+
     async play(): Promise<void> {
 
         await this.page.evaluate(() => {

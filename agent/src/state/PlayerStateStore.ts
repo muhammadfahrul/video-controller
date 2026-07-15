@@ -4,9 +4,15 @@ export class PlayerStateStore {
 
     private state: PlayerStatus = {
 
+        videoId: null,
+
+        title: null,
+
         playing: false,
 
         paused: true,
+
+        ended: false,
 
         volume: 100,
 

@@ -1,11 +1,6 @@
 import QueueEmpty from "./QueueEmpty";
 import QueueItemCard from "./QueueItem";
 
-import type {
-
-    QueueItem
-
-} from "../types/QueueItem";
 import { useAppStore } from "../../../store/appStore";
 
 import {

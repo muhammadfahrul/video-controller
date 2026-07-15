@@ -42,13 +42,7 @@ import {
 
 export default function PlayerControls() {
 
-    const {
-
-        play,
-
-        pause
-
-    } = usePlayerControls();
+    const { } = usePlayerControls();
 
     const {
 

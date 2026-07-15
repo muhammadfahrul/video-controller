@@ -319,6 +319,14 @@ export class YouTubePlayer {
 
     }
 
+    public async isFullscreen(): Promise<boolean> {
+
+        this.ensureReady();
+
+        return await this.dom.isFullscreen();
+
+    }
+
 
     public async onEvent(
         callback:

@@ -1,11 +1,11 @@
 {
   "player": {
-    "playing": true,
-    "currentTime": 52,
-    "duration": 1777.481,
-    "volume": 50,
+    "playing": false,
+    "currentTime": 17.359022,
+    "duration": 225.841,
+    "volume": 67,
     "muted": false,
-    "fullscreen": true,
-    "videoId": "yHGBi1LksJ0"
+    "fullscreen": false,
+    "videoId": "FiqSOnwYAx0"
   }
 }

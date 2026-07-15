@@ -1,0 +1,25 @@
+{
+    "browser": {
+        "headless": false,
+        "channel": "chrome",
+        "args": [
+            "--start-maximized",
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-web-security",
+            "--disable-features=IsolateOrigins,site-per-process"
+        ],
+        "viewport": null
+    },
+    "youtube": {
+        "home": "https://www.youtube.com"
+    },
+    "health": {
+        "interval": 5000
+    },
+    "logging": {
+        "level": "info"
+    }
+}

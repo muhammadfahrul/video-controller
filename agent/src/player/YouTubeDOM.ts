@@ -13,6 +13,7 @@ import { Page } from "playwright";
 import { YouTubeSelectors } from "./YouTubeSelectors";
 import { PlayerEvents } from "./PlayerEvents";
 import { PlayerEventPayload } from "./PlayerEventPayload";
+import { VideoSnapshot } from "../types/VideoSnapshot";
 
 
 
@@ -322,6 +323,16 @@ export class YouTubeDOM {
 
             await document.documentElement
                 .requestFullscreen();
+
+        });
+
+    }
+
+    public async isFullscreen(): Promise<boolean> {
+
+        return await this.page.evaluate(() => {
+
+            return !!document.fullscreenElement;
 
         });
 

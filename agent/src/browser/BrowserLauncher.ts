@@ -68,6 +68,9 @@ export class BrowserLauncher {
         options: BrowserOptions
     ): Promise<BrowserContext> {
 
+        // Use large viewport for maximized window (null causes issues)
+        const viewport = options.viewport ?? { width: 1920, height: 1080 };
+
         return chromium.launchPersistentContext(
 
             profile,
@@ -78,9 +81,18 @@ export class BrowserLauncher {
 
                 headless: options.headless,
 
-                viewport: options.viewport,
+                viewport: viewport,
 
-                args: options.args
+                args: options.args,
+
+                // Launch in fullscreen/maximized mode
+                locale: "en-US",
+
+                geolocation: { latitude: 0, longitude: 0 },
+
+                permissions: ["geolocation"],
+
+
 
             }
 
@@ -93,6 +105,9 @@ export class BrowserLauncher {
         options: BrowserOptions
     ): Promise<BrowserContext> {
 
+        // Use large viewport for maximized window
+        const viewport = options.viewport ?? { width: 1920, height: 1080 };
+
         return chromium.launchPersistentContext(
 
             profile,
@@ -101,9 +116,15 @@ export class BrowserLauncher {
 
                 headless: options.headless,
 
-                viewport: options.viewport,
+                viewport: viewport,
 
-                args: options.args
+                args: options.args,
+
+                locale: "en-US",
+
+                geolocation: { latitude: 0, longitude: 0 },
+
+                permissions: ["geolocation"]
 
             }
 

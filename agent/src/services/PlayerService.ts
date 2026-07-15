@@ -14,8 +14,10 @@ import { PlayerRepository } from "../repositories/PlayerRepository";
 export class PlayerService {
 
 
-    private player:
+    private player!:
         YouTubePlayer;
+
+    private repository?: PlayerRepository;
 
     private restoredSnapshot?: PlayerSnapshot;
 
@@ -28,12 +30,17 @@ export class PlayerService {
 
 
     constructor(
-        page:Page,
-        private readonly repository: PlayerRepository
+        page?: Page,
+        repository?: PlayerRepository
     ){
 
-        this.player =
-            new YouTubePlayer(page);
+        if (page) {
+            this.player = new YouTubePlayer(page);
+        }
+
+        if (repository) {
+            this.repository = repository;
+        }
 
     }
 
@@ -73,7 +80,7 @@ export class PlayerService {
 
             await this.getSnapshot();
 
-        await this.repository.save({
+        await this.repository?.save({
 
             player: snapshot
 
@@ -263,13 +270,12 @@ export class PlayerService {
 
         const data =
 
-            await this.repository.load();
+            await this.repository?.load();
 
-        this.restoredSnapshot =
-            data.player;
-
-        this.lastHealthySnapshot =
-            data.player;
+        if (data) {
+            this.restoredSnapshot = data.player;
+            this.lastHealthySnapshot = data.player;
+        }
 
         return this.restoredSnapshot;
 

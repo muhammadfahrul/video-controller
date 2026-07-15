@@ -1,27 +1,22 @@
-import { BrowserChannel } from "../browser/BrowserChannel";
-import { AppConfig } from "./AppConfig";
-
 export class ConfigValidator {
 
     public static validate(
 
-        config: AppConfig
+        config: unknown
 
     ): void {
 
-        this.validateBrowser(config);
+        this.validateBrowser(config as any);
 
     }
 
     private static validateBrowser(
 
-        config: AppConfig
+        config: { browser: { channel: string | null } }
 
     ) {
 
-        const channel =
-
-            config.browser.channel;
+        const channel = config.browser.channel;
 
         if (channel === null) {
 
@@ -29,13 +24,8 @@ export class ConfigValidator {
 
         }
 
-        const valid = Object.values(
-
-            BrowserChannel
-
-        ).includes(channel);
-
-        if (!valid) {
+        // Allow any channel string
+        if (typeof channel !== "string") {
 
             throw new Error(
 

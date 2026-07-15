@@ -1,14 +1,12 @@
-import { BrowserChannel } from "./BrowserChannel";
-
 export interface BrowserOptions {
 
     headless: boolean;
 
-    channel: BrowserChannel | null;
+    channel: string | null;
 
     args: string[];
 
-    viewport: {
+    viewport?: {
 
         width: number;
 

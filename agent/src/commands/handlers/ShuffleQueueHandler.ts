@@ -1,7 +1,7 @@
 import {
     CommandHandler,
     CommandPayload
-} from "../types";
+} from "../index";
 
 import {
     QueueService

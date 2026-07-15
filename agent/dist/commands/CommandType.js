@@ -1,0 +1,27 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CommandType = void 0;
+var CommandType;
+(function (CommandType) {
+    CommandType["PLAY"] = "PLAY";
+    CommandType["PAUSE"] = "PAUSE";
+    CommandType["NEXT"] = "NEXT";
+    CommandType["PREVIOUS"] = "PREVIOUS";
+    CommandType["VOLUME"] = "VOLUME";
+    CommandType["SEEK"] = "SEEK";
+    CommandType["MUTE"] = "MUTE";
+    CommandType["UNMUTE"] = "UNMUTE";
+    CommandType["STOP"] = "STOP";
+    CommandType["OPEN_VIDEO"] = "OPEN_VIDEO";
+    CommandType["FULLSCREEN"] = "FULLSCREEN";
+    CommandType["EXIT_FULLSCREEN"] = "EXIT_FULLSCREEN";
+    CommandType["TOGGLE_FULLSCREEN"] = "TOGGLE_FULLSCREEN";
+    CommandType["ADD_QUEUE"] = "ADD_QUEUE";
+    CommandType["REMOVE_QUEUE"] = "REMOVE_QUEUE";
+    CommandType["CLEAR_QUEUE"] = "CLEAR_QUEUE";
+    CommandType["PLAY_QUEUE_ITEM"] = "PLAY_QUEUE_ITEM";
+    CommandType["SHUFFLE_QUEUE"] = "SHUFFLE_QUEUE";
+    CommandType["REPEAT_OFF"] = "REPEAT_OFF";
+    CommandType["REPEAT_ONE"] = "REPEAT_ONE";
+    CommandType["REPEAT_ALL"] = "REPEAT_ALL";
+})(CommandType || (exports.CommandType = CommandType = {}));

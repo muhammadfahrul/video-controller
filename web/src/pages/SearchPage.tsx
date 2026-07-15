@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
-import AgentStatusCard from "../features/agent/components/AgentStatusCard";
 import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
-import QueuePanel from "../features/queue/components/QueuePanel";
 import { useAppStore } from "../store/appStore";
 import { useAgent } from "../hooks/useAgent";
 import { useQueue } from "../hooks/useQueue";
@@ -20,7 +18,7 @@ export default function SearchPage(){
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const { agent, setAgent, loadAgent } = useAppStore();
+    const { setAgent, loadAgent } = useAppStore();
 
     const search = async () => {
         if (!keyword.trim()) {

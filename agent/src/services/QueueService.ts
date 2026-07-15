@@ -1,4 +1,5 @@
 import { RepeatMode } from "../queue/RepeatMode";
+import { QueueItem } from "../queue/QueueItem";
 import { QueueRepository } from "../repositories/QueueRepository";
 import { QueuePersistence } from "../types/QueuePersistence";
 import { QueueSnapshot } from "../types/QueueSnapshot";
@@ -174,7 +175,7 @@ export class QueueService {
 
     }
 
-    public async remove(id: string): boolean {
+    public async remove(id: string): Promise<boolean> {
 
         const index = this.items.findIndex(
             item => item.id === id

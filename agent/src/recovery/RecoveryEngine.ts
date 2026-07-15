@@ -105,7 +105,7 @@ export class RecoveryEngine {
 
                             await this.restoreSettings();
 
-                            await this.page.waitForTimeout(300);
+                            await this.context.browser.getPage().waitForTimeout(300);
 
                             await this.restorePlayback();
 

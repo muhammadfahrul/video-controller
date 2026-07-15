@@ -1,4 +1,4 @@
-import config from "../config/config.json";
+import { config } from "../config/config";
 import { ConfigValidator } from "../config/ConfigValidator";
 import { getLocalIpAddress } from "../utils/network";
 
