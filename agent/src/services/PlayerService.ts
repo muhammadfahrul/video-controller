@@ -183,6 +183,12 @@ export class PlayerService {
 
     }
 
+    public async skipAd(): Promise<boolean> {
+
+        return await this.player.skipAd();
+
+    }
+
     public async mute() {
 
         await this.player.mute();

@@ -46,6 +46,8 @@ export interface PlayerCommand {
 
         | "ADD_QUEUE"
 
+        | "SKIP_AD"
+
         | string;
 
     volume?: number;

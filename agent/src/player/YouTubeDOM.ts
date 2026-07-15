@@ -328,6 +328,146 @@ export class YouTubeDOM {
 
     }
 
+    public async skipAd(): Promise<boolean> {
+
+        console.log("[YouTubeDOM] Attempting to skip ad...");
+
+        // First, let's check if there's an ad playing
+        const isAdPlaying = await this.page.evaluate(() => {
+
+            const video = document.querySelector("video");
+            const adContainer = document.querySelector(".ad-showing");
+            const player = document.querySelector("#movie_player");
+
+            // Check various ad indicators
+            const hasAdOverlay = !!document.querySelector(".ytp-ad-module");
+            const hasAdText = !!document.querySelector(".ytp-ad-text");
+            const isAd = adContainer !== null || hasAdOverlay || hasAdText;
+
+            console.log("[YouTubeDOM] Ad detection:", {
+                hasVideo: !!video,
+                hasAdContainer: !!adContainer,
+                hasAdOverlay,
+                hasAdText,
+                isAd
+            });
+
+            return isAd;
+
+        });
+
+        console.log("[YouTubeDOM] Is ad playing:", isAdPlaying);
+
+        if (!isAdPlaying) {
+            console.log("[YouTubeDOM] No ad detected, skipping skip attempt");
+            return false;
+        }
+
+        // Try using Playwright's click for more reliable interaction
+        const skipButtonSelectors = [
+            ".ytp-ad-skip-button",
+            ".ytp-ad-skip-button-modern",
+            ".videoAdUiSkipButton",
+            ".ytp-skip-ad-button",
+            ".ytp-ad-skip-button-container button"
+        ];
+
+        for (const selector of skipButtonSelectors) {
+
+            try {
+
+                const button = await this.page.$(selector);
+
+                if (button) {
+
+                    const isVisible = await button.isVisible();
+
+                    if (isVisible) {
+
+                        console.log("[YouTubeDOM] Clicking skip button via Playwright:", selector);
+                        
+                        // Wait for the button to be actionable
+                        await button.waitForElementState("visible", { timeout: 2000 });
+                        
+                        // Click using Playwright for more reliable click
+                        await button.click();
+
+                        console.log("[YouTubeDOM] Successfully clicked skip button");
+                        return true;
+
+                    }
+
+                }
+
+            } catch (err) {
+
+                console.log("[YouTubeDOM] Error clicking", selector, err);
+
+            }
+
+        }
+
+        // Fallback: try with page.evaluate
+        return await this.page.evaluate(async () => {
+
+            console.log("[YouTubeDOM] Trying fallback click method...");
+
+            const skipButtonSelectors = [
+                ".ytp-ad-skip-button",
+                ".ytp-ad-skip-button-modern", 
+                ".videoAdUiSkipButton",
+                ".ytp-skip-ad-button"
+            ];
+
+            for (const selector of skipButtonSelectors) {
+
+                const skipButton = document.querySelector(selector) as HTMLButtonElement | null;
+
+                if (skipButton) {
+
+                    console.log("[YouTubeDOM] Found and clicking:", selector);
+                    
+                    // Use both click and programmatic dispatch
+                    skipButton.click();
+
+                    // Also try dispatching click event
+                    skipButton.dispatchEvent(new MouseEvent("click", {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    }));
+
+                    return true;
+
+                }
+
+            }
+
+            // Try the generic skip button approach
+            const allButtons = document.querySelectorAll("button");
+            
+            for (const btn of allButtons) {
+
+                const text = btn.textContent?.toLowerCase() || "";
+                const ariaLabel = btn.getAttribute("aria-label")?.toLowerCase() || "";
+                
+                if (text.includes("skip") || ariaLabel.includes("skip")) {
+                    
+                    console.log("[YouTubeDOM] Found button with 'skip' text:", text);
+                    (btn as HTMLButtonElement).click();
+                    return true;
+
+                }
+
+            }
+
+            console.log("[YouTubeDOM] No skip button found");
+            return false;
+
+        });
+
+    }
+
     public async isFullscreen(): Promise<boolean> {
 
         return await this.page.evaluate(() => {

@@ -40,5 +40,7 @@ export enum CommandType {
 
     REPEAT_ONE = "REPEAT_ONE",
 
-    REPEAT_ALL = "REPEAT_ALL"
+    REPEAT_ALL = "REPEAT_ALL",
+
+    SKIP_AD = "SKIP_AD"
 }

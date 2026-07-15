@@ -24,6 +24,8 @@ export * from "./handlers/UnmuteHandler";
 
 export * from "./handlers/StopHandler";
 
+export * from "./handlers/SkipAdHandler";
+
 export * from "./handlers/NextHandler";
 
 export * from "./handlers/PreviousHandler";

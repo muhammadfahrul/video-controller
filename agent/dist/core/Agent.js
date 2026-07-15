@@ -11,6 +11,7 @@ const FullscreenHandler_1 = require("../commands/handlers/FullscreenHandler");
 const ExitFullscreenHandler_1 = require("../commands/handlers/ExitFullscreenHandler");
 const ToggleFullscreenHandler_1 = require("../commands/handlers/ToggleFullscreenHandler");
 const RepeatModeHandler_1 = require("../commands/handlers/RepeatModeHandler");
+const SkipAdHandler_1 = require("../commands/handlers/SkipAdHandler");
 const RepeatMode_1 = require("../queue/RepeatMode");
 const QueueRepository_1 = require("../repositories/QueueRepository");
 const PlayerRepository_1 = require("../repositories/PlayerRepository");
@@ -128,6 +129,7 @@ class Agent {
         this.commandDispatcher.register(commands_1.CommandType.REPEAT_OFF, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.OFF));
         this.commandDispatcher.register(commands_1.CommandType.REPEAT_ONE, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.ONE));
         this.commandDispatcher.register(commands_1.CommandType.REPEAT_ALL, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.ALL));
+        this.commandDispatcher.register(commands_1.CommandType.SKIP_AD, new SkipAdHandler_1.SkipAdHandler(this.player));
     }
     getSocketClient() {
         return this.socketClient;

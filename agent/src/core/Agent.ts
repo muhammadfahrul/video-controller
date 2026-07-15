@@ -46,6 +46,7 @@ import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
+import { SkipAdHandler } from "../commands/handlers/SkipAdHandler";
 import { RepeatMode } from "../queue/RepeatMode";
 import { QueueRepository } from "../repositories/QueueRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
@@ -443,6 +444,13 @@ export class Agent {
             new RepeatModeHandler(
                 this.queue,
                 RepeatMode.ALL
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.SKIP_AD,
+            new SkipAdHandler(
+                this.player!
             )
         );
     }

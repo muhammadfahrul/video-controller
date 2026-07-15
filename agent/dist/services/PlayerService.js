@@ -73,6 +73,9 @@ class PlayerService {
         await this.player.seek(seconds);
         await this.persist();
     }
+    async skipAd() {
+        return await this.player.skipAd();
+    }
     async mute() {
         await this.player.mute();
         await this.persist();

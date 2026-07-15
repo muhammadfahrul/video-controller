@@ -27,6 +27,7 @@ __exportStar(require("./handlers/SeekHandler"), exports);
 __exportStar(require("./handlers/MuteHandler"), exports);
 __exportStar(require("./handlers/UnmuteHandler"), exports);
 __exportStar(require("./handlers/StopHandler"), exports);
+__exportStar(require("./handlers/SkipAdHandler"), exports);
 __exportStar(require("./handlers/NextHandler"), exports);
 __exportStar(require("./handlers/PreviousHandler"), exports);
 __exportStar(require("./handlers/FullscreenHandler"), exports);

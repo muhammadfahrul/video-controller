@@ -16,7 +16,9 @@ import {
 
     Maximize2,
 
-    Minimize2
+    Minimize2,
+
+    FastForward
 
 } from "lucide-react";
 
@@ -210,6 +212,16 @@ export default function PlayerControls() {
         }
         
         playerCommandService.previous(agent.id)
+    }
+
+    function handleSkipAd() {
+        if (!agent.id) {
+
+            return;
+            
+        }
+        
+        playerCommandService.skipAd(agent.id)
     }
 
     return (
@@ -428,6 +440,18 @@ export default function PlayerControls() {
                     }
 
                     onClick={handleFullscreen}
+
+                    disabled={disabled}
+
+                />
+
+                <ControlButton
+
+                    icon={<FastForward size={22}/>}
+
+                    label="Skip Ad"
+
+                    onClick={handleSkipAd}
 
                     disabled={disabled}
 

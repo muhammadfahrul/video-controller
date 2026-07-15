@@ -24,4 +24,5 @@ var CommandType;
     CommandType["REPEAT_OFF"] = "REPEAT_OFF";
     CommandType["REPEAT_ONE"] = "REPEAT_ONE";
     CommandType["REPEAT_ALL"] = "REPEAT_ALL";
+    CommandType["SKIP_AD"] = "SKIP_AD";
 })(CommandType || (exports.CommandType = CommandType = {}));

@@ -357,6 +357,15 @@ export class PlayerCommandService {
         });
 
     }
+
+    skipAd(
+        agentId:string
+    ){
+        this.emit({
+            agentId,
+            type:"SKIP_AD"
+        });
+    }
 }
 
 export const playerCommandService =

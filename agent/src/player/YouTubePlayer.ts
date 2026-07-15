@@ -170,6 +170,14 @@ export class YouTubePlayer {
 
     }
 
+    public async skipAd(): Promise<boolean> {
+
+        this.ensureReady();
+
+        return await this.dom.skipAd();
+
+    }
+
 
     public async setVolume(
         volume: number

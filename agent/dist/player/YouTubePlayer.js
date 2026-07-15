@@ -86,6 +86,10 @@ class YouTubePlayer {
         await this.dom.pause();
         this.state = PlayerState_1.PlayerState.PAUSED;
     }
+    async skipAd() {
+        this.ensureReady();
+        return await this.dom.skipAd();
+    }
     async setVolume(volume) {
         this.ensureReady();
         console.log("YouTubePlayer.setVolume", volume);
