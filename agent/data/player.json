@@ -1,9 +1,9 @@
 {
   "player": {
-    "playing": false,
-    "currentTime": 17.359022,
+    "playing": true,
+    "currentTime": 0,
     "duration": 225.841,
-    "volume": 67,
+    "volume": 16,
     "muted": false,
     "fullscreen": false,
     "videoId": "FiqSOnwYAx0"
