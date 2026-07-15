@@ -62,6 +62,12 @@ const handleRepeat = (mode: string) => {
     
 };
 
+const repeatModes = [
+    { mode: "OFF", label: "Repeat Off" },
+    { mode: "ALL", label: "Repeat All" },
+    { mode: "ONE", label: "Repeat One" }
+];
+
 
 return (
 
@@ -69,6 +75,7 @@ return (
 className="
 flex
 gap-2
+flex-wrap
 "
 >
 
@@ -76,6 +83,15 @@ gap-2
 <button
 
 onClick={handleShuffleQueue}
+
+className="
+px-3
+py-1
+text-sm
+bg-gray-200
+rounded
+hover:bg-gray-300
+"
 
 >
 
@@ -89,6 +105,15 @@ Shuffle
 
 onClick={handleClearQueue}
 
+className="
+px-3
+py-1
+text-sm
+bg-gray-200
+rounded
+hover:bg-gray-300
+"
+
 >
 
 Clear
@@ -96,16 +121,39 @@ Clear
 </button>
 
 
-<button
-
-onClick={() => handleRepeat("ALL")}
-
->
-
-Repeat All
-
-</button>
-
+{
+    
+    repeatModes.map(({ mode, label }) => (
+        
+        <button
+        
+            key={mode}
+            
+            onClick={() => handleRepeat(mode)}
+            
+            className={
+                `
+                    px-3
+                    py-1
+                    text-sm
+                    rounded
+                    `
+                +
+                (queue.repeat === mode
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 hover:bg-gray-300"
+                )
+            }
+        
+        >
+        
+            {label}
+        
+        </button>
+        
+    ))
+    
+}
 
 
 </div>

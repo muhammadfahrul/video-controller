@@ -1,5 +1,5 @@
 import PlayerControls from "../features/player/components/PlayerControls";
-import PlayerStatus from "../features/player/components/PlayerStatus";
+// import PlayerStatus from "../features/player/components/PlayerStatus";
 import ProgressBar from "../features/player/components/ProgressBar";
 import VolumeSlider from "../features/player/components/VolumeSlider";
 import { useAppStore } from "../store/appStore";
@@ -18,7 +18,7 @@ export default function HomePage(){
 
         <div className="space-y-6">
 
-            <PlayerStatus />
+            {/* <PlayerStatus /> */}
 
             <ProgressBar />
 
