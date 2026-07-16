@@ -2,7 +2,14 @@ import { Outlet } from "react-router-dom";
 
 import Footer from "./Footer";
 
+import FullPageLoading from "../shared/components/FullPageLoading";
+
+import { useAppStore } from "../store/appStore";
+
 export default function MainLayout() {
+
+    const globalLoading = useAppStore((state)=>state.globalLoading);
+    const initialLoading = useAppStore((state)=>state.initialLoading);
 
     return (
 
@@ -13,6 +20,8 @@ export default function MainLayout() {
                 md:bg-gray-200
             "
         >
+
+            {(globalLoading || initialLoading) && <FullPageLoading />}
 
             {/* Mobile: Full width | Tablet/Desktop: Centered container */}
             <div

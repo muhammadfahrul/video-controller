@@ -103,6 +103,18 @@ interface AppStore {
         value: boolean
     ): void;
 
+    globalLoading: boolean;
+
+    setGlobalLoading(
+        value: boolean
+    ): void;
+
+    initialLoading: boolean;
+
+    setInitialLoading(
+        value: boolean
+    ): void;
+
     loadAgent(
         value: AgentState
     ): void;
@@ -199,6 +211,14 @@ create<AppStore>((set)=>({
 
     removingItemId: null as string | null,
 
+    globalLoading: false,
+
+    initialLoading: true,
+
+    setInitialLoading:(value)=>set({ initialLoading:value }),
+
+    setGlobalLoading:(value)=>set({ globalLoading:value }),
+
     setAgent:(value)=>
 
         set(state=>({
@@ -251,17 +271,27 @@ create<AppStore>((set)=>({
 
     setProcessing:(key, value)=>
 
-        set(state=>({
+        set(state=>{
 
-            processing:{
+            const newProcessing = {
 
                 ...state.processing,
 
                 [key]:value
 
-            }
+            };
 
-        })),
+            const hasAnyProcessing = Object.values(newProcessing).some(v=>v);
+
+            return {
+
+                processing:newProcessing,
+
+                globalLoading:hasAnyProcessing
+
+            };
+
+        }),
 
     setRemovingItemId:(id)=>
 
@@ -277,7 +307,9 @@ create<AppStore>((set)=>({
 
         set({
 
-            addingToQueue: value
+            addingToQueue: value,
+
+            globalLoading: value
 
         }),
 

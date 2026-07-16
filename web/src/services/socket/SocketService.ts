@@ -2,6 +2,8 @@ import { io, Socket } from "socket.io-client";
 
 import { env } from "../../config/env";
 
+import { useAppStore } from "../../store/appStore";
+
 type EventCallback = (payload: unknown) => void;
 
 interface PendingHandler {
@@ -48,6 +50,11 @@ export class SocketService {
 
             // Register pending handlers after connection
             this.registerPendingHandlers();
+
+            // Disable initial loading after data is received
+            setTimeout(() => {
+                useAppStore.getState().setInitialLoading(false);
+            }, 1000);
 
         });
 

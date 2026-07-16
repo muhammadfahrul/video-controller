@@ -1,5 +1,7 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { Home, ListMusic, Search, Settings } from "lucide-react";
+
+import MenuLink from "../shared/components/MenuLink";
 
 export default function Footer() {
 
@@ -56,7 +58,7 @@ export default function Footer() {
                 {navItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
-                        <NavLink
+                        <MenuLink
                             key={item.path}
                             to={item.path}
                             className={`
@@ -69,7 +71,7 @@ export default function Footer() {
                         >
                             <item.icon className="h-4 w-4" />
                             <span className="text-xs">{item.label}</span>
-                        </NavLink>
+                        </MenuLink>
                     );
                 })}
             </nav>
