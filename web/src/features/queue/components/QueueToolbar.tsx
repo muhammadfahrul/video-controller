@@ -14,7 +14,6 @@ export default function QueueToolbar(){
 const {
     agent,
     queue,
-    setQueue,
     processing,
     setProcessing
 }=useAppStore();
@@ -22,66 +21,26 @@ const {
 
 const handleClearQueue = () => {
     
-    // Optimistic update - langsung kosongkan queue
-    setQueue({
-        ...queue,
-        items: [],
-        currentIndex: -1
-    });
-    
     // Set processing state
     setProcessing("clearQueue", true);
     
-    // Kirim perintah ke server
+    // Kirim perintah ke server - tunggu response sebelum update UI
     playerCommandService.clearQueue(agent.id);
     
     setTimeout(() => setProcessing("clearQueue", false), 500);
     
 };
 
-
-// Fisher-Yates shuffle algorithm - proper unbiased shuffle
-const shuffleArray = <T,>(array: T[]): T[] => {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-};
-
-
 const handleShuffleQueue = () => {
-    
-    // Simpan video yang sedang diputar sebelum shuffle
-    const currentVideoId = queue.currentIndex >= 0 
-        ? queue.items[queue.currentIndex]?.videoId 
-        : null;
-    
-    // Optimistic update - langsung shuffle array dengan algoritma yang benar
-    const shuffledItems = shuffleArray(queue.items);
-    
-    // Update currentIndex agar sesuai dengan video yang sedang diputar
-    let newCurrentIndex = -1;
-    if (currentVideoId) {
-        newCurrentIndex = shuffledItems.findIndex(
-            item => item.videoId === currentVideoId
-        );
-    }
-    
-    setQueue({
-        ...queue,
-        items: shuffledItems,
-        currentIndex: newCurrentIndex,
-        shuffle: true
-    });
     
     // Set processing state
     setProcessing("shuffleQueue", true);
     
-    // Kirim perintah ke server
+    // Kirim perintah ke server - tunggu response sebelum update UI
+    // Server akan broadcast queue state baru setelah shuffle selesai
     playerCommandService.shuffleQueue(agent.id);
     
+    // Reset processing state setelah delay (dari server response)
     setTimeout(() => setProcessing("shuffleQueue", false), 500);
     
 };
@@ -89,16 +48,10 @@ const handleShuffleQueue = () => {
 
 const handleRepeat = (mode: string) => {
     
-    // Optimistic update - langsung update repeat mode
-    setQueue({
-        ...queue,
-        repeat: mode
-    });
-    
     // Set processing state
     setProcessing("repeat", true);
     
-    // Kirim perintah ke server
+    // Kirim perintah ke server - tunggu response sebelum update UI
     playerCommandService.repeat(agent.id, mode);
     
     setTimeout(() => setProcessing("repeat", false), 500);

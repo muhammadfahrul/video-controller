@@ -28,6 +28,8 @@ interface Props {
     onRemove(): void;
 
     removing?: boolean;
+    
+    disabled?: boolean;
 
 }
 
@@ -41,7 +43,9 @@ export default function QueueItemCard({
 
     onRemove,
 
-    removing = false
+    removing = false,
+    
+    disabled = false
 
 }: Props) {
 
@@ -163,7 +167,7 @@ export default function QueueItemCard({
 
                 }}
 
-                disabled={removing}
+                disabled={removing || disabled}
 
                 className={`
                     self-start
@@ -171,13 +175,13 @@ export default function QueueItemCard({
                     p-2
                     text-red-500
                     transition
-                    ${removing 
+                    ${removing || disabled
                         ? "opacity-50 cursor-not-allowed" 
                         : "hover:bg-red-50"}
                 `}
             >
 
-                {removing ? (
+                {removing || disabled ? (
                     <Loader2 size={18} className="animate-spin" />
                 ) : (
                     <Trash2 size={18} />

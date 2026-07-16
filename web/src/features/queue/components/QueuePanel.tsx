@@ -17,9 +17,10 @@ export default function QueuePanel() {
         agent,
 
         queue,
-        setQueue,
         removingItemId,
-        setRemovingItemId
+        setRemovingItemId,
+        processing,
+        setProcessing
 
     } = useAppStore();
 
@@ -101,6 +102,8 @@ export default function QueuePanel() {
                                 }
 
                                 removing={removingItemId === item.id}
+                                
+                                disabled={processing.removeFromQueue}
 
                                 onPlay={()=>{
 
@@ -120,17 +123,10 @@ export default function QueuePanel() {
                                     // Set removing state
                                     setRemovingItemId(item.id);
                                     
-                                    // Optimistic update - langsung hapus item dari UI
-                                    const newItems = queue.items.filter(
-                                        i => i.id !== item.id
-                                    );
+                                    // Set processing state
+                                    setProcessing("removeFromQueue", true);
                                     
-                                    setQueue({
-                                        ...queue,
-                                        items: newItems
-                                    });
-                                    
-                                    // Kirim perintah ke server
+                                    // Kirim perintah ke server - tunggu response sebelum update UI
                                     playerCommandService
                                         .removeQueue(
 
@@ -140,7 +136,10 @@ export default function QueuePanel() {
 
                                         );
 
-                                    setTimeout(() => setRemovingItemId(null), 500);
+                                    setTimeout(() => {
+                                        setRemovingItemId(null);
+                                        setProcessing("removeFromQueue", false);
+                                    }, 500);
 
                                 }}
 
