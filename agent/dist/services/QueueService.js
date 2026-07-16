@@ -120,22 +120,40 @@ class QueueService {
         }
         this.shuffleEnabled = true;
         const current = this.items[this.currentIndex];
-        const shuffled = [...this.items];
-        for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [
-                shuffled[i],
-                shuffled[j]
-            ] = [
-                shuffled[j],
-                shuffled[i]
-            ];
-        }
+        let shuffled;
+        let attempts = 0;
+        // Retry shuffle until order is different from original
+        do {
+            shuffled = [...this.items];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [
+                    shuffled[i],
+                    shuffled[j]
+                ] = [
+                    shuffled[j],
+                    shuffled[i]
+                ];
+            }
+            attempts++;
+        } while (this.isSameOrder(this.items, shuffled) &&
+            attempts < 10);
         this.items =
             shuffled;
         this.currentIndex =
             this.items.findIndex(item => item.id === current.id);
         await this.persist();
+    }
+    isSameOrder(original, shuffled) {
+        if (original.length !== shuffled.length) {
+            return false;
+        }
+        for (let i = 0; i < original.length; i++) {
+            if (original[i].id !== shuffled[i].id) {
+                return false;
+            }
+        }
+        return true;
     }
     async setRepeatMode(mode) {
         this.repeatMode = mode;

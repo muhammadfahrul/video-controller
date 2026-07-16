@@ -251,29 +251,40 @@ export class QueueService {
         const current =
             this.items[this.currentIndex];
 
-        const shuffled =
-            [...this.items];
+        let shuffled: QueueItem[];
+        let attempts = 0;
+        
+        // Retry shuffle until order is different from original
+        do {
+            shuffled = [...this.items];
+            
+            for (
+                let i = shuffled.length - 1;
+                i > 0;
+                i--
+            ) {
 
-        for (
-            let i = shuffled.length - 1;
-            i > 0;
-            i--
-        ) {
+                const j =
+                    Math.floor(
+                        Math.random() * (i + 1)
+                    );
 
-            const j =
-                Math.floor(
-                    Math.random() * (i + 1)
-                );
+                [
+                    shuffled[i],
+                    shuffled[j]
+                ] = [
+                    shuffled[j],
+                    shuffled[i]
+                ];
 
-            [
-                shuffled[i],
-                shuffled[j]
-            ] = [
-                shuffled[j],
-                shuffled[i]
-            ];
-
-        }
+            }
+            
+            attempts++;
+            
+        } while (
+            this.isSameOrder(this.items, shuffled) && 
+            attempts < 10
+        );
 
         this.items =
             shuffled;
@@ -286,6 +297,25 @@ export class QueueService {
 
         await this.persist();
 
+    }
+    
+    private isSameOrder(
+        original: QueueItem[],
+        shuffled: QueueItem[]
+    ): boolean {
+        
+        if (original.length !== shuffled.length) {
+            return false;
+        }
+        
+        for (let i = 0; i < original.length; i++) {
+            if (original[i].id !== shuffled[i].id) {
+                return false;
+            }
+        }
+        
+        return true;
+        
     }
 
     public async setRepeatMode(
