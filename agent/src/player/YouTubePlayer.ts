@@ -86,6 +86,8 @@ export class YouTubePlayer {
 
             await this.dom.waitUntilReady();
 
+            // Reset ended listener to ensure it's attached to the new video
+            this.endedListenerInitialized = false;
             await this.setupEndedListener();
 
             await this.attachEvents();
@@ -612,20 +614,24 @@ export class YouTubePlayer {
 
     private async setupEndedListener() {
 
+        // Register the exposed function only once
+        if (!this.endedFunctionRegistered) {
+            await this.page.exposeFunction(
+                "youtubeEnded",
+                () => {
+
+                    console.log("[YOUTUBE] ended");
+
+                    this.onEnded?.();
+
+                }
+            );
+            this.endedFunctionRegistered = true;
+        }
+
         if (this.endedListenerInitialized) {
             return;
         }
-
-        await this.page.exposeFunction(
-            "youtubeEnded",
-            () => {
-
-                console.log("[YOUTUBE] ended");
-
-                this.onEnded?.();
-
-            }
-        );
 
         await this.page.waitForSelector("video");
 
@@ -638,6 +644,7 @@ export class YouTubePlayer {
                 return;
             }
 
+            // Check if listener already attached to this video element
             if (video.dataset.endedAttached === "true") {
                 return;
             }

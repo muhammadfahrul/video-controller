@@ -73,10 +73,15 @@ class Agent {
             console.log("[AGENT] No saved video, opening YouTube home");
             await this.player.openVideo("");
         }
+        // Load queue state BEFORE setting up ended callback
+        // This ensures repeatMode is restored before queue.next() is called
+        await this.queue.load();
+        console.log("[QUEUE] Restored", this.queue.size(), "items");
         // Enter fullscreen on startup
         await this.player.fullscreen();
+        // Set up ended callback AFTER queue.load() to ensure repeatMode is restored
         this.player.setOnEnded(async () => {
-            console.log("[AGENT] Video ended");
+            console.log("[AGENT] Video ended, repeatMode:", this.queue.getRepeatMode());
             const next = await this.queue.next();
             if (!next) {
                 console.log("[QUEUE] No next item");
@@ -87,8 +92,6 @@ class Agent {
                 .openVideo(next.videoId);
         });
         this.registerCommands();
-        await this.queue.load();
-        console.log("[QUEUE] Restored", this.queue.size(), "items");
         this.socketClient.connect();
         this.heartbeat =
             new network_1.HeartbeatService(this.socketClient);
