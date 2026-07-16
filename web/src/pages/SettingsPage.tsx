@@ -1,7 +1,11 @@
 import { useAppStore } from "../store/appStore";
+import { useAgent } from "../hooks/useAgent";
 import AgentStatusCard from "../features/agent/components/AgentStatusCard";
 
 export default function SettingsPage() {
+
+    // Initialize agent connection and state
+    useAgent();
 
     const { agent } = useAppStore();
 
