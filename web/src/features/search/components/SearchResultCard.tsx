@@ -16,7 +16,8 @@ import {
 import {
 
     Play,
-    Plus
+    Plus,
+    Loader2
 
 } from "lucide-react";
 
@@ -35,7 +36,11 @@ export default function SearchResultCard({
 
     const {
 
-        agent
+        agent,
+        addingToQueue,
+        setAddingToQueue,
+        setProcessing,
+        processing
 
     } = useAppStore();
 
@@ -55,6 +60,9 @@ export default function SearchResultCard({
 
         );
 
+        setProcessing("play", true);
+        setTimeout(() => setProcessing("play", false), 500);
+
     };
 
     const addQueue = () => {
@@ -64,6 +72,8 @@ export default function SearchResultCard({
             return;
 
         }
+
+        setAddingToQueue(true);
 
         playerCommandService.addQueue(
 
@@ -94,6 +104,8 @@ export default function SearchResultCard({
             }
 
         );
+
+        setTimeout(() => setAddingToQueue(false), 500);
 
     };
 
@@ -168,7 +180,9 @@ export default function SearchResultCard({
 
                         onClick={play}
 
-                        className="
+                        disabled={!agent.id || processing.play}
+
+                        className={`
                             flex
                             items-center
                             gap-2
@@ -179,14 +193,20 @@ export default function SearchResultCard({
                             text-sm
                             text-white
                             transition
-                            hover:bg-red-700
-                        "
+                            ${!agent.id || processing.play
+                                ? "opacity-50 cursor-not-allowed" 
+                                : "hover:bg-red-700"}
+                        `}
 
                     >
 
-                        <Play size={16} />
+                        {processing.play ? (
+                            <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                            <Play size={16} />
+                        )}
 
-                        Play
+                        {processing.play ? "Playing..." : "Play"}
 
                     </button>
 
@@ -194,7 +214,9 @@ export default function SearchResultCard({
 
                         onClick={addQueue}
                         
-                        className="
+                        disabled={!agent.id || addingToQueue}
+                        
+                        className={`
                             flex
                             items-center
                             gap-2
@@ -204,13 +226,19 @@ export default function SearchResultCard({
                             py-2
                             text-sm
                             transition
-                            hover:bg-gray-100
-                        "
+                            ${!agent.id || addingToQueue
+                                ? "opacity-50 cursor-not-allowed" 
+                                : "hover:bg-gray-100"}
+                        `}
                     >
 
-                        <Plus size={16} />
+                        {addingToQueue ? (
+                            <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                            <Plus size={16} />
+                        )}
 
-                        Playlist
+                        {addingToQueue ? "Adding..." : "Playlist"}
 
                     </button>
 

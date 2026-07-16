@@ -101,19 +101,28 @@ export default function VolumeSlider({
 
                 onMouseUp={()=>{
 
-                    onChange(localValue);
+                    if (!disabled) {
+
+                        onChange(localValue);
+
+                    }
 
                 }}
 
                 onTouchEnd={()=>{
 
-                    onChange(localValue);
+                    if (!disabled) {
+
+                        onChange(localValue);
+
+                    }
 
                 }}
 
-                className="
+                className={`
                     w-full
-                "
+                    ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+                `}
 
             />
 

@@ -24,6 +24,40 @@ import type {
 
 } from "../types/app/SearchState";
 
+interface ProcessingState {
+
+    play: boolean;
+
+    pause: boolean;
+
+    stop: boolean;
+
+    next: boolean;
+
+    previous: boolean;
+
+    volume: boolean;
+
+    mute: boolean;
+
+    fullscreen: boolean;
+
+    search: boolean;
+
+    addToQueue: boolean;
+
+    removeFromQueue: boolean;
+
+    skipAd: boolean;
+
+    clearQueue: boolean;
+
+    shuffleQueue: boolean;
+
+    repeat: boolean;
+
+}
+
 interface AppStore {
 
     agent: AgentState;
@@ -33,6 +67,8 @@ interface AppStore {
     queue: QueueState;
 
     search: SearchState;
+
+    processing: ProcessingState;
 
     setAgent(
         value: Partial<AgentState>
@@ -48,6 +84,23 @@ interface AppStore {
 
     setSearch(
         value: Partial<SearchState>
+    ): void;
+
+    setProcessing(
+        key: keyof ProcessingState,
+        value: boolean
+    ): void;
+
+    removingItemId: string | null;
+
+    setRemovingItemId(
+        id: string | null
+    ): void;
+
+    addingToQueue: boolean;
+
+    setAddingToQueue(
+        value: boolean
     ): void;
 
     loadAgent(
@@ -110,6 +163,42 @@ create<AppStore>((set)=>({
 
     },
 
+    processing:{
+
+        play: false,
+
+        pause: false,
+
+        stop: false,
+
+        next: false,
+
+        previous: false,
+
+        volume: false,
+
+        mute: false,
+
+        fullscreen: false,
+
+        search: false,
+
+        addToQueue: false,
+
+        removeFromQueue: false,
+
+        clearQueue: false,
+
+        shuffleQueue: false,
+
+        repeat: false,
+
+        skipAd: false
+
+    },
+
+    removingItemId: null as string | null,
+
     setAgent:(value)=>
 
         set(state=>({
@@ -159,6 +248,38 @@ create<AppStore>((set)=>({
             }
 
         })),
+
+    setProcessing:(key, value)=>
+
+        set(state=>({
+
+            processing:{
+
+                ...state.processing,
+
+                [key]:value
+
+            }
+
+        })),
+
+    setRemovingItemId:(id)=>
+
+        set({
+
+            removingItemId: id
+
+        }),
+
+    addingToQueue: false,
+
+    setAddingToQueue:(value)=>
+
+        set({
+
+            addingToQueue: value
+
+        }),
 
     loadAgent:(value)=>
 

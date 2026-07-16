@@ -14,7 +14,9 @@ export default function QueueToolbar(){
 const {
     agent,
     queue,
-    setQueue
+    setQueue,
+    processing,
+    setProcessing
 }=useAppStore();
 
 
@@ -27,9 +29,25 @@ const handleClearQueue = () => {
         currentIndex: -1
     });
     
+    // Set processing state
+    setProcessing("clearQueue", true);
+    
     // Kirim perintah ke server
     playerCommandService.clearQueue(agent.id);
     
+    setTimeout(() => setProcessing("clearQueue", false), 500);
+    
+};
+
+
+// Fisher-Yates shuffle algorithm - proper unbiased shuffle
+const shuffleArray = <T,>(array: T[]): T[] => {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
 };
 
 
@@ -40,8 +58,8 @@ const handleShuffleQueue = () => {
         ? queue.items[queue.currentIndex]?.videoId 
         : null;
     
-    // Optimistic update - langsung shuffle array
-    const shuffledItems = [...queue.items].sort(() => Math.random() - 0.5);
+    // Optimistic update - langsung shuffle array dengan algoritma yang benar
+    const shuffledItems = shuffleArray(queue.items);
     
     // Update currentIndex agar sesuai dengan video yang sedang diputar
     let newCurrentIndex = -1;
@@ -58,8 +76,13 @@ const handleShuffleQueue = () => {
         shuffle: true
     });
     
+    // Set processing state
+    setProcessing("shuffleQueue", true);
+    
     // Kirim perintah ke server
     playerCommandService.shuffleQueue(agent.id);
+    
+    setTimeout(() => setProcessing("shuffleQueue", false), 500);
     
 };
 
@@ -72,8 +95,13 @@ const handleRepeat = (mode: string) => {
         repeat: mode
     });
     
+    // Set processing state
+    setProcessing("repeat", true);
+    
     // Kirim perintah ke server
     playerCommandService.repeat(agent.id, mode);
+    
+    setTimeout(() => setProcessing("repeat", false), 500);
     
 };
 
@@ -99,18 +127,21 @@ flex-wrap
 
 onClick={handleShuffleQueue}
 
-className="
+disabled={processing.shuffleQueue}
+
+className={`
 px-3
 py-1
 text-sm
-bg-gray-200
 rounded
-hover:bg-gray-300
-"
+${processing.shuffleQueue 
+    ? "bg-gray-300 cursor-not-allowed" 
+    : "bg-gray-200 hover:bg-gray-300"}
+`}
 
 >
 
-Shuffle
+{processing.shuffleQueue ? "Shuffling..." : "Shuffle"}
 
 </button>
 
@@ -120,18 +151,21 @@ Shuffle
 
 onClick={handleClearQueue}
 
-className="
+disabled={processing.clearQueue}
+
+className={`
 px-3
 py-1
 text-sm
-bg-gray-200
 rounded
-hover:bg-gray-300
-"
+${processing.clearQueue 
+    ? "bg-gray-300 cursor-not-allowed" 
+    : "bg-gray-200 hover:bg-gray-300"}
+`}
 
 >
 
-Clear
+{processing.clearQueue ? "Clearing..." : "Clear"}
 
 </button>
 
@@ -146,6 +180,8 @@ Clear
             
             onClick={() => handleRepeat(mode)}
             
+            disabled={processing.repeat}
+            
             className={
                 `
                     px-3
@@ -155,14 +191,18 @@ Clear
                     `
                 +
                 (queue.repeat === mode
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
+                    ? processing.repeat
+                        ? "bg-blue-400 cursor-not-allowed"
+                        : "bg-blue-500 text-white"
+                    : processing.repeat
+                        ? "bg-gray-300 cursor-not-allowed"
+                        : "bg-gray-200 hover:bg-gray-300"
                 )
             }
         
         >
         
-            {label}
+            {processing.repeat ? "..." : label}
         
         </button>
         

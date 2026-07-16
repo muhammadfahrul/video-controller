@@ -50,7 +50,11 @@ export default function PlayerControls() {
 
         player,
 
-        agent
+        agent,
+
+        processing,
+
+        setProcessing
 
     } = useAppStore();
 
@@ -102,6 +106,10 @@ export default function PlayerControls() {
 
         }
 
+        const action = player.playing ? "pause" : "play";
+        
+        setProcessing(action, true);
+
         if (player.playing) {
 
             playerCommandService.pause(
@@ -122,6 +130,8 @@ export default function PlayerControls() {
 
         }
 
+        setTimeout(() => setProcessing(action, false), 500);
+
     }
 
     function handleMute() {
@@ -131,6 +141,8 @@ export default function PlayerControls() {
             return;
 
         }
+
+        setProcessing("mute", true);
 
         if (player.muted) {
 
@@ -152,6 +164,8 @@ export default function PlayerControls() {
 
         }
 
+        setTimeout(() => setProcessing("mute", false), 500);
+
     }
 
     function handleFullscreen() {
@@ -161,6 +175,8 @@ export default function PlayerControls() {
             return;
 
         }
+
+        setProcessing("fullscreen", true);
 
         if (player.fullscreen) {
 
@@ -182,6 +198,8 @@ export default function PlayerControls() {
 
         }
 
+        setTimeout(() => setProcessing("fullscreen", false), 500);
+
     }
 
     function handleStop() {
@@ -191,7 +209,9 @@ export default function PlayerControls() {
             
         }
         
-        playerCommandService.stop(agent.id)
+        setProcessing("stop", true);
+        playerCommandService.stop(agent.id);
+        setTimeout(() => setProcessing("stop", false), 500);
     }
 
     function handleNext() {
@@ -201,7 +221,9 @@ export default function PlayerControls() {
             
         }
         
-        playerCommandService.next(agent.id)
+        setProcessing("next", true);
+        playerCommandService.next(agent.id);
+        setTimeout(() => setProcessing("next", false), 500);
     }
 
     function handlePrev() {
@@ -211,7 +233,9 @@ export default function PlayerControls() {
             
         }
         
-        playerCommandService.previous(agent.id)
+        setProcessing("previous", true);
+        playerCommandService.previous(agent.id);
+        setTimeout(() => setProcessing("previous", false), 500);
     }
 
     function handleSkipAd() {
@@ -221,7 +245,9 @@ export default function PlayerControls() {
             
         }
         
-        playerCommandService.skipAd(agent.id)
+        setProcessing("skipAd", true);
+        playerCommandService.skipAd(agent.id);
+        setTimeout(() => setProcessing("skipAd", false), 500);
     }
 
     return (
@@ -321,7 +347,9 @@ export default function PlayerControls() {
 
                     onClick={handlePrev}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.previous}
+
+                    loading={processing.previous}
 
                 />
 
@@ -359,7 +387,9 @@ export default function PlayerControls() {
 
                     onClick={handlePlayPause}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.play || processing.pause}
+
+                    loading={processing.play || processing.pause}
 
                 />
 
@@ -373,7 +403,9 @@ export default function PlayerControls() {
 
                     onClick={handleStop}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.stop}
+
+                    loading={processing.stop}
 
                 />
 
@@ -385,7 +417,9 @@ export default function PlayerControls() {
 
                     onClick={handleNext}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.next}
+
+                    loading={processing.next}
 
                 />
 
@@ -413,7 +447,9 @@ export default function PlayerControls() {
 
                     onClick={handleMute}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.mute}
+
+                    loading={processing.mute}
 
                 />
 
@@ -441,7 +477,9 @@ export default function PlayerControls() {
 
                     onClick={handleFullscreen}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.fullscreen}
+
+                    loading={processing.fullscreen}
 
                 />
 
@@ -453,7 +491,9 @@ export default function PlayerControls() {
 
                     onClick={handleSkipAd}
 
-                    disabled={disabled}
+                    disabled={disabled || processing.skipAd}
+
+                    loading={processing.skipAd}
 
                 />
 

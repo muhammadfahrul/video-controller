@@ -4,6 +4,12 @@ import type {
 
 } from "react";
 
+import {
+
+    Loader2
+
+} from "lucide-react";
+
 interface Props {
 
     icon: ReactNode;
@@ -19,6 +25,8 @@ interface Props {
 
     disabled: boolean;
 
+    loading?: boolean;
+
 }
 
 export default function ControlButton({
@@ -31,7 +39,9 @@ export default function ControlButton({
 
     variant = "secondary",
 
-    disabled = false
+    disabled = false,
+
+    loading = false
 
 }: Props) {
 
@@ -64,13 +74,19 @@ export default function ControlButton({
                 p-4
                 transition
                 ${styles[variant]}
+                ${disabled || loading ? "opacity-50 cursor-not-allowed" : ""}
             `}
 
-            disabled={disabled}
+            disabled={disabled || loading}
 
         >
 
-            {icon}
+            {loading ? (
+                <Loader2 
+                    className="animate-spin" 
+                    size={24} 
+                />
+            ) : icon}
 
             <span
                 className="

@@ -18,7 +18,7 @@ export default function SearchPage(){
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const { setAgent, loadAgent } = useAppStore();
+    const { setAgent, loadAgent, setProcessing } = useAppStore();
 
     const search = async () => {
         if (!keyword.trim()) {
@@ -28,6 +28,7 @@ export default function SearchPage(){
 
         try {
             setLoading(true);
+            setProcessing("search", true);
             setError("");
             const response = await searchService.search(keyword);
             setResults(response);
@@ -35,6 +36,7 @@ export default function SearchPage(){
             setError("Search failed");
         } finally {
             setLoading(false);
+            setProcessing("search", false);
         }
     };
 
@@ -76,6 +78,7 @@ export default function SearchPage(){
                 value={keyword}
                 onChange={setKeyword}
                 onSearch={search}
+                loading={loading}
             />
 
             {loading && (

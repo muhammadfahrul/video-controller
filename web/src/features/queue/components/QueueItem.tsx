@@ -2,7 +2,9 @@ import {
 
     Trash2,
 
-    Play
+    Play,
+
+    Loader2
 
 } from "lucide-react";
 
@@ -25,6 +27,8 @@ interface Props {
 
     onRemove(): void;
 
+    removing?: boolean;
+
 }
 
 export default function QueueItemCard({
@@ -35,7 +39,9 @@ export default function QueueItemCard({
 
     onPlay,
 
-    onRemove
+    onRemove,
+
+    removing = false
 
 }: Props) {
 
@@ -157,17 +163,25 @@ export default function QueueItemCard({
 
                 }}
 
-                className="
+                disabled={removing}
+
+                className={`
                     self-start
                     rounded-lg
                     p-2
                     text-red-500
                     transition
-                    hover:bg-red-50
-                "
+                    ${removing 
+                        ? "opacity-50 cursor-not-allowed" 
+                        : "hover:bg-red-50"}
+                `}
             >
 
-                <Trash2 size={18} />
+                {removing ? (
+                    <Loader2 size={18} className="animate-spin" />
+                ) : (
+                    <Trash2 size={18} />
+                )}
 
             </button>
 

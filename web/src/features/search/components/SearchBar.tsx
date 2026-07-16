@@ -1,6 +1,8 @@
 import {
 
-    Search
+    Search,
+
+    Loader2
 
 } from "lucide-react";
 
@@ -14,6 +16,8 @@ interface Props {
 
     onSearch(): void;
 
+    loading?: boolean;
+
 }
 
 export default function SearchBar({
@@ -22,7 +26,9 @@ export default function SearchBar({
 
     onChange,
 
-    onSearch
+    onSearch,
+
+    loading = false
 
 }:Props){
 
@@ -87,7 +93,9 @@ export default function SearchBar({
 
                 onClick={onSearch}
 
-                className="
+                disabled={loading}
+
+                className={`
                     absolute
                     right-2
                     top-1/2
@@ -98,12 +106,19 @@ export default function SearchBar({
                     py-2
                     text-sm
                     text-white
-                    hover:bg-red-700
-                "
+                    ${loading 
+                        ? "opacity-50 cursor-not-allowed" 
+                        : "hover:bg-red-700"}
+                `}
 
             >
 
-                Search
+                {loading ? (
+                    <span className="flex items-center gap-2">
+                        <Loader2 size={16} className="animate-spin" />
+                        Searching...
+                    </span>
+                ) : "Search"}
 
             </button>
 
