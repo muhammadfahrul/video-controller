@@ -1,7 +1,6 @@
 import { Outlet } from "react-router-dom";
 
-import Header from "../components/layout/Header";
-import Footer from "../components/layout/Footer";
+import Footer from "./Footer";
 
 export default function MainLayout() {
 
@@ -31,13 +30,12 @@ export default function MainLayout() {
                 "
             >
 
-                <Header />
-
                 <main
                     className="
                         flex-1
                         overflow-y-auto
                         p-4
+                        pb-20
                     "
                 >
 
