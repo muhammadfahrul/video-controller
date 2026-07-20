@@ -44,6 +44,7 @@ export default function Footer() {
                 bg-white
                 px-3
                 py-2
+                pb-[env(safe-area-inset-bottom)]
             "
         >
             <nav

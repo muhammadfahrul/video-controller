@@ -36,6 +36,7 @@ export default function MainLayout() {
                     md:my-4
                     md:rounded-xl
                     md:min-h-[calc(100vh-32px)]
+                    pt-[env(safe-area-inset-top)]
                 "
             >
 
