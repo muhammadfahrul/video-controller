@@ -121,15 +121,13 @@ export default function SearchPage(){
                 <SearchResultCard key={result.videoId} result={result} />
             ))}
 
-            {totalPages > 1 && (
-                <Pagination
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    itemsPerPage={itemsPerPage}
-                    totalItems={totalResults}
-                />
-            )}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={totalResults}
+            />
 
         </div>
     );

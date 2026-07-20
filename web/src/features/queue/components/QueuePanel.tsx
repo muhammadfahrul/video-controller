@@ -79,15 +79,13 @@ export default function QueuePanel() {
                         ))}
                     </div>
 
-                    {totalPages > 1 && (
-                        <Pagination
-                            currentPage={currentPage}
-                            totalPages={totalPages}
-                            onPageChange={setCurrentPage}
-                            itemsPerPage={itemsPerPage}
-                            totalItems={totalItems}
-                        />
-                    )}
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setCurrentPage}
+                        itemsPerPage={itemsPerPage}
+                        totalItems={totalItems}
+                    />
                 </>
             )}
 
