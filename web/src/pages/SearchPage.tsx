@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
+import Pagination from "../shared/components/Pagination";
 import { useAppStore } from "../store/appStore";
 import { useAgent } from "../hooks/useAgent";
 import { useQueue } from "../hooks/useQueue";
@@ -17,7 +18,11 @@ export default function SearchPage(){
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
+    
     const { setAgent, loadAgent, setProcessing } = useAppStore();
 
     const search = async () => {
@@ -39,6 +44,19 @@ export default function SearchPage(){
             setProcessing("search", false);
         }
     };
+
+    // Reset to page 1 when search results change
+    const handleSearch = async () => {
+        setCurrentPage(1);
+        await search();
+    };
+    
+    // Calculate pagination
+    const totalResults = results.length;
+    const totalPages = Math.ceil(totalResults / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedResults = results.slice(startIndex, endIndex);
 
     useEffect(() => {
         setAgent({
@@ -77,7 +95,7 @@ export default function SearchPage(){
             <SearchBar
                 value={keyword}
                 onChange={setKeyword}
-                onSearch={search}
+                onSearch={handleSearch}
                 loading={loading}
             />
 
@@ -99,9 +117,19 @@ export default function SearchPage(){
                 </div>
             )}
 
-            {results.map(result => (
+            {paginatedResults.map(result => (
                 <SearchResultCard key={result.videoId} result={result} />
             ))}
+
+            {totalPages > 1 && (
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={itemsPerPage}
+                    totalItems={totalResults}
+                />
+            )}
 
         </div>
     );

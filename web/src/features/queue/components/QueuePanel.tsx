@@ -1,5 +1,7 @@
+import { useState } from "react";
 import QueueEmpty from "./QueueEmpty";
 import QueueItemCard from "./QueueItem";
+import Pagination from "../../../shared/components/Pagination";
 
 import { useAppStore } from "../../../store/appStore";
 
@@ -23,6 +25,17 @@ export default function QueuePanel() {
         setProcessing
 
     } = useAppStore();
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
+    
+    // Calculate pagination
+    const totalItems = queue.items.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedItems = queue.items.slice(startIndex, endIndex);
 
     return (
 
@@ -71,87 +84,49 @@ export default function QueuePanel() {
 
             <QueueToolbar/>
 
-            {
-
-                queue.items.length === 0
-
-                ?
-
+            {queue.items.length === 0 ? (
                 <QueueEmpty />
-
-                :
-
-                <div
-                    className="
-                        space-y-3
-                    "
-                >
-
-                    {
-
-                        queue.items.map((item,index)=>
-
+            ) : (
+                <>
+                    <div
+                        className="
+                            space-y-3
+                        "
+                    >
+                        {paginatedItems.map((item, index) => (
                             <QueueItemCard
-
                                 key={item.id}
-
                                 item={item}
-
-                                active={
-                                    index === queue.currentIndex
-                                }
-
+                                active={(startIndex + index) === queue.currentIndex}
                                 removing={removingItemId === item.id}
-                                
                                 disabled={processing.removeFromQueue}
-
-                                onPlay={()=>{
-
-                                    playerCommandService
-                                        .playQueueItem(
-
-                                            agent.id,
-
-                                            item.id
-
-                                        );
-
+                                onPlay={() => {
+                                    playerCommandService.playQueueItem(agent.id, item.id);
                                 }}
-
-                                onRemove={()=>{
-
-                                    // Set removing state
+                                onRemove={() => {
                                     setRemovingItemId(item.id);
-                                    
-                                    // Set processing state
                                     setProcessing("removeFromQueue", true);
-                                    
-                                    // Kirim perintah ke server - tunggu response sebelum update UI
-                                    playerCommandService
-                                        .removeQueue(
-
-                                            agent.id,
-
-                                            item.id
-
-                                        );
-
+                                    playerCommandService.removeQueue(agent.id, item.id);
                                     setTimeout(() => {
                                         setRemovingItemId(null);
                                         setProcessing("removeFromQueue", false);
                                     }, 500);
-
                                 }}
-
                             />
+                        ))}
+                    </div>
 
-                        )
-
-                    }
-
-                </div>
-
-            }
+                    {totalPages > 1 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onPageChange={setCurrentPage}
+                            itemsPerPage={itemsPerPage}
+                            totalItems={totalItems}
+                        />
+                    )}
+                </>
+            )}
 
         </section>
 
