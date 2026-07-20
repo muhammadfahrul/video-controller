@@ -258,17 +258,6 @@ export default function PlayerControls() {
             "
         >
 
-            <h2
-                className="
-                    text-lg
-                    font-bold
-                "
-            >
-
-                Player Controls
-
-            </h2>
-
             <div
                 className="
                     flex

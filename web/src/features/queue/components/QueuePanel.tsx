@@ -45,43 +45,6 @@ export default function QueuePanel() {
             "
         >
 
-            <div
-                className="
-                    flex
-                    items-center
-                    justify-between
-                "
-            >
-
-                <h2
-                    className="
-                        text-lg
-                        font-bold
-                    "
-                >
-
-                    Playlist
-
-                </h2>
-
-                <span
-                    className="
-                        rounded-full
-                        bg-red-500
-                        px-3
-                        py-1
-                        text-xs
-                        font-semibold
-                        text-white
-                    "
-                >
-
-                    {queue.items.length}
-
-                </span>
-
-            </div>
-
             <QueueToolbar/>
 
             {queue.items.length === 0 ? (

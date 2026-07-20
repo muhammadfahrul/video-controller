@@ -13,8 +13,6 @@ export default function SettingsPage() {
 
         <div className="space-y-6 landscape:space-y-5">
 
-            <h2 className="text-lg font-bold">Settings</h2>
-
             <div className="rounded-xl bg-white p-4 shadow-sm">
                 <h3 className="font-semibold mb-4">Agent Status</h3>
                 <AgentStatusCard
