@@ -23,7 +23,7 @@ export default function PlaylistEmpty() {
                 "
             >
 
-                Playlist kosong
+                Empty playlist
 
             </p>
 
@@ -35,7 +35,7 @@ export default function PlaylistEmpty() {
                 "
             >
 
-                Cari video lalu tambahkan ke playlist.
+                Search for videos and add them to the playlist.
 
             </p>
 

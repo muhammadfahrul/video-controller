@@ -24,7 +24,7 @@ const handleClearPlaylist = () => {
     // Set processing state
     setProcessing("clearPlaylist", true);
     
-    // Kirim perintah ke server - tunggu response sebelum update UI
+    // Send command to server - wait for response before updating UI
     playerCommandService.clearPlaylist(agent.id);
     
     setTimeout(() => setProcessing("clearPlaylist", false), 500);
@@ -36,11 +36,11 @@ const handleShufflePlaylist = () => {
     // Set processing state
     setProcessing("shufflePlaylist", true);
     
-    // Kirim perintah ke server - tunggu response sebelum update UI
-    // Server akan broadcast playlist state baru setelah shuffle selesai
+    // Send command to server - wait for response before updating UI
+    // Server will broadcast new playlist state after shuffle completes
     playerCommandService.shufflePlaylist(agent.id);
     
-    // Reset processing state setelah delay (dari server response)
+    // Reset processing state after delay (from server response)
     setTimeout(() => setProcessing("shufflePlaylist", false), 500);
     
 };
@@ -51,7 +51,7 @@ const handleRepeat = (mode: string) => {
     // Set processing state
     setProcessing("repeat", true);
     
-    // Kirim perintah ke server - tunggu response sebelum update UI
+    // Send command to server - wait for response before updating UI
     playerCommandService.repeat(agent.id, mode);
     
     setTimeout(() => setProcessing("repeat", false), 500);

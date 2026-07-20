@@ -74,7 +74,7 @@ export class AgentManager {
 
         if (changed) {
 
-            // nanti dipanggil callback
+            // will be called later
 
         }
 

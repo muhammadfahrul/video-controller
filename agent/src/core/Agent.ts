@@ -565,7 +565,7 @@ export class Agent {
                         err.message.includes("Execution context was destroyed")
                     ) {
 
-                        // Halaman sedang berpindah, lewati siklus ini.
+                        // Page is transitioning, skip this cycle.
                         return;
                     }
 

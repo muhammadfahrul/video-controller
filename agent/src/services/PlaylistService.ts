@@ -130,7 +130,7 @@ export class PlaylistService {
 
         this.currentIndex--;
 
-        // Sudah melewati item pertama
+        // Already past first item
         if (
             this.currentIndex < 0
         ) {
@@ -140,13 +140,13 @@ export class PlaylistService {
                 RepeatMode.ALL
             ) {
 
-                // Lompat ke item terakhir
+                // Jump to last item
                 this.currentIndex =
                     this.items.length - 1;
 
             } else {
 
-                // Tetap di item pertama
+                // Stay at first item
                 this.currentIndex = 0;
 
                 return undefined;
