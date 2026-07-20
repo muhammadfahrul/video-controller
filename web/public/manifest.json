@@ -3,7 +3,7 @@
   "short_name": "VideoCtrl",
   "description": "Remote Video Player Controller",
   "start_url": "/",
-  "display": "standalone",
+  "display": "fullscreen",
   "orientation": "any",
   "background_color": "#16171d",
   "theme_color": "#16171d",
