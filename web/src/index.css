@@ -178,3 +178,17 @@ select {
     min-height: 100vh;
   }
 }
+
+/* Landscape mode - adjust root for wider screens */
+@media (orientation: landscape) {
+  #root {
+    max-width: 100%;
+  }
+}
+
+/* Large landscape - constrain width for readability */
+@media (orientation: landscape) and (min-width: 1024px) {
+  #root {
+    max-width: 900px;
+  }
+}

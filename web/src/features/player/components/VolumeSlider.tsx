@@ -46,6 +46,8 @@ export default function VolumeSlider({
                 p-4
                 shadow
                 space-y-3
+                landscape:p-3
+                landscape:space-y-2
             "
         >
 

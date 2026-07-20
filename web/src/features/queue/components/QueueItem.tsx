@@ -56,6 +56,9 @@ export default function QueueItemCard({
                 cursor-pointer
                 transition
                 hover:scale-[1.01]
+                landscape:flex
+                landscape:items-center
+                landscape:gap-3
             "
             onClick={onPlay}
         >

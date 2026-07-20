@@ -45,6 +45,8 @@ export default function Footer() {
                 px-3
                 py-2
                 pb-[env(safe-area-inset-bottom)]
+                landscape:py-1
+                landscape:pb-1
             "
         >
             <nav
@@ -54,6 +56,8 @@ export default function Footer() {
                     bg-gray-100
                     rounded-lg
                     p-1
+                    landscape:max-w-md
+                    landscape:mx-auto
                 "
             >
                 {navItems.map((item) => {

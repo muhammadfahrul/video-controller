@@ -90,7 +90,7 @@ export default function SearchPage(){
     }, []);
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-5 landscape:space-y-6">
 
             <SearchBar
                 value={keyword}

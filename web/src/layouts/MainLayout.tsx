@@ -32,10 +32,13 @@ export default function MainLayout() {
                     flex-col
                     bg-gray-50
                     md:max-w-2xl
+                    lg:max-w-4xl
+                    xl:max-w-5xl
                     md:shadow-xl
                     md:my-4
                     md:rounded-xl
                     md:min-h-[calc(100vh-32px)]
+                    lg:min-h-[calc(100vh-48px)]
                     pt-[env(safe-area-inset-top)]
                 "
             >
@@ -46,6 +49,8 @@ export default function MainLayout() {
                         overflow-y-auto
                         p-4
                         pb-20
+                        md:pb-4
+                        lg:p-6
                     "
                 >
 

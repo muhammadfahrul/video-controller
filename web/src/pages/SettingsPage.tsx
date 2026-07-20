@@ -11,7 +11,7 @@ export default function SettingsPage() {
 
     return (
 
-        <div className="space-y-6">
+        <div className="space-y-6 landscape:space-y-5">
 
             <h2 className="text-lg font-bold">Settings</h2>
 

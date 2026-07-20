@@ -37,28 +37,28 @@ export default function CurrentVideo() {
     };
 
     return (
-        <div className="rounded-xl bg-white p-4 shadow">
-            <h3 className="text-sm font-semibold text-gray-500 mb-2">
+        <div className="rounded-xl bg-white p-4 shadow landscape:p-3">
+            <h3 className="text-sm font-semibold text-gray-500 mb-2 landscape:mb-1">
                 Now Playing
             </h3>
-            <div className="flex gap-4">
+            <div className="flex gap-4 landscape:gap-3">
                 <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-32 h-20 object-cover rounded-lg"
+                    className="w-32 h-20 object-cover rounded-lg landscape:w-40 landscape:h-24"
                     onError={(e) => {
                         // Fallback thumbnail
                         (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${player.videoId}/default.jpg`;
                     }}
                 />
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold truncate">
+                    <h4 className="font-semibold truncate landscape:text-base">
                         {video.title}
                     </h4>
-                    <p className="text-sm text-gray-500 truncate">
+                    <p className="text-sm text-gray-500 truncate landscape:text-sm">
                         {video.channel}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-400 mt-1 landscape:mt-2">
                         {video.duration}
                     </p>
                 </div>

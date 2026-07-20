@@ -111,7 +111,7 @@ export default function SearchResultCard({
 
     return(
 
-        <Card>
+        <Card className="landscape:flex landscape:items-start landscape:gap-4">
 
             <img
 

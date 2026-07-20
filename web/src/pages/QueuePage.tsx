@@ -8,7 +8,7 @@ export default function QueuePage() {
 
     return (
 
-        <div className="space-y-4">
+        <div className="space-y-4 landscape:space-y-5">
 
             <QueuePanel />
 

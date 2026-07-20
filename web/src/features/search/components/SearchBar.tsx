@@ -37,6 +37,8 @@ export default function SearchBar({
         <div
             className="
                 relative
+                landscape:max-w-3xl
+                landscape:mx-auto
             "
         >
 
