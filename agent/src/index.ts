@@ -8,8 +8,8 @@ import {
  VolumeHandler,
  FullscreenHandler
 } from "./commands";
-import { QueueRepository } from "./repositories/QueueRepository";
-import { RepeatMode } from "./queue/RepeatMode";
+import { PlaylistRepository } from "./repositories/PlaylistRepository";
+import { RepeatMode } from "./playlist/RepeatMode";
 
 
 async function bootstrap(){

@@ -11,7 +11,7 @@ function formatDuration(seconds: number): string {
 
 export default function CurrentVideo() {
 
-    const { queue, player } = useAppStore();
+    const { playlist, player } = useAppStore();
 
     // If no player video, show nothing
     if (!player.videoId) {
@@ -22,14 +22,14 @@ export default function CurrentVideo() {
         );
     }
 
-    // Try to find the current video in queue by matching videoId
-    let queueVideo = null;
-    if (queue.items && queue.items.length > 0) {
-        queueVideo = queue.items.find(item => item.videoId === player.videoId);
+    // Try to find the current video in playlist by matching videoId
+    let playlistVideo = null;
+    if (playlist.items && playlist.items.length > 0) {
+        playlistVideo = playlist.items.find(item => item.videoId === player.videoId);
     }
 
-    // Use queue video if found, otherwise use player video info (title, channel, thumbnail, duration from agent)
-    const video = queueVideo || {
+    // Use playlist video if found, otherwise use player video info (title, channel, thumbnail, duration from agent)
+    const video = playlistVideo || {
         title: player.title || `Video ${player.videoId}`,
         channel: player.channel || "Unknown Channel",
         thumbnail: player.thumbnail || `https://img.youtube.com/vi/${player.videoId}/mqdefault.jpg`,

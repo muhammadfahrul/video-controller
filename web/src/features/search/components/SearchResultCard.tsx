@@ -37,8 +37,8 @@ export default function SearchResultCard({
     const {
 
         agent,
-        addingToQueue,
-        setAddingToQueue,
+        addingToPlaylist,
+        setAddingToPlaylist,
         setProcessing,
         processing
 
@@ -65,7 +65,7 @@ export default function SearchResultCard({
 
     };
 
-    const addQueue = () => {
+    const addPlaylist = () => {
 
         if (!agent.id) {
 
@@ -73,9 +73,9 @@ export default function SearchResultCard({
 
         }
 
-        setAddingToQueue(true);
+        setAddingToPlaylist(true);
 
-        playerCommandService.addQueue(
+        playerCommandService.addPlaylist(
 
             agent.id,
 
@@ -105,7 +105,7 @@ export default function SearchResultCard({
 
         );
 
-        setTimeout(() => setAddingToQueue(false), 500);
+        setTimeout(() => setAddingToPlaylist(false), 500);
 
     };
 
@@ -212,9 +212,9 @@ export default function SearchResultCard({
 
                     <button
 
-                        onClick={addQueue}
-                        
-                        disabled={!agent.id || addingToQueue}
+onClick={addPlaylist}
+
+                        disabled={!agent.id || addingToPlaylist}
                         
                         className={`
                             flex
@@ -226,19 +226,19 @@ export default function SearchResultCard({
                             py-2
                             text-sm
                             transition
-                            ${!agent.id || addingToQueue
+                            ${!agent.id || addingToPlaylist
                                 ? "opacity-50 cursor-not-allowed" 
                                 : "hover:bg-gray-100"}
                         `}
                     >
 
-                        {addingToQueue ? (
+                        {addingToPlaylist ? (
                             <Loader2 size={16} className="animate-spin" />
                         ) : (
                             <Plus size={16} />
                         )}
 
-                        {addingToQueue ? "Adding..." : "Playlist"}
+                        {addingToPlaylist ? "Adding..." : "Playlist"}
 
                     </button>
 

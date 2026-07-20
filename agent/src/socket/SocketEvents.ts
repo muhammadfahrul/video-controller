@@ -30,8 +30,8 @@ export enum SocketEvents {
 
     PLAYER_UPDATE = "player:update",
 
-    QUEUE_STATE = "queue:state",
+    PLAYLIST_STATE = "playlist:state",
 
-    QUEUE_UPDATE = "queue:update"
+    PLAYLIST_UPDATE = "playlist:update"
 
 }

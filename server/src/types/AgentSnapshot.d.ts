@@ -1,7 +1,7 @@
 import { PlayerState } from "./PlayerState";
-import { QueueSnapshot } from "./QueueSnapshot";
+import { PlaylistSnapshot } from "./PlaylistSnapshot";
 export interface AgentSnapshot {
     player: PlayerState;
-    queue: QueueSnapshot;
+    playlist: PlaylistSnapshot;
 }
 //# sourceMappingURL=AgentSnapshot.d.ts.map

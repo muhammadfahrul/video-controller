@@ -14,7 +14,7 @@ import {
 } from "./CommandRouter";
 import { PlayerSnapshot } from "../types/PlayerSnapshot";
 import { SocketEvents } from "../socket/SocketEvents";
-import { QueueSnapshot } from "../types/QueueSnapshot";
+import { PlaylistSnapshot } from "../types/PlaylistSnapshot";
 
 import {
 
@@ -156,15 +156,15 @@ export class SocketClient {
     }
 
 
-    public sendQueueState(
+    public sendPlaylistState(
 
-        snapshot: QueueSnapshot
+        snapshot: PlaylistSnapshot
 
     ) {
 
         this.socket?.emit(
 
-            SocketEvents.QUEUE_STATE,
+            SocketEvents.PLAYLIST_STATE,
 
             snapshot
 

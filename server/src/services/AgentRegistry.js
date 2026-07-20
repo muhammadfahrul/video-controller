@@ -47,8 +47,8 @@ class AgentRegistry {
         }
         agent.player =
             snapshot.player;
-        agent.queue =
-            snapshot.queue;
+        agent.playlist =
+            snapshot.playlist;
     }
     getPlayerState(id) {
         return this.agents

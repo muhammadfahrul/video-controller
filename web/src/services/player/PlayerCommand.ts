@@ -10,13 +10,13 @@ export interface PlayerCommand {
 
         | "SEEK"
 
-        | "PLAY_QUEUE_ITEM"
+        | "PLAY_PLAYLIST_ITEM"
 
-        | "REMOVE_QUEUE"
+        | "REMOVE_PLAYLIST"
 
-        | "CLEAR_QUEUE"
+        | "CLEAR_PLAYLIST"
 
-        | "SHUFFLE_QUEUE"
+        | "SHUFFLE_PLAYLIST"
 
         | "REPEAT_OFF"
 
@@ -44,7 +44,7 @@ export interface PlayerCommand {
 
         | "OPEN_VIDEO"
 
-        | "ADD_QUEUE"
+        | "ADD_PLAYLIST"
 
         | "SKIP_AD"
 

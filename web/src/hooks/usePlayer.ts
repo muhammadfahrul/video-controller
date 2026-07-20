@@ -18,7 +18,7 @@ export function usePlayer() {
 
         setPlayer,
 
-        setQueue
+        setPlaylist
 
     } = useAppStore();
 
@@ -64,10 +64,10 @@ export function usePlayer() {
                     });
                 }
 
-                if (payload.queue) {
-                    setQueue(
+                if (payload.playlist) {
+                    setPlaylist(
 
-                        payload.queue
+                        payload.playlist
 
                     );
                 }

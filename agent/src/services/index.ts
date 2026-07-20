@@ -2,7 +2,7 @@ export * from "./BrowserService";
 
 export * from "./PlayerService";
 
-export * from "./QueueService";
+export * from "./PlaylistService";
 
 export * from "./CommandService";
 

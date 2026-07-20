@@ -1,5 +1,5 @@
 import { PlayerState } from "./PlayerState";
-import { QueueSnapshot } from "./QueueSnapshot";
+import { PlaylistSnapshot } from "./PlaylistSnapshot";
 
 export type AgentStatus =
 
@@ -27,6 +27,6 @@ export interface AgentInfo {
 
     player?: PlayerState;
 
-    queue?: QueueSnapshot;
+    playlist?: PlaylistSnapshot;
 
 }

@@ -1,5 +1,5 @@
 import { CommandType } from "./CommandType";
-import type { QueueItemPayload } from "../types/QueueItemPayload";
+import type { PlaylistItemPayload } from "../types/PlaylistItemPayload";
 
 export interface CommandPayload {
 
@@ -17,6 +17,6 @@ export interface CommandPayload {
 
     repeatMode?: string;
 
-    item?: QueueItemPayload;
+    item?: PlaylistItemPayload;
 
 }

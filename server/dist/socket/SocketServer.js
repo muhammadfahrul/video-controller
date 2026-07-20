@@ -64,9 +64,9 @@ class SocketServer {
                 registry.updateSnapshot(payload.agentId, payload);
                 this.io.emit(SocketEvents_1.SocketEvents.PLAYER_UPDATE, payload);
             });
-            socket.on(SocketEvents_1.SocketEvents.QUEUE_STATE, (snapshot) => {
-                console.log("[SERVER] Queue", snapshot);
-                this.io.emit(SocketEvents_1.SocketEvents.QUEUE_UPDATE, snapshot);
+            socket.on(SocketEvents_1.SocketEvents.PLAYLIST_STATE, (snapshot) => {
+                console.log("[SERVER] Playlist", snapshot);
+                this.io.emit(SocketEvents_1.SocketEvents.PLAYLIST_UPDATE, snapshot);
             });
         });
     }

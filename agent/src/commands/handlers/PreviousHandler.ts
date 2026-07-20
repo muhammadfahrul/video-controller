@@ -8,8 +8,8 @@ import {
 } from "../../services/PlayerService";
 
 import {
-    QueueService
-} from "../../services/QueueService";
+    PlaylistService
+} from "../../services/PlaylistService";
 
 export class PreviousHandler
     implements CommandHandler {
@@ -19,8 +19,8 @@ export class PreviousHandler
         private readonly player:
             PlayerService,
 
-        private readonly queue:
-            QueueService
+        private readonly playlist:
+            PlaylistService
 
     ) {}
 
@@ -34,7 +34,7 @@ export class PreviousHandler
         );
 
         const item =
-            await this.queue.previous();
+            await this.playlist.previous();
 
         if (!item) {
 
@@ -48,7 +48,7 @@ export class PreviousHandler
 
         console.log(
 
-            "[QUEUE] Previous:",
+            "[PLAYLIST] Previous:",
 
             item.title,
 

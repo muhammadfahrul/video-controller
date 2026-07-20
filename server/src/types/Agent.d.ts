@@ -1,5 +1,5 @@
 import { PlayerState } from "./PlayerState";
-import { QueueSnapshot } from "./QueueSnapshot";
+import { PlaylistSnapshot } from "./PlaylistSnapshot";
 export type AgentStatus = "ONLINE" | "OFFLINE" | "PLAYING" | "PAUSED";
 export interface AgentInfo {
     id: string;
@@ -9,6 +9,6 @@ export interface AgentInfo {
     lastHeartbeat: number;
     connectedAt: number;
     player?: PlayerState;
-    queue?: QueueSnapshot;
+    playlist?: PlaylistSnapshot;
 }
 //# sourceMappingURL=Agent.d.ts.map

@@ -260,13 +260,13 @@ export class SocketServer {
 
                 socket.on(
 
-                    SocketEvents.QUEUE_STATE,
+                    SocketEvents.PLAYLIST_STATE,
 
                     (snapshot) => {
 
                         console.log(
 
-                            "[SERVER] Queue",
+                            "[SERVER] Playlist",
 
                             snapshot
 
@@ -274,7 +274,7 @@ export class SocketServer {
 
                         this.io.emit(
 
-                            SocketEvents.QUEUE_UPDATE,
+                            SocketEvents.PLAYLIST_UPDATE,
 
                             snapshot
 

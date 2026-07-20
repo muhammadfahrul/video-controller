@@ -1,7 +1,7 @@
 {
   "name": "video-controller",
   "version": "1.0.0",
-  "description": "Video Controller - Real-time video queue management system",
+  "description": "Video Controller - Real-time video playlist management system",
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev:agent\" \"npm run dev:server\" \"npm run dev:web\"",

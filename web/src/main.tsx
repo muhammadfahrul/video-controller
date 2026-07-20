@@ -17,11 +17,11 @@ import {
 } from "./services/player";
 
 import {
-    registerQueueListener
+    registerPlaylistListener
 } from "./services/socket";
 
 // Register socket listeners before connecting
-registerQueueListener();
+registerPlaylistListener();
 
 // Start player state listener
 const playerListener = new PlayerStateListener();

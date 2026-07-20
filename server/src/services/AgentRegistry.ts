@@ -166,9 +166,9 @@ export class AgentRegistry {
 
             snapshot.player;
 
-        agent.queue =
+        agent.playlist =
 
-            snapshot.queue;
+            snapshot.playlist;
 
     }
 

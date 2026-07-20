@@ -4,20 +4,20 @@ import {
 } from "../index";
 
 import {
-    QueueService
-} from "../../services/QueueService";
+    PlaylistService
+} from "../../services/PlaylistService";
 
 import {
     RepeatMode
-} from "../../queue/RepeatMode";
+} from "../../playlist/RepeatMode";
 
 export class RepeatModeHandler
 implements CommandHandler {
 
     constructor(
 
-        private readonly queue:
-            QueueService,
+        private readonly playlist:
+            PlaylistService,
 
         private readonly mode:
             RepeatMode
@@ -28,7 +28,7 @@ implements CommandHandler {
         command: CommandPayload
     ) {
 
-        await this.queue.setRepeatMode(
+        await this.playlist.setRepeatMode(
             this.mode
         );
 

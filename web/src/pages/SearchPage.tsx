@@ -4,7 +4,7 @@ import SearchResultCard from "../features/search/components/SearchResultCard";
 import Pagination from "../shared/components/Pagination";
 import { useAppStore } from "../store/appStore";
 import { useAgent } from "../hooks/useAgent";
-import { useQueue } from "../hooks/useQueue";
+import { usePlaylist } from "../hooks/usePlaylist";
 import { agentService, apiService } from "../services";
 import { searchService } from "../services/search";
 import type { SearchResult } from "../features/search/types/SearchResult";
@@ -12,7 +12,7 @@ import type { SearchResult } from "../features/search/types/SearchResult";
 export default function SearchPage(){
 
     useAgent();
-    useQueue();
+    usePlaylist();
 
     const [keyword, setKeyword] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);

@@ -44,8 +44,8 @@ class SocketClient {
         console.log("[Agent Snapshot]", state);
         this.socket?.emit(SocketEvents_1.SocketEvents.PLAYER_STATE, state);
     }
-    sendQueueState(snapshot) {
-        this.socket?.emit(SocketEvents_1.SocketEvents.QUEUE_STATE, snapshot);
+    sendPlaylistState(snapshot) {
+        this.socket?.emit(SocketEvents_1.SocketEvents.PLAYLIST_STATE, snapshot);
     }
 }
 exports.SocketClient = SocketClient;

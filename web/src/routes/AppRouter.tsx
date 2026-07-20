@@ -8,7 +8,7 @@ import {
 import MainLayout from "../layouts/MainLayout";
 
 import HomePage from "../pages/HomePage";
-import QueuePage from "../pages/QueuePage";
+import PlaylistPage from "../pages/PlaylistPage";
 import SearchPage from "../pages/SearchPage";
 import SettingsPage from "../pages/SettingsPage";
 
@@ -28,8 +28,8 @@ export default function AppRouter() {
                 />
 
                 <Route
-                    path="/queue"
-                    element={<QueuePage />}
+                    path="/playlist"
+                    element={<PlaylistPage />}
                 />
 
                 <Route

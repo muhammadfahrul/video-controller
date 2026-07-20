@@ -5,7 +5,10 @@
     "duration": 225.841,
     "volume": 16,
     "muted": false,
-    "fullscreen": false,
-    "videoId": "FiqSOnwYAx0"
+    "fullscreen": true,
+    "videoId": "FiqSOnwYAx0",
+    "title": "GADIS MANIS KALIMANTAN - Karaoke Nada Wanita [ SYAHRIYADI ]",
+    "channel": "PLAYER KARAOKE",
+    "thumbnail": "https://img.youtube.com/vi/FiqSOnwYAx0/mqdefault.jpg"
   }
 }

@@ -6,4 +6,4 @@ export const socketService =
 
 export * from "./SocketService";
 
-export * from "./QueueListener";
+export * from "./PlaylistListener";

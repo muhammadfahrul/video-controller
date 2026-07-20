@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Agent = void 0;
 const BrowserService_1 = require("../services/BrowserService");
 const PlayerService_1 = require("../services/PlayerService");
-const QueueService_1 = require("../services/QueueService");
+const PlaylistService_1 = require("../services/PlaylistService");
 const network_1 = require("../network");
 const services_1 = require("../services");
 const commands_1 = require("../commands");
@@ -12,8 +12,8 @@ const ExitFullscreenHandler_1 = require("../commands/handlers/ExitFullscreenHand
 const ToggleFullscreenHandler_1 = require("../commands/handlers/ToggleFullscreenHandler");
 const RepeatModeHandler_1 = require("../commands/handlers/RepeatModeHandler");
 const SkipAdHandler_1 = require("../commands/handlers/SkipAdHandler");
-const RepeatMode_1 = require("../queue/RepeatMode");
-const QueueRepository_1 = require("../repositories/QueueRepository");
+const RepeatMode_1 = require("../playlist/RepeatMode");
+const PlaylistRepository_1 = require("../repositories/PlaylistRepository");
 const PlayerRepository_1 = require("../repositories/PlayerRepository");
 const HealthService_1 = require("../health/HealthService");
 const ConfigService_1 = require("../services/ConfigService");
@@ -22,22 +22,22 @@ class Agent {
     health;
     player;
     playerRepository = new PlayerRepository_1.PlayerRepository();
-    queue;
+    playlist;
     socketClient;
     heartbeat;
     commandRouter;
     commandDispatcher;
     playerStateTimer;
-    queueStateTimer;
+    playlistStateTimer;
     adSkipTimer;
     autoSkipEnabled = true;
     identity;
     constructor() {
         this.browser =
             new BrowserService_1.BrowserService();
-        const queueRepository = new QueueRepository_1.QueueRepository();
-        this.queue =
-            new QueueService_1.QueueService(queueRepository);
+        const playlistRepository = new PlaylistRepository_1.PlaylistRepository();
+        this.playlist =
+            new PlaylistService_1.PlaylistService(playlistRepository);
         this.commandDispatcher =
             new commands_1.CommandDispatcher();
         const commandService = new services_1.CommandService(this.commandDispatcher);
@@ -73,21 +73,21 @@ class Agent {
             console.log("[AGENT] No saved video, opening YouTube home");
             await this.player.openVideo("");
         }
-        // Load queue state BEFORE setting up ended callback
-        // This ensures repeatMode is restored before queue.next() is called
-        await this.queue.load();
-        console.log("[QUEUE] Restored", this.queue.size(), "items");
+        // Load playlist state BEFORE setting up ended callback
+        // This ensures repeatMode is restored before playlist.next() is called
+        await this.playlist.load();
+        console.log("[PLAYLIST] Restored", this.playlist.size(), "items");
         // Enter fullscreen on startup
         await this.player.fullscreen();
-        // Set up ended callback AFTER queue.load() to ensure repeatMode is restored
+        // Set up ended callback AFTER playlist.load() to ensure repeatMode is restored
         this.player.setOnEnded(async () => {
-            console.log("[AGENT] Video ended, repeatMode:", this.queue.getRepeatMode());
-            const next = await this.queue.next();
+            console.log("[AGENT] Video ended, repeatMode:", this.playlist.getRepeatMode());
+            const next = await this.playlist.next();
             if (!next) {
-                console.log("[QUEUE] No next item");
+                console.log("[PLAYLIST] No next item");
                 return;
             }
-            console.log("[QUEUE] Playing next", next.title);
+            console.log("[PLAYLIST] Playing next", next.title);
             await this.player
                 .openVideo(next.videoId);
         });
@@ -97,8 +97,8 @@ class Agent {
             new network_1.HeartbeatService(this.socketClient);
         this.heartbeat.start();
         this.startPlayerStateSync();
-        this.sendCurrentQueue();
-        this.startQueueSync();
+        this.sendCurrentPlaylist();
+        this.startPlaylistSync();
         this.startAutoSkipAds();
     }
     getPlayer() {
@@ -107,8 +107,8 @@ class Agent {
         }
         return this.player;
     }
-    getQueue() {
-        return this.queue;
+    getPlaylist() {
+        return this.playlist;
     }
     registerCommands() {
         if (!this.player) {
@@ -122,19 +122,19 @@ class Agent {
         this.commandDispatcher.register(commands_1.CommandType.UNMUTE, new commands_1.UnmuteHandler(this.player));
         this.commandDispatcher.register(commands_1.CommandType.STOP, new commands_1.StopHandler(this.player));
         this.commandDispatcher.register(commands_1.CommandType.OPEN_VIDEO, new commands_1.OpenVideoHandler(this.player));
-        this.commandDispatcher.register(commands_1.CommandType.NEXT, new commands_1.NextHandler(this.player, this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.PREVIOUS, new commands_1.PreviousHandler(this.player, this.queue));
+        this.commandDispatcher.register(commands_1.CommandType.NEXT, new commands_1.NextHandler(this.player, this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.PREVIOUS, new commands_1.PreviousHandler(this.player, this.playlist));
         this.commandDispatcher.register(commands_1.CommandType.FULLSCREEN, new FullscreenHandler_1.FullscreenHandler(this.player));
         this.commandDispatcher.register(commands_1.CommandType.EXIT_FULLSCREEN, new ExitFullscreenHandler_1.ExitFullscreenHandler(this.player));
         this.commandDispatcher.register(commands_1.CommandType.TOGGLE_FULLSCREEN, new ToggleFullscreenHandler_1.ToggleFullscreenHandler(this.player));
-        this.commandDispatcher.register(commands_1.CommandType.ADD_QUEUE, new commands_1.AddQueueHandler(this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.REMOVE_QUEUE, new commands_1.RemoveQueueHandler(this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.CLEAR_QUEUE, new commands_1.ClearQueueHandler(this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.PLAY_QUEUE_ITEM, new commands_1.PlayQueueItemHandler(this.player, this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.SHUFFLE_QUEUE, new commands_1.ShuffleQueueHandler(this.queue));
-        this.commandDispatcher.register(commands_1.CommandType.REPEAT_OFF, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.OFF));
-        this.commandDispatcher.register(commands_1.CommandType.REPEAT_ONE, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.ONE));
-        this.commandDispatcher.register(commands_1.CommandType.REPEAT_ALL, new RepeatModeHandler_1.RepeatModeHandler(this.queue, RepeatMode_1.RepeatMode.ALL));
+        this.commandDispatcher.register(commands_1.CommandType.ADD_PLAYLIST, new commands_1.AddPlaylistHandler(this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.REMOVE_PLAYLIST, new commands_1.RemovePlaylistHandler(this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.CLEAR_PLAYLIST, new commands_1.ClearPlaylistHandler(this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.PLAY_PLAYLIST_ITEM, new commands_1.PlayPlaylistItemHandler(this.player, this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.SHUFFLE_PLAYLIST, new commands_1.ShufflePlaylistHandler(this.playlist));
+        this.commandDispatcher.register(commands_1.CommandType.REPEAT_OFF, new RepeatModeHandler_1.RepeatModeHandler(this.playlist, RepeatMode_1.RepeatMode.OFF));
+        this.commandDispatcher.register(commands_1.CommandType.REPEAT_ONE, new RepeatModeHandler_1.RepeatModeHandler(this.playlist, RepeatMode_1.RepeatMode.ONE));
+        this.commandDispatcher.register(commands_1.CommandType.REPEAT_ALL, new RepeatModeHandler_1.RepeatModeHandler(this.playlist, RepeatMode_1.RepeatMode.ALL));
         this.commandDispatcher.register(commands_1.CommandType.SKIP_AD, new SkipAdHandler_1.SkipAdHandler(this.player));
     }
     getSocketClient() {
@@ -149,8 +149,8 @@ class Agent {
         if (this.playerStateTimer) {
             clearInterval(this.playerStateTimer);
         }
-        if (this.queueStateTimer) {
-            clearInterval(this.queueStateTimer);
+        if (this.playlistStateTimer) {
+            clearInterval(this.playlistStateTimer);
         }
         this.stopAutoSkipAds();
         this.health?.stop();
@@ -164,13 +164,13 @@ class Agent {
                 }
                 const playerSnapshot = await this.player
                     .getSnapshot();
-                const queueSnapshot = this.queue
+                const playlistSnapshot = this.playlist
                     .getSnapshot();
                 this.socketClient
                     .sendPlayerState({
                     agentId: this.identity.id,
                     player: playerSnapshot,
-                    queue: queueSnapshot
+                    playlist: playlistSnapshot
                 });
             }
             catch (err) {
@@ -210,19 +210,19 @@ class Agent {
             this.adSkipTimer = undefined;
         }
     }
-    startQueueSync() {
-        this.queueStateTimer =
+    startPlaylistSync() {
+        this.playlistStateTimer =
             setInterval(() => {
-                const snapshot = this.queue.getSnapshot();
+                const snapshot = this.playlist.getSnapshot();
                 this.socketClient
-                    ?.sendQueueState(snapshot);
+                    ?.sendPlaylistState(snapshot);
             }, 1000);
     }
-    sendCurrentQueue() {
+    sendCurrentPlaylist() {
         if (!this.socketClient) {
             return;
         }
-        this.socketClient.sendQueueState(this.queue.getSnapshot());
+        this.socketClient.sendPlaylistState(this.playlist.getSnapshot());
     }
 }
 exports.Agent = Agent;

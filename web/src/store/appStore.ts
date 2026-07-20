@@ -14,9 +14,9 @@ import type {
 
 import type {
 
-    QueueState
+    PlaylistState
 
-} from "../types/app/QueueState";
+} from "../types/app/PlaylistState";
 
 import type {
 
@@ -44,15 +44,15 @@ interface ProcessingState {
 
     search: boolean;
 
-    addToQueue: boolean;
+    addToPlaylist: boolean;
 
-    removeFromQueue: boolean;
+    removeFromPlaylist: boolean;
 
     skipAd: boolean;
 
-    clearQueue: boolean;
+    clearPlaylist: boolean;
 
-    shuffleQueue: boolean;
+    shufflePlaylist: boolean;
 
     repeat: boolean;
 
@@ -64,7 +64,7 @@ interface AppStore {
 
     player: PlayerState;
 
-    queue: QueueState;
+    playlist: PlaylistState;
 
     search: SearchState;
 
@@ -78,8 +78,8 @@ interface AppStore {
         value: Partial<PlayerState>
     ): void;
 
-    setQueue(
-        value: QueueState
+    setPlaylist(
+        value: PlaylistState
     ): void;
 
     setSearch(
@@ -97,9 +97,9 @@ interface AppStore {
         id: string | null
     ): void;
 
-    addingToQueue: boolean;
+    addingToPlaylist: boolean;
 
-    setAddingToQueue(
+    setAddingToPlaylist(
         value: boolean
     ): void;
 
@@ -155,7 +155,7 @@ create<AppStore>((set)=>({
 
     },
 
-    queue: {
+    playlist: {
 
         items: [],
 
@@ -195,13 +195,13 @@ create<AppStore>((set)=>({
 
         search: false,
 
-        addToQueue: false,
+        addToPlaylist: false,
 
-        removeFromQueue: false,
+        removeFromPlaylist: false,
 
-        clearQueue: false,
+        clearPlaylist: false,
 
-        shuffleQueue: false,
+        shufflePlaylist: false,
 
         repeat: false,
 
@@ -247,11 +247,11 @@ create<AppStore>((set)=>({
 
         })),
 
-    setQueue:(queue)=>
+    setPlaylist:(value)=>
 
         set({
 
-            queue
+            playlist: value
 
         }),
 
@@ -301,17 +301,17 @@ create<AppStore>((set)=>({
 
         }),
 
-    addingToQueue: false,
+    addingToPlaylist: false,
 
-    setAddingToQueue:(value)=>
+    setAddingToPlaylist: (value) =>
 
-        set({
+        set(() => ({
 
-            addingToQueue: value,
+            addingToPlaylist: value,
 
             globalLoading: value
 
-        }),
+        })),
 
     loadAgent:(value)=>
 

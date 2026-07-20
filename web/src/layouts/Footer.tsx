@@ -14,7 +14,7 @@ export default function Footer() {
             icon: Home
         },
         {
-            path: "/queue",
+            path: "/playlist",
             label: "Playlist",
             icon: ListMusic
         },

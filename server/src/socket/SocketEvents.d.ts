@@ -6,7 +6,7 @@ export declare enum SocketEvents {
     PLAYER_COMMAND = "player:command",
     PLAYER_STATE = "player:state",
     PLAYER_UPDATE = "player:update",
-    QUEUE_STATE = "queue:state",
-    QUEUE_UPDATE = "queue:update"
+    PLAYLIST_STATE = "playlist:state",
+    PLAYLIST_UPDATE = "playlist:update"
 }
 //# sourceMappingURL=SocketEvents.d.ts.map

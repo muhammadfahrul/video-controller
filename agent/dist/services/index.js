@@ -16,6 +16,6 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./BrowserService"), exports);
 __exportStar(require("./PlayerService"), exports);
-__exportStar(require("./QueueService"), exports);
+__exportStar(require("./PlaylistService"), exports);
 __exportStar(require("./CommandService"), exports);
 __exportStar(require("./HealthService"), exports);

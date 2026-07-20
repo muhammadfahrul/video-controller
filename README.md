@@ -1,16 +1,16 @@
 # Video Controller
 
-A real-time video queue management system with YouTube integration, featuring a web frontend, Node.js server, and Windows agent. Control video playback remotely and manage a shared queue across multiple clients.
+A real-time video playlist management system with YouTube integration, featuring a web frontend, Node.js server, and Windows agent. Control video playback remotely and manage a shared playlist across multiple clients.
 
 ## Features
 
-- **Real-time Queue Management** - Add, remove, and reorder videos in a shared queue
+- **Real-time Playlist Management** - Add, remove, and reorder videos in a shared playlist
 - **Remote Playback Control** - Play, pause, skip, and adjust volume from any connected client
 - **YouTube Integration** - Seamlessly play YouTube videos with full DOM control
 - **Multi-client Support** - Multiple web clients can connect simultaneously via Socket.IO
 - **Health Monitoring** - Automatic health checks for browser, player, and network status
 - **Auto-recovery** - Intelligent recovery system handles common failure scenarios
-- **Persistent Storage** - Queue and player state are persisted to JSON files
+- **Persistent Storage** - Playlist and player state are persisted to JSON files
 
 ## Architecture
 
@@ -105,16 +105,16 @@ cd ../agent && npm start
 
 | Event | Direction | Description |
 |-------|-----------|-------------|
-| `queue:add` | Web → Server | Add video to queue |
-| `queue:remove` | Web → Server | Remove video from queue |
-| `queue:update` | Server → Web | Queue updated |
+| `playlist:add` | Web → Server | Add video to playlist |
+| `playlist:remove` | Web → Server | Remove video from playlist |
+| `playlist:update` | Server → Web | Playlist updated |
 | `player:control` | Server → Agent | Play/pause/skip commands |
 | `player:status` | Agent → Server | Current player state |
 | `heartbeat` | Agent → Server | Agent heartbeat |
 
 ### REST Endpoints
 
-- `GET /api/queue` - Get current queue
+- `GET /api/playlist` - Get current playlist
 - `GET /api/player/status` - Get player status
 - `GET /api/health` - Get system health
 
@@ -128,7 +128,7 @@ video-controller/
 │       ├── commands/# Command handlers
 │       ├── config/  # Configuration
 │       ├── player/  # YouTube player control
-│       ├── queue/  # Queue management
+│       ├── playlist/  # Playlist management
 │       ├── services/ # Business logic
 │       └── socket/  # Socket.io client
 ├── server/          # Socket.io server
@@ -166,7 +166,7 @@ video-controller/
 - Check that YouTube page loads correctly
 - Verify player DOM selectors are up to date
 
-### Queue not syncing
+### Playlist not syncing
 - Check Socket.IO connection status
 - Verify JSON storage files are writable
 - Review server logs

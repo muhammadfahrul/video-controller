@@ -10,6 +10,6 @@ var SocketEvents;
     SocketEvents["PLAYER_COMMAND"] = "player:command";
     SocketEvents["PLAYER_STATE"] = "player:state";
     SocketEvents["PLAYER_UPDATE"] = "player:update";
-    SocketEvents["QUEUE_STATE"] = "queue:state";
-    SocketEvents["QUEUE_UPDATE"] = "queue:update";
+    SocketEvents["PLAYLIST_STATE"] = "playlist:state";
+    SocketEvents["PLAYLIST_UPDATE"] = "playlist:update";
 })(SocketEvents || (exports.SocketEvents = SocketEvents = {}));

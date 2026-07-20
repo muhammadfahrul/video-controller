@@ -2,14 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RepeatModeHandler = void 0;
 class RepeatModeHandler {
-    queue;
+    playlist;
     mode;
-    constructor(queue, mode) {
-        this.queue = queue;
+    constructor(playlist, mode) {
+        this.playlist = playlist;
         this.mode = mode;
     }
     async execute(command) {
-        await this.queue.setRepeatMode(this.mode);
+        await this.playlist.setRepeatMode(this.mode);
         console.log("Repeat:", this.mode);
     }
 }

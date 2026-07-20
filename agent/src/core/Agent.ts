@@ -9,8 +9,8 @@ import {
 
 
 import {
- QueueService
-} from "../services/QueueService";
+ PlaylistService
+} from "../services/PlaylistService";
 
 import {
     SocketClient,
@@ -36,19 +36,19 @@ import {
     OpenVideoHandler,
     NextHandler,
     PreviousHandler,
-    AddQueueHandler,
-    RemoveQueueHandler,
-    ClearQueueHandler,
-    PlayQueueItemHandler,
-    ShuffleQueueHandler
+    AddPlaylistHandler,
+    RemovePlaylistHandler,
+    ClearPlaylistHandler,
+    PlayPlaylistItemHandler,
+    ShufflePlaylistHandler
 } from "../commands";
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { SkipAdHandler } from "../commands/handlers/SkipAdHandler";
-import { RepeatMode } from "../queue/RepeatMode";
-import { QueueRepository } from "../repositories/QueueRepository";
+import { RepeatMode } from "../playlist/RepeatMode";
+import { PlaylistRepository } from "../repositories/PlaylistRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
 import { HealthService } from "../health/HealthService";
 import { ConfigService } from "../services/ConfigService";
@@ -70,8 +70,8 @@ export class Agent {
         new PlayerRepository();
 
 
-    private queue:
-        QueueService;
+    private playlist:
+        PlaylistService;
 
     private socketClient?:
         SocketClient;
@@ -88,7 +88,7 @@ export class Agent {
 
     private playerStateTimer?: NodeJS.Timeout;
 
-    private queueStateTimer?: NodeJS.Timeout;
+    private playlistStateTimer?: NodeJS.Timeout;
 
     private adSkipTimer?: NodeJS.Timeout;
 
@@ -106,12 +106,12 @@ export class Agent {
         this.browser =
             new BrowserService();
 
-        const queueRepository =
-            new QueueRepository();
+        const playlistRepository =
+            new PlaylistRepository();
 
-        this.queue =
-            new QueueService(
-                queueRepository
+        this.playlist =
+            new PlaylistService(
+                playlistRepository
             );
 
         this.commandDispatcher =
@@ -202,34 +202,34 @@ export class Agent {
             await this.player.openVideo("");
         }
 
-        // Load queue state BEFORE setting up ended callback
-        // This ensures repeatMode is restored before queue.next() is called
-        await this.queue.load();
+        // Load playlist state BEFORE setting up ended callback
+        // This ensures repeatMode is restored before playlist.next() is called
+        await this.playlist.load();
 
         console.log(
-            "[QUEUE] Restored",
-            this.queue.size(),
+            "[PLAYLIST] Restored",
+            this.playlist.size(),
             "items"
         );
 
         // Enter fullscreen on startup
         await this.player.fullscreen();
 
-        // Set up ended callback AFTER queue.load() to ensure repeatMode is restored
+        // Set up ended callback AFTER playlist.load() to ensure repeatMode is restored
         this.player.setOnEnded(async () => {
 
             console.log(
                 "[AGENT] Video ended, repeatMode:",
-                this.queue.getRepeatMode()
+                this.playlist.getRepeatMode()
             );
 
             const next =
-                await this.queue.next();
+                await this.playlist.next();
 
             if (!next) {
 
                 console.log(
-                    "[QUEUE] No next item"
+                    "[PLAYLIST] No next item"
                 );
 
                 return;
@@ -238,7 +238,7 @@ export class Agent {
 
             console.log(
 
-                "[QUEUE] Playing next",
+                "[PLAYLIST] Playing next",
 
                 next.title
 
@@ -264,9 +264,9 @@ export class Agent {
 
         this.startPlayerStateSync();
 
-        this.sendCurrentQueue();
+        this.sendCurrentPlaylist();
 
-        this.startQueueSync();
+        this.startPlaylistSync();
 
         this.startAutoSkipAds();
 
@@ -293,9 +293,9 @@ export class Agent {
 
 
 
-    getQueue(){
+    getPlaylist(){
 
-        return this.queue;
+        return this.playlist;
 
     }
 
@@ -364,7 +364,7 @@ export class Agent {
             CommandType.NEXT,
             new NextHandler(
                 this.player!,
-                this.queue
+                this.playlist
             )
         );
 
@@ -372,7 +372,7 @@ export class Agent {
             CommandType.PREVIOUS,
             new PreviousHandler(
                 this.player!,
-                this.queue
+                this.playlist
             )
         );
 
@@ -398,45 +398,45 @@ export class Agent {
         );
 
         this.commandDispatcher.register(
-            CommandType.ADD_QUEUE,
-            new AddQueueHandler(
-                this.queue
+            CommandType.ADD_PLAYLIST,
+            new AddPlaylistHandler(
+                this.playlist
             )
         );
 
         this.commandDispatcher.register(
-            CommandType.REMOVE_QUEUE,
-            new RemoveQueueHandler(
-                this.queue
+            CommandType.REMOVE_PLAYLIST,
+            new RemovePlaylistHandler(
+                this.playlist
             )
         );
 
         this.commandDispatcher.register(
-            CommandType.CLEAR_QUEUE,
-            new ClearQueueHandler(
-                this.queue
+            CommandType.CLEAR_PLAYLIST,
+            new ClearPlaylistHandler(
+                this.playlist
             )
         );
 
         this.commandDispatcher.register(
-            CommandType.PLAY_QUEUE_ITEM,
-            new PlayQueueItemHandler(
+            CommandType.PLAY_PLAYLIST_ITEM,
+            new PlayPlaylistItemHandler(
                 this.player!,
-                this.queue
+                this.playlist
             )
         );
 
         this.commandDispatcher.register(
-            CommandType.SHUFFLE_QUEUE,
-            new ShuffleQueueHandler(
-                this.queue
+            CommandType.SHUFFLE_PLAYLIST,
+            new ShufflePlaylistHandler(
+                this.playlist
             )
         );
 
         this.commandDispatcher.register(
             CommandType.REPEAT_OFF,
             new RepeatModeHandler(
-                this.queue,
+                this.playlist,
                 RepeatMode.OFF
             )
         );
@@ -444,7 +444,7 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.REPEAT_ONE,
             new RepeatModeHandler(
-                this.queue,
+                this.playlist,
                 RepeatMode.ONE
             )
         );
@@ -452,7 +452,7 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.REPEAT_ALL,
             new RepeatModeHandler(
-                this.queue,
+                this.playlist,
                 RepeatMode.ALL
             )
         );
@@ -498,11 +498,11 @@ export class Agent {
         }
 
         if(
-            this.queueStateTimer
+            this.playlistStateTimer
         ){
 
             clearInterval(
-                this.queueStateTimer
+                this.playlistStateTimer
             );
 
         }
@@ -535,9 +535,9 @@ export class Agent {
                         await this.player
                             .getSnapshot();
 
-                    const queueSnapshot =
+                    const playlistSnapshot =
 
-                        this.queue
+                        this.playlist
                             .getSnapshot();
 
                     this.socketClient
@@ -551,8 +551,8 @@ export class Agent {
                                 playerSnapshot,
 
 
-                            queue:
-                                queueSnapshot
+                            playlist:
+                                playlistSnapshot
 
                         });
 
@@ -647,9 +647,9 @@ export class Agent {
     }
 
 
-    private startQueueSync() {
+    private startPlaylistSync() {
 
-        this.queueStateTimer =
+        this.playlistStateTimer =
 
             setInterval(
 
@@ -657,11 +657,11 @@ export class Agent {
 
                     const snapshot =
 
-                        this.queue.getSnapshot();
+                        this.playlist.getSnapshot();
 
                     this.socketClient
 
-                        ?.sendQueueState(
+                        ?.sendPlaylistState(
 
                             snapshot
 
@@ -675,7 +675,7 @@ export class Agent {
 
     }
 
-    private sendCurrentQueue() {
+    private sendCurrentPlaylist() {
 
         if (!this.socketClient) {
 
@@ -683,9 +683,9 @@ export class Agent {
 
         }
 
-        this.socketClient.sendQueueState(
+        this.socketClient.sendPlaylistState(
 
-            this.queue.getSnapshot()
+            this.playlist.getSnapshot()
 
         );
 

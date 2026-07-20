@@ -12,9 +12,9 @@ import type {
 
 import type {
 
-    QueueItem
+    PlaylistItem
 
-} from "../../features/queue/types/QueueItem";
+} from "../../features/playlist/types/PlaylistItem";
 
 export class PlayerCommandService {
 
@@ -212,11 +212,11 @@ export class PlayerCommandService {
 
     }
 
-    addQueue(
+    addPlaylist(
 
         agentId: string,
 
-        item: QueueItem
+        item: PlaylistItem
 
     ): void {
 
@@ -224,7 +224,7 @@ export class PlayerCommandService {
 
             agentId,
 
-            type: "ADD_QUEUE",
+            type: "ADD_PLAYLIST",
 
             item
 
@@ -260,11 +260,11 @@ export class PlayerCommandService {
 
     }
 
-    playQueueItem(
+    playPlaylistItem(
 
         agentId:string,
 
-        queueId:string
+        playlistId:string
 
     ){
 
@@ -272,9 +272,9 @@ export class PlayerCommandService {
 
             agentId,
 
-            type:"PLAY_QUEUE_ITEM",
+            type:"PLAY_PLAYLIST_ITEM",
 
-            id:queueId
+            id:playlistId
 
         });
 
@@ -282,11 +282,11 @@ export class PlayerCommandService {
 
 
 
-    removeQueue(
+    removePlaylist(
 
         agentId:string,
 
-        queueId:string
+        playlistId:string
 
     ){
 
@@ -294,9 +294,9 @@ export class PlayerCommandService {
 
             agentId,
 
-            type:"REMOVE_QUEUE",
+            type:"REMOVE_PLAYLIST",
 
-            id:queueId
+            id:playlistId
 
         });
 
@@ -304,7 +304,7 @@ export class PlayerCommandService {
 
 
 
-    clearQueue(
+    clearPlaylist(
 
         agentId:string
 
@@ -314,7 +314,7 @@ export class PlayerCommandService {
 
             agentId,
 
-            type:"CLEAR_QUEUE"
+            type:"CLEAR_PLAYLIST"
 
         });
 
@@ -322,7 +322,7 @@ export class PlayerCommandService {
 
 
 
-    shuffleQueue(
+    shufflePlaylist(
 
         agentId:string
 
@@ -332,7 +332,7 @@ export class PlayerCommandService {
 
             agentId,
 
-            type:"SHUFFLE_QUEUE"
+            type:"SHUFFLE_PLAYLIST"
 
         });
 

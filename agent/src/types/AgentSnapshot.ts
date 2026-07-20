@@ -1,5 +1,5 @@
 import { PlayerSnapshot } from "./PlayerSnapshot";
-import { QueueSnapshot } from "./QueueSnapshot";
+import { PlaylistSnapshot } from "./PlaylistSnapshot";
 
 export interface AgentSnapshot {
 
@@ -7,6 +7,6 @@ export interface AgentSnapshot {
 
     player: PlayerSnapshot;
 
-    queue: QueueSnapshot;
+    playlist: PlaylistSnapshot;
 
 }

@@ -36,14 +36,14 @@ export * from "./handlers/ExitFullscreenHandler";
 
 export * from "./handlers/ToggleFullscreenHandler";
 
-export * from "./handlers/AddQueueHandler";
+export * from "./handlers/AddPlaylistHandler";
 
-export * from "./handlers/RemoveQueueHandler";
+export * from "./handlers/RemovePlaylistHandler";
 
-export * from "./handlers/ClearQueueHandler";
+export * from "./handlers/ClearPlaylistHandler";
 
-export * from "./handlers/PlayQueueItemHandler";
+export * from "./handlers/PlayPlaylistItemHandler";
 
-export * from "./handlers/ShuffleQueueHandler";
+export * from "./handlers/ShufflePlaylistHandler";
 
 export * from "./handlers/RepeatModeHandler";
