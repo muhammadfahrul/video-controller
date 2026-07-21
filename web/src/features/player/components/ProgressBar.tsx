@@ -1,5 +1,6 @@
 import {
-    useState
+    useState,
+    useEffect
 } from "react";
 
 
@@ -22,18 +23,18 @@ export default function ProgressBar(){
     } = useAppStore();
 
 
-    const [seeking,setSeeking] =
-        useState(false);
+    const [localValue, setLocalValue] =
+        useState(player.currentTime);
 
 
+    useEffect(() => {
 
-    const value =
-        seeking
-        ?
-        undefined
-        :
-        player.currentTime;
+        setLocalValue(player.currentTime);
 
+    }, [player.currentTime]);
+
+
+    const value = localValue;
 
 
     function handleSeek(
@@ -47,7 +48,13 @@ export default function ProgressBar(){
             );
 
 
-        setSeeking(true);
+        setLocalValue(time);
+
+
+    }
+
+
+    function handleChangeEnd(){
 
 
         playerCommandService
@@ -55,19 +62,9 @@ export default function ProgressBar(){
 
                 agent.id,
 
-                time
+                localValue
 
             );
-
-
-    }
-
-
-
-    function handleChangeEnd(){
-
-
-        setSeeking(false);
 
 
     }
