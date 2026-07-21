@@ -1,3 +1,6 @@
+import { config } from "../config/config";
+
+
 export interface AgentIdentity {
 
 
@@ -5,6 +8,12 @@ export interface AgentIdentity {
 
 
     name:string;
+
+
+    roomId: string;
+
+
+    roomName: string;
 
 
 }
@@ -22,11 +31,17 @@ export class AgentIdentityProvider {
         this.identity = {
 
             id:
-            "windows-agent-01",
+            `agent-${config.room.id}`,
 
 
             name:
-            "Windows Player"
+            `${config.room.name} Agent`,
+
+
+            roomId: config.room.id,
+
+
+            roomName: config.room.name
 
         };
 

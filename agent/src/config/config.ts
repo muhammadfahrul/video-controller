@@ -2,6 +2,14 @@ import configJson from './config.json';
 
 export interface AppConfig {
 
+    room: {
+
+        id: string;
+
+        name: string;
+
+    };
+
     browser: {
 
         headless: boolean;

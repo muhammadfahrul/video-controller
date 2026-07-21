@@ -19,6 +19,10 @@ export interface AgentInfo {
 
     name: string;
 
+    roomId: string;
+
+    roomName: string;
+
     status: AgentStatus;
 
     lastHeartbeat: number;

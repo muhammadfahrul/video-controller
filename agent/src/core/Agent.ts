@@ -15,6 +15,7 @@ import {
 import {
     SocketClient,
     AgentIdentityProvider,
+    AgentIdentity,
     HeartbeatService,
     CommandRouter
 } from "../network";
@@ -95,10 +96,7 @@ export class Agent {
     private autoSkipEnabled = true;
 
     private identity:
-    {
-        id:string;
-        name:string;
-    };
+        AgentIdentity;
 
 
     constructor() {

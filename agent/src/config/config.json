@@ -1,4 +1,9 @@
 {
+  "room": {
+    "id": "room-001",
+    "name": "Room 1"
+  },
+
   "browser": {
     "headless": false,
     "channel": "chrome",

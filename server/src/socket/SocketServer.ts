@@ -105,6 +105,10 @@ export class SocketServer {
 
                             name: data.name,
 
+                            roomId: data.roomId || "",
+
+                            roomName: data.roomName || "",
+
                             status: "ONLINE",
 
                             lastHeartbeat: Date.now(),
