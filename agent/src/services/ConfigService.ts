@@ -80,7 +80,7 @@ export class ConfigService {
 
         const ip = getLocalIpAddress();
 
-        const port = process.env.PORT || 3000;
+        const port = process.env.PORT || 53331;
 
         return `http://${ip}:${port}`;
 

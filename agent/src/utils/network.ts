@@ -29,7 +29,7 @@ export function getLocalIpAddress(): string {
 
 }
 
-export function getServerUrl(port: number = 3000): string {
+export function getServerUrl(port: number = 53331): string {
 
     const ip = getLocalIpAddress();
 

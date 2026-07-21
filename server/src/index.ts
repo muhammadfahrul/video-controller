@@ -7,7 +7,7 @@ import { createApp } from "./app";
 import { ServiceContainer } from "./container/ServiceContainer";
 import { registerRoutes } from "./bootstrap/registerRoutes";
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 53331;
 
 const app = createApp();
 

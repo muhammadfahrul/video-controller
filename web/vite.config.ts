@@ -5,6 +5,12 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    port: 53332
+  },
+  preview: {
+    port: 53333
+  },
   plugins: [
     react(),
     tailwindcss(),
