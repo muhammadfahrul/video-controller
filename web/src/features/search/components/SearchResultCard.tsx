@@ -138,6 +138,7 @@ export default function SearchResultCard({
                     className="
                         line-clamp-2
                         font-semibold
+                        text-white
                     "
                 >
 
@@ -149,7 +150,7 @@ export default function SearchResultCard({
                     className="
                         mt-2
                         text-sm
-                        text-gray-500
+                        text-[#b8b8d0]
                     "
                 >
 
@@ -160,7 +161,7 @@ export default function SearchResultCard({
                 <p
                     className="
                         text-xs
-                        text-gray-400
+                        text-[#00f0ff]
                     "
                 >
 
@@ -187,15 +188,16 @@ export default function SearchResultCard({
                             items-center
                             gap-2
                             rounded-lg
-                            bg-red-600
+                            bg-[#ff2d95]
                             px-3
                             py-2
                             text-sm
                             text-white
                             transition
+                            shadow-[0_0_10px_rgba(255,45,149,0.4)]
                             ${!agent.id || processing.play
                                 ? "opacity-50 cursor-not-allowed" 
-                                : "hover:bg-red-700"}
+                                : "hover:bg-[#ff4da6] hover:shadow-[0_0_20px_rgba(255,45,149,0.6)]"}
                         `}
 
                     >
@@ -222,13 +224,16 @@ onClick={addPlaylist}
                             gap-2
                             rounded-lg
                             border
+                            border-[#00f0ff]
+                            bg-transparent
                             px-3
                             py-2
                             text-sm
+                            text-[#00f0ff]
                             transition
                             ${!agent.id || addingToPlaylist
                                 ? "opacity-50 cursor-not-allowed" 
-                                : "hover:bg-gray-100"}
+                                : "hover:bg-[#00f0ff] hover:text-[#0a0a14]"}
                         `}
                     >
 

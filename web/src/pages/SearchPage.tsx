@@ -100,19 +100,19 @@ export default function SearchPage(){
             />
 
             {loading && (
-                <div className="rounded-xl bg-gray-100 p-4 text-center">
+                <div className="rounded-xl bg-[#12121f] border border-[#2a2a4a] p-4 text-center text-[#ff2d95]">
                     Searching...
                 </div>
             )}
 
             {!loading && results.length === 0 && keyword && (
-                <div className="rounded-xl border p-6 text-center text-gray-500">
+                <div className="rounded-xl border border-[#2a2a4a] bg-[#12121f] p-6 text-center text-[#b8b8d0]">
                     No videos found
                 </div>
             )}
 
             {error && (
-                <div className="rounded-xl bg-red-100 p-4 text-red-600">
+                <div className="rounded-xl bg-[#1a1a2e] border border-red-500 p-4 text-red-400">
                     {error}
                 </div>
             )}

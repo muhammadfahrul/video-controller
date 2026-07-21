@@ -17,9 +17,10 @@ export default function PlayerStatus() {
         <div
             className="
                 rounded-xl
-                bg-white
+                bg-[#12121f]
                 p-4
-                shadow
+                shadow-[0_0_15px_rgba(255,45,149,0.1)]
+                border border-[#2a2a4a]
             "
         >
 

@@ -88,8 +88,8 @@ py-1
 text-sm
 rounded
 ${processing.shufflePlaylist 
-    ? "bg-gray-300 cursor-not-allowed" 
-    : "bg-gray-200 hover:bg-gray-300"}
+    ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400" 
+    : "bg-[#1a1a2e] hover:bg-[#252542] text-[#00f0ff] border border-[#00f0ff]"}
 `}
 
 >
@@ -112,8 +112,8 @@ py-1
 text-sm
 rounded
 ${processing.clearPlaylist 
-    ? "bg-gray-300 cursor-not-allowed" 
-    : "bg-gray-200 hover:bg-gray-300"}
+    ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400" 
+    : "bg-[#1a1a2e] hover:bg-[#252542] text-[#ff2d95] border border-[#ff2d95]"}
 `}
 
 >
@@ -145,11 +145,11 @@ ${processing.clearPlaylist
                 +
                 (playlist.repeat === mode
                     ? processing.repeat
-                        ? "bg-blue-400 cursor-not-allowed"
-                        : "bg-blue-500 text-white"
+                        ? "bg-[#a855f7] cursor-not-allowed text-white"
+                        : "bg-[#a855f7] text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]"
                     : processing.repeat
-                        ? "bg-gray-300 cursor-not-allowed"
-                        : "bg-gray-200 hover:bg-gray-300"
+                        ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400"
+                        : "bg-[#1a1a2e] hover:bg-[#252542] text-[#a855f7] border border-[#a855f7]"
                 )
             }
         

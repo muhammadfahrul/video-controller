@@ -12,7 +12,7 @@ export default function PlaylistEmpty() {
                 "
             >
 
-                📭
+                🎤
 
             </p>
 
@@ -20,6 +20,7 @@ export default function PlaylistEmpty() {
                 className="
                     mt-2
                     font-medium
+                    text-white
                 "
             >
 
@@ -31,7 +32,7 @@ export default function PlaylistEmpty() {
                 className="
                     mt-1
                     text-sm
-                    text-gray-500
+                    text-[#b8b8d0]
                 "
             >
 

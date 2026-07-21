@@ -42,6 +42,11 @@ export default function PlaylistPanel() {
         <section
             className="
                 space-y-4
+                bg-[#12121f]
+                p-4
+                rounded-xl
+                border border-[#2a2a4a]
+                shadow-[0_0_20px_rgba(168,85,247,0.15)]
             "
         >
 

@@ -48,13 +48,13 @@ export default function ControlButton({
     const styles = {
 
         primary:
-            "bg-red-600 text-white hover:bg-red-700",
+            "bg-[#ff2d95] text-white hover:bg-[#ff4da6] shadow-[0_0_15px_rgba(255,45,149,0.5)]",
 
         secondary:
-            "bg-gray-100 hover:bg-gray-200",
+            "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542] shadow-[0_0_10px_rgba(0,240,255,0.3)]",
 
         danger:
-            "bg-red-100 text-red-600 hover:bg-red-200"
+            "bg-[#1a1a2e] text-red-400 hover:bg-[#252542]"
 
     };
 

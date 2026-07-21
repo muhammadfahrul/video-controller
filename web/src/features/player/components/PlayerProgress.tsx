@@ -94,10 +94,11 @@ export default function PlayerProgress() {
         <section
             className="
                 rounded-xl
-                bg-white
+                bg-[#12121f]
                 p-4
-                shadow
+                shadow-[0_0_15px_rgba(255,45,149,0.1)]
                 space-y-2
+                border border-[#2a2a4a]
             "
         >
 
@@ -132,7 +133,7 @@ export default function PlayerProgress() {
                     flex
                     justify-between
                     text-xs
-                    text-gray-500
+                    text-[#b8b8d0]
                 "
             >
 

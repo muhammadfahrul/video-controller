@@ -60,7 +60,7 @@ export default function PlayerControls() {
 
     let statusText = "Offline";
 
-    let statusColor = "bg-gray-400";
+    let statusColor = "bg-gray-600";
 
     if (agent.online) {
 
@@ -68,7 +68,7 @@ export default function PlayerControls() {
 
             statusText = "Playing";
 
-            statusColor = "bg-green-500";
+            statusColor = "bg-[#ff2d95] shadow-[0_0_10px_rgba(255,45,149,0.8)]";
 
         }
 
@@ -76,7 +76,7 @@ export default function PlayerControls() {
 
             statusText = "Paused";
 
-            statusColor = "bg-yellow-500";
+            statusColor = "bg-[#00f0ff] shadow-[0_0_10px_rgba(0,240,255,0.8)]";
 
         }
 
@@ -255,6 +255,11 @@ export default function PlayerControls() {
         <section
             className="
                 space-y-4
+                bg-[#12121f]
+                p-4
+                rounded-xl
+                border border-[#2a2a4a]
+                shadow-[0_0_20px_rgba(255,45,149,0.15)]
             "
         >
 
@@ -290,7 +295,7 @@ export default function PlayerControls() {
                     items-center
                     gap-2
                     text-sm
-                    text-gray-600
+                    text-[#b8b8d0]
                 "
             >
 

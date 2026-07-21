@@ -79,6 +79,11 @@ export default function ProgressBar(){
         <div
             className="
                 space-y-2
+                bg-[#12121f]
+                p-4
+                rounded-xl
+                border border-[#2a2a4a]
+                shadow-[0_0_15px_rgba(255,45,149,0.1)]
             "
         >
 
@@ -123,7 +128,7 @@ export default function ProgressBar(){
                     flex
                     justify-between
                     text-xs
-                    text-gray-500
+                    text-[#b8b8d0]
                 "
             >
 

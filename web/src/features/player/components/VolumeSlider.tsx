@@ -42,12 +42,13 @@ export default function VolumeSlider({
         <section
             className="
                 rounded-xl
-                bg-white
+                bg-[#12121f]
                 p-4
-                shadow
+                shadow-[0_0_15px_rgba(0,240,255,0.1)]
                 space-y-3
                 landscape:p-3
                 landscape:space-y-2
+                border border-[#2a2a4a]
             "
         >
 

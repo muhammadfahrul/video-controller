@@ -40,8 +40,8 @@ export default function Footer() {
                 right-0
                 z-50
                 border-t
-                border-gray-200
-                bg-white
+                border-[#2a2a4a]
+                bg-[#0a0a14]
                 px-3
                 py-2
                 pb-[env(safe-area-inset-bottom)]
@@ -53,7 +53,7 @@ export default function Footer() {
                 className="
                     flex
                     justify-between
-                    bg-gray-100
+                    bg-[#12121f]
                     rounded-lg
                     p-1
                     landscape:max-w-md
@@ -67,10 +67,10 @@ export default function Footer() {
                             key={item.path}
                             to={item.path}
                             className={`
-                                flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-colors
+                                flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-all
                                 ${isActive
-                                    ? "bg-white text-blue-600 shadow-sm"
-                                    : "text-gray-600 hover:text-gray-900"
+                                    ? "bg-[#ff2d95] text-white shadow-[0_0_10px_rgba(255,45,149,0.5)]"
+                                    : "text-[#b8b8d0] hover:text-[#00f0ff] hover:bg-[#1a1a2e]"
                                 }
                             `}
                         >

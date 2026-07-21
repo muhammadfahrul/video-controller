@@ -39,10 +39,11 @@ export default function AgentStatusCard({
                         className="
                             text-lg
                             font-semibold
+                            text-white
                         "
                     >
 
-                        🖥 {agent.name}
+                        🎤 {agent.name}
 
                     </h2>
 
@@ -50,7 +51,7 @@ export default function AgentStatusCard({
                         className="
                             mt-1
                             text-sm
-                            text-gray-500
+                            text-[#b8b8d0]
                         "
                     >
 
@@ -107,7 +108,7 @@ export default function AgentStatusCard({
                 <p
                     className="
                         text-xs
-                        text-gray-500
+                        text-[#b8b8d0]
                     "
                 >
 

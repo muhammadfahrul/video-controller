@@ -36,10 +36,12 @@ export default function Card({
             className={`
                 rounded-2xl
                 border
-                border-gray-200
-                bg-white
+                border-[#2a2a4a]
+                bg-[#12121f]
                 p-4
-                shadow-sm
+                shadow-[0_0_15px_rgba(168,85,247,0.1)]
+                hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]
+                transition-all
                 ${className}
             `}
 

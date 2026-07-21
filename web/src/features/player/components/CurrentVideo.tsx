@@ -16,8 +16,8 @@ export default function CurrentVideo() {
     // If no player video, show nothing
     if (!player.videoId) {
         return (
-            <div className="rounded-xl bg-white p-4 shadow">
-                <p className="text-gray-500">No video playing</p>
+            <div className="rounded-xl bg-[#12121f] p-4 shadow-[0_0_15px_rgba(255,45,149,0.1)] border border-[#2a2a4a]">
+                <p className="text-[#b8b8d0]">No video playing</p>
             </div>
         );
     }
@@ -37,28 +37,28 @@ export default function CurrentVideo() {
     };
 
     return (
-        <div className="rounded-xl bg-white p-4 shadow landscape:p-3">
-            <h3 className="text-sm font-semibold text-gray-500 mb-2 landscape:mb-1">
+        <div className="rounded-xl bg-[#12121f] p-4 shadow-[0_0_20px_rgba(255,45,149,0.2)] border border-[#2a2a4a] landscape:p-3">
+            <h3 className="text-sm font-semibold text-[#00f0ff] mb-2 landscape:mb-1 uppercase tracking-wider">
                 Now Playing
             </h3>
             <div className="flex gap-4 landscape:gap-3">
                 <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-32 h-20 object-cover rounded-lg landscape:w-40 landscape:h-24"
+                    className="w-32 h-20 object-cover rounded-lg landscape:w-40 landscape:h-24 shadow-[0_0_10px_rgba(255,45,149,0.3)]"
                     onError={(e) => {
                         // Fallback thumbnail
                         (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${player.videoId}/default.jpg`;
                     }}
                 />
                 <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold truncate landscape:text-base">
+                    <h4 className="font-semibold truncate landscape:text-base text-white">
                         {video.title}
                     </h4>
-                    <p className="text-sm text-gray-500 truncate landscape:text-sm">
+                    <p className="text-sm text-[#b8b8d0] truncate landscape:text-sm">
                         {video.channel}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1 landscape:mt-2">
+                    <p className="text-xs text-[#ff2d95] mt-1 landscape:mt-2 font-mono">
                         {video.duration}
                     </p>
                 </div>

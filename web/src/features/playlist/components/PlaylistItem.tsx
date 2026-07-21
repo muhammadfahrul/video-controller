@@ -115,13 +115,14 @@ export default function PlaylistItemCard({
                                     items-center
                                     gap-1
                                     rounded-full
-                                    bg-red-500
+                                    bg-[#ff2d95]
                                     px-2
                                     py-1
                                     text-[10px]
                                     font-semibold
                                     text-white
                                     animate-pulse
+                                    shadow-[0_0_10px_rgba(255,45,149,0.6)]
                                 "
                             >
 
@@ -140,7 +141,7 @@ export default function PlaylistItemCard({
                 <p
                     className="
                         text-sm
-                        text-gray-500
+                        text-[#b8b8d0]
                     "
                 >
 
@@ -151,7 +152,7 @@ export default function PlaylistItemCard({
                 <p
                     className="
                         text-xs
-                        text-gray-400
+                        text-[#a855f7]
                     "
                 >
 

@@ -29,6 +29,7 @@ export default function SectionTitle({
                 className="
                     text-lg
                     font-bold
+                    text-white
                 "
             >
 

@@ -49,7 +49,7 @@ export default function SearchBar({
                     left-4
                     top-1/2
                     -translate-y-1/2
-                    text-gray-400
+                    text-[#ff2d95]
                 "
             />
 
@@ -81,12 +81,17 @@ export default function SearchBar({
                     w-full
                     rounded-xl
                     border
+                    border-[#2a2a4a]
+                    bg-[#12121f]
                     py-3
                     pl-11
                     pr-4
                     outline-none
+                    text-white
+                    placeholder-gray-500
 
-                    focus:border-red-500
+                    focus:border-[#ff2d95]
+                    focus:shadow-[0_0_15px_rgba(255,45,149,0.3)]
                 "
 
             />
@@ -103,14 +108,15 @@ export default function SearchBar({
                     top-1/2
                     -translate-y-1/2
                     rounded-lg
-                    bg-red-600
+                    bg-[#ff2d95]
                     px-4
                     py-2
                     text-sm
                     text-white
+                    shadow-[0_0_10px_rgba(255,45,149,0.4)]
                     ${loading 
                         ? "opacity-50 cursor-not-allowed" 
-                        : "hover:bg-red-700"}
+                        : "hover:bg-[#ff4da6] hover:shadow-[0_0_20px_rgba(255,45,149,0.6)]"}
                 `}
 
             >

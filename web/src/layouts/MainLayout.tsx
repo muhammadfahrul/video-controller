@@ -16,8 +16,7 @@ export default function MainLayout() {
         <div
             className="
                 min-h-screen
-                bg-gray-100
-                md:bg-gray-200
+                bg-[#0a0a14]
             "
         >
 
@@ -30,16 +29,17 @@ export default function MainLayout() {
                     flex
                     min-h-screen
                     flex-col
-                    bg-gray-50
+                    bg-[#12121f]
                     md:max-w-2xl
                     lg:max-w-4xl
                     xl:max-w-5xl
-                    md:shadow-xl
+                    md:shadow-[0_0_30px_rgba(255,45,149,0.2)]
                     md:my-4
                     md:rounded-xl
                     md:min-h-[calc(100vh-32px)]
                     lg:min-h-[calc(100vh-48px)]
                     pt-[env(safe-area-inset-top)]
+                    border-x border-[#2a2a4a]
                 "
             >
 

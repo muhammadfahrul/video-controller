@@ -24,7 +24,7 @@ export default function FullPageLoading() {
                     items-center
                     gap-4
                     rounded-xl
-                    bg-white
+                    bg-[#12121f]
                     p-8
                     shadow-2xl
                 "
@@ -43,7 +43,7 @@ export default function FullPageLoading() {
                     className="
                         text-lg
                         font-medium
-                        text-gray-700
+                        text-white
                     "
                 >
 

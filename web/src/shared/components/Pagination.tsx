@@ -72,7 +72,7 @@ export default function Pagination({
             {/* Info section - hidden on small screens */}
             <div className="
                 text-sm 
-                text-gray-500
+                text-[#b8b8d0]
                 order-2 
                 sm:order-1
             ">
@@ -117,7 +117,7 @@ export default function Pagination({
                         transition-colors
                         ${currentPage === 1
                             ? "cursor-not-allowed opacity-50"
-                            : "hover:bg-gray-100 active:bg-gray-200"}
+                            : "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542]"}
                     `}
                     aria-label="Previous page"
                 >
@@ -144,10 +144,10 @@ export default function Pagination({
                                     py-2
                                     text-sm 
                                     font-medium
-                                    transition-colors
+                                    transition-all
                                     ${page === currentPage
-                                        ? "bg-red-600 text-white"
-                                        : "hover:bg-gray-100 active:bg-gray-200"}
+                                        ? "bg-[#ff2d95] text-white shadow-[0_0_10px_rgba(255,45,149,0.5)]"
+                                        : "bg-[#1a1a2e] text-[#b8b8d0] hover:bg-[#252542] hover:text-[#00f0ff]"}
                                 `}
                             >
                                 {page}
@@ -155,7 +155,7 @@ export default function Pagination({
                         ) : (
                             <span
                                 key={index}
-                                className="px-1 sm:px-2 text-gray-400"
+                                className="px-1 sm:px-2 text-[#a855f7]"
                             >
                                 {page}
                             </span>
@@ -181,7 +181,7 @@ export default function Pagination({
                         transition-colors
                         ${currentPage === totalPages
                             ? "cursor-not-allowed opacity-50"
-                            : "hover:bg-gray-100 active:bg-gray-200"}
+                            : "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542]"}
                     `}
                     aria-label="Next page"
                 >
