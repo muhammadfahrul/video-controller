@@ -1,15 +1,103 @@
 #!/bin/bash
 
 # Video Controller - Deploy Script
-# Run all three services with a single command
-# Auto-installs EVERYTHING - just run ./deploy.sh
+# Run selected services with a single command
+# Auto-installs dependencies - just run ./install.sh
 
 set -e
 
-echo "🚀 Starting Video Controller (Production)..."
-
 # Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+# ============================================
+# Interactive menu
+# ============================================
+show_menu() {
+    echo "============================================"
+    echo "   Video Controller - Deploy Script"
+    echo "============================================"
+    echo ""
+    echo "Pilih aplikasi yang ingin diinstall:"
+    echo ""
+    echo "  [1] Room App       - Agent, Server, Web PWA"
+    echo "  [2] Kasir          - Aplikasi Kasir (Cashier)"
+    echo "  [3] Semua          - Room App + Kasir"
+    echo ""
+    echo "  [0] Keluar"
+    echo ""
+    echo -n "Masukkan pilihan [1-3]: "
+}
+
+# ============================================
+# Parse menu selection
+# ============================================
+INSTALL_MODE=""
+
+if [[ $# -gt 0 ]]; then
+    # Command line argument provided
+    case $1 in
+        1|room)
+            INSTALL_MODE="room"
+            ;;
+        2|kasir)
+            INSTALL_MODE="kasir"
+            ;;
+        3|all)
+            INSTALL_MODE="all"
+            ;;
+        0|exit)
+            echo "Keluar..."
+            exit 0
+            ;;
+        *)
+            echo "Pilihan tidak valid: $1"
+            exit 1
+            ;;
+    esac
+else
+    # Show interactive menu
+    show_menu
+    read -r choice
+    echo ""
+    
+    case $choice in
+        1)
+            INSTALL_MODE="room"
+            ;;
+        2)
+            INSTALL_MODE="kasir"
+            ;;
+        3)
+            INSTALL_MODE="all"
+            ;;
+        0)
+            echo "Keluar..."
+            exit 0
+            ;;
+        *)
+            echo "Pilihan tidak valid!"
+            exit 1
+            ;;
+    esac
+fi
+
+# ============================================
+# Show selected mode
+# ============================================
+echo "🚀 Starting Video Controller..."
+
+case $INSTALL_MODE in
+    all)
+        echo "📦 Mode: Semua layanan (Room App + Kasir)"
+        ;;
+    room)
+        echo "📦 Mode: Room App saja (agent, server, web)"
+        ;;
+    kasir)
+        echo "📦 Mode: Kasir saja (cashier)"
+        ;;
+esac
+echo ""
 
 # ============================================
 # Auto-install Git if needed
@@ -178,53 +266,87 @@ if [ -d "$PROJECT_ROOT/web/node_modules" ]; then
     rm -f "$PROJECT_ROOT/web/package-lock.json"
 fi
 
+# Clean cashier/node_modules to avoid issues
+if [ -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+    echo "🧹 Cleaning cashier node_modules..."
+    rm -rf "$PROJECT_ROOT/cashier/node_modules"
+    rm -f "$PROJECT_ROOT/cashier/package-lock.json"
+fi
+
 # Clean other node_modules if Node.js was upgraded
 if [ "$NODE_UPGRADED" = true ]; then
     echo "🧹 Removing old node_modules (Node.js upgraded)..."
     rm -rf "$PROJECT_ROOT/node_modules"
     rm -rf "$PROJECT_ROOT/agent/node_modules"
     rm -rf "$PROJECT_ROOT/server/node_modules"
+    rm -rf "$PROJECT_ROOT/web/node_modules"
+    rm -rf "$PROJECT_ROOT/cashier/node_modules"
     rm -f "$PROJECT_ROOT/package-lock.json"
     rm -f "$PROJECT_ROOT/agent/package-lock.json"
     rm -f "$PROJECT_ROOT/server/package-lock.json"
+    rm -f "$PROJECT_ROOT/web/package-lock.json"
+    rm -f "$PROJECT_ROOT/cashier/package-lock.json"
 fi
 
 # ============================================
-# Install dependencies if not present
+# Install dependencies based on mode
 # ============================================
 echo "📦 Checking dependencies..."
 
+# Root dependencies (always needed for workspace)
 if [ ! -d "$PROJECT_ROOT/node_modules" ]; then
     echo "📦 Installing root dependencies..."
     cd "$PROJECT_ROOT" && npm install
 fi
 
-if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
-    echo "📦 Installing agent dependencies..."
-    cd "$PROJECT_ROOT/agent" && npm install
+# Room App dependencies
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        echo "📦 Installing agent dependencies..."
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    
+    # Install Playwright browsers if not exists
+    if [ ! -d "$HOME/.cache/ms-playwright" ]; then
+        echo "🌐 Installing Playwright browsers..."
+        cd "$PROJECT_ROOT/agent" && npx playwright install chromium --with-deps
+    fi
+    
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        echo "📦 Installing server dependencies..."
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        echo "📦 Installing web dependencies..."
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
 fi
 
-# Install Playwright browsers if not exists
-if [ ! -d "$HOME/.cache/ms-playwright" ]; then
-    echo "🌐 Installing Playwright browsers..."
-    cd "$PROJECT_ROOT/agent" && npx playwright install chromium --with-deps
-fi
-
-if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
-    echo "📦 Installing server dependencies..."
-    cd "$PROJECT_ROOT/server" && npm install
-fi
-
-if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
-    echo "📦 Installing web dependencies..."
-    cd "$PROJECT_ROOT/web" && npm install
+# Kasir dependencies
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        echo "📦 Installing cashier dependencies..."
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
 fi
 
 # ============================================
-# Build all services
+# Build based on mode
 # ============================================
-echo "🔨 Building all services..."
-cd "$PROJECT_ROOT" && npm run build
+echo "🔨 Building services..."
+
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    echo "🔨 Building Room App (agent, server, web)..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+fi
+
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    echo "🔨 Building Kasir (cashier)..."
+    cd "$PROJECT_ROOT/cashier" && npm run build
+fi
 
 # ============================================
 # Install xvfb for headless browser
@@ -247,29 +369,51 @@ if [ -z "$DISPLAY" ] && ! command -v xvfb-run &> /dev/null; then
 fi
 
 # ============================================
-# Start all services in production mode
+# Start services based on mode
 # ============================================
-echo "▶️ Starting all services..."
+echo "▶️ Starting services..."
 
-cd "$PROJECT_ROOT/server" && npm run start &
-SERVER_PID=$!
+# PIDs for cleanup
+PIDS=""
 
-# Start agent with xvfb if no display
-if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
-    cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
-    AGENT_PID=$!
-else
-    cd "$PROJECT_ROOT/agent" && npm run start &
-    AGENT_PID=$!
+# Start Room App services
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    echo "▶️ Starting Room App services..."
+    
+    cd "$PROJECT_ROOT/server" && npm run start &
+    SERVER_PID=$!
+    PIDS="$PIDS $SERVER_PID"
+    echo "   - Server: PID $SERVER_PID"
+    
+    # Start agent with xvfb if no display
+    if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
+        cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
+        AGENT_PID=$!
+    else
+        cd "$PROJECT_ROOT/agent" && npm run start &
+        AGENT_PID=$!
+    fi
+    PIDS="$PIDS $AGENT_PID"
+    echo "   - Agent: PID $AGENT_PID"
+    
+    cd "$PROJECT_ROOT/web" && npm run preview:host &
+    WEB_PID=$!
+    PIDS="$PIDS $WEB_PID"
+    echo "   - Web: PID $WEB_PID"
 fi
 
-cd "$PROJECT_ROOT/web" && npm run preview:host &
-WEB_PID=$!
+# Start Kasir service
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    echo "▶️ Starting Kasir service..."
+    
+    cd "$PROJECT_ROOT/cashier" && npm run preview:host &
+    CASHIER_PID=$!
+    PIDS="$PIDS $CASHIER_PID"
+    echo "   - Cashier: PID $CASHIER_PID"
+fi
 
-echo "✅ All services started!"
-echo "   - Server: PID $SERVER_PID"
-echo "   - Agent: PID $AGENT_PID"
-echo "   - Web: PID $WEB_PID"
+echo ""
+echo "✅ All selected services started!"
 echo ""
 echo "Press Ctrl+C to stop all services"
 
@@ -279,7 +423,9 @@ echo "Press Ctrl+C to stop all services"
 cleanup() {
     echo ""
     echo "🛑 Stopping all services..."
-    kill $SERVER_PID $AGENT_PID $WEB_PID 2>/dev/null || true
+    for pid in $PIDS; do
+        kill $pid 2>/dev/null || true
+    done
     echo "✅ All services stopped"
     exit 0
 }
@@ -287,4 +433,4 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 # Wait for any process to exit
-wait $SERVER_PID $AGENT_PID $WEB_PID
+wait $PIDS
