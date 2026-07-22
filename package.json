@@ -4,19 +4,22 @@
   "description": "Video Controller - Real-time video playlist management system",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"npm run dev:agent\" \"npm run dev:server\" \"npm run dev:web\"",
+    "dev": "concurrently \"npm run dev:agent\" \"npm run dev:server\" \"npm run dev:web\" \"npm run dev:cashier\"",
     "dev:agent": "cd agent && npm run dev",
     "dev:server": "cd server && npm run dev",
     "dev:web": "cd web && npm run dev",
-    "build": "npm run build:agent && npm run build:server && npm run build:web",
+    "dev:cashier": "cd cashier && npm run dev",
+    "build": "npm run build:agent && npm run build:server && npm run build:web && npm run build:cashier",
     "build:agent": "cd agent && npm run build",
     "build:server": "cd server && npm run build",
     "build:web": "cd web && npm run build",
-    "install:all": "cd agent && npm install && cd ../server && npm install && cd ../web && npm install",
-    "start": "npm run build && concurrently \"npm run start:server\" \"npm run start:agent\" \"npm run start:web\"",
+    "build:cashier": "cd cashier && npm run build",
+    "install:all": "cd agent && npm install && cd ../server && npm install && cd ../web && npm install && cd ../cashier && npm install",
+    "start": "npm run build && concurrently \"npm run start:server\" \"npm run start:agent\" \"npm run start:web\" \"npm run start:cashier\"",
     "start:agent": "cd agent && npm run start",
     "start:server": "cd server && npm run start",
-    "start:web": "cd web && npm run preview:host"
+    "start:web": "cd web && npm run preview:host",
+    "start:cashier": "cd cashier && npm run preview:host"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

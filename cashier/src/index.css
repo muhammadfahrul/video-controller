@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  
+  /* Karaoke Theme Colors */
+  --karaoke-purple: #8b5cf6;
+  --karaoke-pink: #ec4899;
+  --karaoke-blue: #3b82f6;
+  --karaoke-green: #10b981;
+  --karaoke-yellow: #f59e0b;
+  --karaoke-red: #ef4444;
+  --karaoke-dark: #0f0f1a;
+  --karaoke-darker: #080810;
+  --karaoke-card: #1a1a2e;
+  --karaoke-glow: rgba(139, 92, 246, 0.5);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--karaoke-darker) 0%, var(--karaoke-dark) 50%, #1a1a2e 100%);
+  background-attachment: fixed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Neon glow effects */
+.neon-text {
+  text-shadow: 0 0 10px var(--karaoke-glow), 0 0 20px var(--karaoke-glow), 0 0 30px var(--karaoke-glow);
+}
+
+.neon-border {
+  box-shadow: 0 0 5px var(--karaoke-glow), 0 0 10px var(--karaoke-glow), inset 0 0 5px rgba(139, 92, 246, 0.1);
+}
+
+.neon-card {
+  background: linear-gradient(145deg, rgba(26, 26, 46, 0.9), rgba(15, 15, 26, 0.9));
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(139, 92, 246, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.neon-card:hover {
+  border-color: rgba(236, 72, 153, 0.5);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5), 0 0 20px rgba(236, 72, 153, 0.2);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--karaoke-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--karaoke-purple);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--karaoke-pink);
+}
+
+/* Animation for loading */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--karaoke-glow); }
+  50% { opacity: 0.7; box-shadow: 0 0 20px var(--karaoke-glow), 0 0 30px var(--karaoke-pink); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(90deg, var(--karaoke-purple), var(--karaoke-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

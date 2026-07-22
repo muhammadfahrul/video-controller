@@ -19,13 +19,19 @@ A real-time video playlist management system with YouTube integration, featuring
 │   Web   │ ◄─────────────────► │ Server  │ ◄─────────────────► │  Agent  │
 │ (React) │                     │ (Node.js)│                    │(Windows)│
 └─────────┘                     └─────────┘                     └─────────┘
-                                      │
-                                 YouTube API
+        │                            │                              │
+        │                            │                              │
+        ▼                            ▼                              ▼
+┌─────────┐                  YouTube API
+│ Cashier │
+│ (React) │
+└─────────┘
 ```
 
-- **Web** - React frontend for user interface
+- **Web** - React PWA frontend for user interface (放在PC包厢)
+- **Cashier** - React frontend for billing and timer management (放在PC收银台)
 - **Server** - Socket.io server for real-time communication and API
-- **Agent** - Windows agent that controls the browser and player
+- **Agent** - Windows agent that controls the browser and player (放在每个PC包厢)
 
 ## Prerequisites
 
@@ -61,18 +67,23 @@ Run each service in separate terminals:
 cd server
 npm run dev
 
-# Terminal 2 - Start the agent
+# Terminal 2 - Start the agent (repeat for each room)
 cd agent
 npm run dev
 
 # Terminal 3 - Start the web frontend
 cd web
 npm run dev
+
+# Terminal 4 - Start the cashier app
+cd cashier
+npm run dev
 ```
 
 The services will be available at:
 - **Web UI**: http://localhost:5173
-- **Server API**: http://localhost:3000
+- **Cashier UI**: http://localhost:5174
+- **Server API**: http://localhost:53331
 
 ## Deployment
 
