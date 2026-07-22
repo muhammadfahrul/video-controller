@@ -1,3 +1,7 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 import { config } from "../config/config";
 import { ConfigValidator } from "../config/ConfigValidator";
 import { getLocalIpAddress } from "../utils/network";
