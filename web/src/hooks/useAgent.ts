@@ -38,7 +38,8 @@ export function useAgent() {
 
                     name: agent.name,
 
-                    online: agent.status === "ONLINE",
+                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
+                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
 
                     lastHeartbeat: agent.lastHeartbeat
 
@@ -90,7 +91,8 @@ export function useAgent() {
 
                     name: agent.name,
 
-                    online: agent.status === "ONLINE",
+                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
+                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
 
                     lastHeartbeat: agent.lastHeartbeat
 

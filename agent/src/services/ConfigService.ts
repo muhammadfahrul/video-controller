@@ -4,6 +4,20 @@ import { getLocalIpAddress } from "../utils/network";
 
 export interface AppConfig {
 
+    room: {
+
+        id: string;
+
+        name: string;
+
+    };
+
+    billing: {
+
+        enabled: boolean;
+
+    };
+
     browser: {
 
         headless: boolean;

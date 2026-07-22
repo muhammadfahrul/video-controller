@@ -31,7 +31,7 @@ export default function HomePage(){
                 value={player.volume}
                 disabled={!agent.online}
                 onChange={(value) => {
-                    if (!agent.id) return;
+                    if (!agent.id || !agent.online) return;
                     playerCommandService.volume(agent.id, value);
                 }}
             />

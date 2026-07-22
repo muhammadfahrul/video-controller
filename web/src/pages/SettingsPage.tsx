@@ -20,7 +20,8 @@ export default function SettingsPage() {
                         id: agent.id,
                         name: agent.name,
                         status: agent.online ? "ONLINE" : "OFFLINE",
-                        lastHeartbeat: agent.lastHeartbeat
+                        lastHeartbeat: agent.lastHeartbeat,
+                        isActive: agent.online
                     }}
                 />
             </div>

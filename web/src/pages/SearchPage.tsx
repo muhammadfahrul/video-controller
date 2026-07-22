@@ -5,7 +5,7 @@ import Pagination from "../shared/components/Pagination";
 import { useAppStore } from "../store/appStore";
 import { useAgent } from "../hooks/useAgent";
 import { usePlaylist } from "../hooks/usePlaylist";
-import { agentService, apiService } from "../services";
+import { agentService } from "../services";
 import { searchService } from "../services/search";
 import type { SearchResult } from "../features/search/types/SearchResult";
 
@@ -23,11 +23,16 @@ export default function SearchPage(){
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
     
-    const { setAgent, loadAgent, setProcessing } = useAppStore();
+    const { loadAgent, setProcessing, agent } = useAppStore();
 
     const search = async () => {
         if (!keyword.trim()) {
             setResults([]);
+            return;
+        }
+
+        // Don't search if agent is offline
+        if (!agent.online) {
             return;
         }
 
@@ -59,17 +64,6 @@ export default function SearchPage(){
     const paginatedResults = results.slice(startIndex, endIndex);
 
     useEffect(() => {
-        setAgent({
-            id: "windows-agent-01",
-            name: "Windows Player",
-            online: true,
-            lastHeartbeat: Date.now()
-        });
-
-        apiService.get("/api/agents")
-            .then(console.log)
-            .catch(console.error);
-
         async function load() {
             try {
                 const agents = await agentService.list();
@@ -78,7 +72,8 @@ export default function SearchPage(){
                 loadAgent({
                     id: agent.id,
                     name: agent.name,
-                    online: agent.status === "ONLINE",
+                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
+                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
                     lastHeartbeat: agent.lastHeartbeat
                 });
             } catch (err) {

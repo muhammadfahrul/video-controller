@@ -10,6 +10,8 @@ export interface AgentDto {
 
     lastHeartbeat: number;
 
+    isActive?: boolean;
+
 }
 
 export class AgentService {

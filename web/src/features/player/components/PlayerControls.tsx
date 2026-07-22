@@ -100,7 +100,7 @@ export default function PlayerControls() {
 
     function handlePlayPause() {
 
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
 
@@ -136,7 +136,7 @@ export default function PlayerControls() {
 
     function handleMute() {
 
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
 
@@ -170,7 +170,7 @@ export default function PlayerControls() {
 
     function handleFullscreen() {
 
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
 
@@ -203,7 +203,7 @@ export default function PlayerControls() {
     }
 
     function handleStop() {
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
             
@@ -215,7 +215,7 @@ export default function PlayerControls() {
     }
 
     function handleNext() {
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
             
@@ -227,7 +227,7 @@ export default function PlayerControls() {
     }
 
     function handlePrev() {
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
             
@@ -239,7 +239,7 @@ export default function PlayerControls() {
     }
 
     function handleSkipAd() {
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
             

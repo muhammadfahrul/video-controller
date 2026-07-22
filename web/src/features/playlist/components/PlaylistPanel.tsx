@@ -67,11 +67,13 @@ export default function PlaylistPanel() {
                                 item={item}
                                 active={(startIndex + index) === playlist.currentIndex}
                                 removing={removingItemId === item.id}
-                                disabled={processing.removeFromPlaylist}
+                                disabled={!agent.online || processing.removeFromPlaylist}
                                 onPlay={() => {
+                                    if (!agent.online) return;
                                     playerCommandService.playPlaylistItem(agent.id, item.id);
                                 }}
                                 onRemove={() => {
+                                    if (!agent.online) return;
                                     setRemovingItemId(item.id);
                                     setProcessing("removeFromPlaylist", true);
                                     playerCommandService.removePlaylist(agent.id, item.id);

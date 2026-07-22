@@ -16,6 +16,9 @@ export interface AgentIdentity {
     roomName: string;
 
 
+    isActive: boolean;
+
+
 }
 
 export class AgentIdentityProvider {
@@ -41,7 +44,10 @@ export class AgentIdentityProvider {
             roomId: config.room.id,
 
 
-            roomName: config.room.name
+            roomName: config.room.name,
+
+
+            isActive: false
 
         };
 
@@ -52,6 +58,13 @@ export class AgentIdentityProvider {
     get(){
 
         return this.identity;
+
+    }
+
+
+    setActive(active: boolean) {
+
+        this.identity.isActive = active;
 
     }
 

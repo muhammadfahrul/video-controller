@@ -46,7 +46,7 @@ export default function SearchResultCard({
 
     const play = () => {
 
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
 
@@ -67,7 +67,7 @@ export default function SearchResultCard({
 
     const addPlaylist = () => {
 
-        if (!agent.id) {
+        if (!agent.id || !agent.online) {
 
             return;
 
@@ -181,7 +181,7 @@ export default function SearchResultCard({
 
                         onClick={play}
 
-                        disabled={!agent.id || processing.play}
+                        disabled={!agent.id || !agent.online || processing.play}
 
                         className={`
                             flex
@@ -195,7 +195,7 @@ export default function SearchResultCard({
                             text-white
                             transition
                             shadow-[0_0_10px_rgba(255,45,149,0.4)]
-                            ${!agent.id || processing.play
+                            ${!agent.id || !agent.online || processing.play
                                 ? "opacity-50 cursor-not-allowed" 
                                 : "hover:bg-[#ff4da6] hover:shadow-[0_0_20px_rgba(255,45,149,0.6)]"}
                         `}
@@ -216,7 +216,7 @@ export default function SearchResultCard({
 
 onClick={addPlaylist}
 
-                        disabled={!agent.id || addingToPlaylist}
+                        disabled={!agent.id || !agent.online || addingToPlaylist}
                         
                         className={`
                             flex
@@ -231,7 +231,7 @@ onClick={addPlaylist}
                             text-sm
                             text-[#00f0ff]
                             transition
-                            ${!agent.id || addingToPlaylist
+                            ${!agent.id || !agent.online || addingToPlaylist
                                 ? "opacity-50 cursor-not-allowed" 
                                 : "hover:bg-[#00f0ff] hover:text-[#0a0a14]"}
                         `}

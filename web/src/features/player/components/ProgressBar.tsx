@@ -56,6 +56,7 @@ export default function ProgressBar(){
 
     function handleChangeEnd(){
 
+        if (!agent.online) return;
 
         playerCommandService
             .seek(

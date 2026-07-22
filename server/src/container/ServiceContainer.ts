@@ -14,9 +14,13 @@ export class ServiceContainer {
 
     private readonly commandService: CommandService;
 
+    private readonly billingEnabled: boolean;
+
     constructor(
-        httpServer: HttpServer
+        httpServer: HttpServer,
+        billingEnabled: boolean = true
     ) {
+        this.billingEnabled = billingEnabled;
 
         this.agentManager =
             new AgentManager();
@@ -24,7 +28,8 @@ export class ServiceContainer {
         this.socketServer =
             new SocketServer(
                 httpServer,
-                this.agentManager
+                this.agentManager,
+                this.billingEnabled
             );
 
         this.commandService =

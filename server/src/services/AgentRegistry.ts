@@ -211,4 +211,41 @@ export class AgentRegistry {
 
 
     }
+
+
+    public setActive(
+        id: string,
+        isActive: boolean
+    ) {
+
+        const agent = this.agents.get(id);
+
+        if (!agent) {
+
+            return;
+
+        }
+
+        agent.isActive = isActive;
+
+    }
+
+
+    public getByRoomId(
+        roomId: string
+    ): AgentInfo | undefined {
+
+        for (const agent of this.agents.values()) {
+
+            if (agent.roomId === roomId) {
+
+                return agent;
+
+            }
+
+        }
+
+        return undefined;
+
+    }
 }

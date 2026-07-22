@@ -48,7 +48,8 @@ export default function PlayerProgress() {
 
             player.duration <= 0 ||
 
-            !agent.id
+            !agent.id ||
+            !agent.online
 
         ) {
 

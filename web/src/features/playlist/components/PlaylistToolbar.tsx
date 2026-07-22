@@ -20,6 +20,7 @@ const {
 
 
 const handleClearPlaylist = () => {
+    if (!agent.online) return;
     
     // Set processing state
     setProcessing("clearPlaylist", true);
@@ -32,6 +33,7 @@ const handleClearPlaylist = () => {
 };
 
 const handleShufflePlaylist = () => {
+    if (!agent.online) return;
     
     // Set processing state
     setProcessing("shufflePlaylist", true);
@@ -47,6 +49,7 @@ const handleShufflePlaylist = () => {
 
 
 const handleRepeat = (mode: string) => {
+    if (!agent.online) return;
     
     // Set processing state
     setProcessing("repeat", true);
@@ -80,14 +83,14 @@ flex-wrap
 
 onClick={handleShufflePlaylist}
 
-disabled={processing.shufflePlaylist}
+disabled={processing.shufflePlaylist || !agent.online}
 
 className={`
 px-3
 py-1
 text-sm
 rounded
-${processing.shufflePlaylist 
+${processing.shufflePlaylist || !agent.online
     ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400" 
     : "bg-[#1a1a2e] hover:bg-[#252542] text-[#00f0ff] border border-[#00f0ff]"}
 `}
@@ -104,14 +107,14 @@ ${processing.shufflePlaylist
 
 onClick={handleClearPlaylist}
 
-disabled={processing.clearPlaylist}
+disabled={processing.clearPlaylist || !agent.online}
 
 className={`
 px-3
 py-1
 text-sm
 rounded
-${processing.clearPlaylist 
+${processing.clearPlaylist || !agent.online
     ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400" 
     : "bg-[#1a1a2e] hover:bg-[#252542] text-[#ff2d95] border border-[#ff2d95]"}
 `}
@@ -133,7 +136,7 @@ ${processing.clearPlaylist
             
             onClick={() => handleRepeat(mode)}
             
-            disabled={processing.repeat}
+            disabled={processing.repeat || !agent.online}
             
             className={
                 `
@@ -144,10 +147,10 @@ ${processing.clearPlaylist
                     `
                 +
                 (playlist.repeat === mode
-                    ? processing.repeat
+                    ? (processing.repeat || !agent.online)
                         ? "bg-[#a855f7] cursor-not-allowed text-white"
                         : "bg-[#a855f7] text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]"
-                    : processing.repeat
+                    : (processing.repeat || !agent.online)
                         ? "bg-[#2a2a4a] cursor-not-allowed text-gray-400"
                         : "bg-[#1a1a2e] hover:bg-[#252542] text-[#a855f7] border border-[#a855f7]"
                 )

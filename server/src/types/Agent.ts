@@ -9,7 +9,9 @@ export type AgentStatus =
 
     | "PLAYING"
 
-    | "PAUSED";
+    | "PAUSED"
+
+    | "WAITING"; // Menunggu aktivasi dari cashier
 
 export interface AgentInfo {
 
@@ -32,5 +34,7 @@ export interface AgentInfo {
     player?: PlayerState;
 
     playlist?: PlaylistSnapshot;
+
+    isActive: boolean;
 
 }

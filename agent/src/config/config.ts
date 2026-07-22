@@ -10,6 +10,12 @@ export interface AppConfig {
 
     };
 
+    billing: {
+
+        enabled: boolean;
+
+    };
+
     browser: {
 
         headless: boolean;

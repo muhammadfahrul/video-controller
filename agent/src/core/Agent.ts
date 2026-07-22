@@ -158,6 +158,41 @@ export class Agent {
                 .getInstance()
                 .getConfig();
 
+        // Connect socket FIRST so agent can register
+        // Use waitForConnection to ensure socket is connected before proceeding
+        console.log("[AGENT] Connecting to server...");
+        this.socketClient?.connect();
+        
+        // Wait for socket to be connected first
+        await this.socketClient?.waitForConnection();
+        
+        // Check if billing is enabled
+        const billingEnabled = config.billing?.enabled ?? true;
+        
+        if (billingEnabled) {
+            // Billing enabled - wait for activation from cashier
+            console.log("[AGENT] Billing enabled - waiting for activation from cashier...");
+            
+            // Send periodic heartbeats while waiting so server doesn't mark as OFFLINE
+            const heartbeatInterval = setInterval(() => {
+                this.socketClient?.sendHeartbeat();
+            }, 5000);
+            
+            // Wait for activation from cashier
+            await this.socketClient?.waitForActivation();
+            
+            // Stop the heartbeat interval since we're activating
+            clearInterval(heartbeatInterval);
+            
+            console.log("[AGENT] Room activated! Starting services...");
+        } else {
+            // Billing disabled - start normally without waiting
+            console.log("[AGENT] Billing disabled - starting services directly...");
+            
+            // Register as already active
+            this.socketClient?.setActive(true);
+        }
+
 
         await this.browser.start();
 

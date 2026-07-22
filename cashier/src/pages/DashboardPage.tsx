@@ -2,23 +2,36 @@ import { useState, useEffect } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
 import { socketService } from '../services/SocketService';
 import { RoomCard } from '../components/RoomCard';
-import { RefreshCw, Mic, Users, Tv, TrendingUp, Zap } from 'lucide-react';
+import { RefreshCw, Mic, Users, Tv, TrendingUp, Zap, Wifi, WifiOff } from 'lucide-react';
 
 export default function DashboardPage() {
   const { rooms, agents, setAgents } = useRoomStore();
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   
   useEffect(() => {
+    // First, set up the callback
     const unsubscribe = socketService.onAgentUpdate((updatedAgents) => {
+      console.log('[Dashboard] Received agents:', updatedAgents);
       setAgents(updatedAgents);
       setIsLoading(false);
     });
     
+    // Then connect
     socketService.connect();
+    
+    // Also listen for connection status
+    const checkConnection = setInterval(() => {
+      if (socketService.isConnected()) {
+        setConnectionStatus('connected');
+      } else {
+        setConnectionStatus('disconnected');
+      }
+    }, 1000);
     
     return () => {
       unsubscribe();
-      socketService.disconnect();
+      clearInterval(checkConnection);
     };
   }, [setAgents]);
   
@@ -29,7 +42,8 @@ export default function DashboardPage() {
   };
 
   const activeRooms = roomList.filter(r => r.status === 'playing').length;
-  const connectedAgents = agents.filter(a => a.status === 'ONLINE').length;
+  // Count all non-OFFLINE agents as connected
+  const connectedAgents = agents.filter(a => a.status !== 'OFFLINE').length;
   const totalRevenue = roomList.reduce((sum, r) => {
     const pricePerHour = 50000;
     const price = Math.ceil(r.currentDuration / 3600) * pricePerHour;
@@ -77,6 +91,35 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Connection Status Banner */}
+      <div className={`flex items-center justify-between px-4 py-2 rounded-lg ${
+        connectionStatus === 'connected' ? 'bg-green-500/20 border border-green-500/30' : 
+        connectionStatus === 'connecting' ? 'bg-yellow-500/20 border border-yellow-500/30' :
+        'bg-red-500/20 border border-red-500/30'
+      }`}>
+        <div className="flex items-center gap-2">
+          {connectionStatus === 'connected' ? (
+            <Wifi className="w-4 h-4 text-green-400" />
+          ) : connectionStatus === 'connecting' ? (
+            <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />
+          ) : (
+            <WifiOff className="w-4 h-4 text-red-400" />
+          )}
+          <span className={`text-sm ${
+            connectionStatus === 'connected' ? 'text-green-400' : 
+            connectionStatus === 'connecting' ? 'text-yellow-400' :
+            'text-red-400'
+          }`}>
+            {connectionStatus === 'connected' ? 'Terhubung ke server' : 
+             connectionStatus === 'connecting' ? 'Menghubungkan...' :
+             'Tidak terhubung'}
+          </span>
+        </div>
+        <div className="text-xs text-gray-400">
+          Agent: {agents.length} | Room: {roomList.length}
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((stat, index) => {

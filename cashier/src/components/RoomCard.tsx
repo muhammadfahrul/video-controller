@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { RoomBilling, AgentInfo } from '../types';
-import { Play, Pause, Square, Clock, Wallet, Music, Disc3 } from 'lucide-react';
+import { useRoomStore } from '../store/useRoomStore';
+import { socketService } from '../services/SocketService';
+import { billingConfig } from '../config/billing';
+import { Play, Pause, Square, Clock, Wallet, Music, Disc3, Power, PowerOff } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -27,7 +30,18 @@ function formatPrice(price: number): string {
 }
 
 export function RoomCard({ roomBilling, agent }: RoomCardProps) {
+  const { activateRoom, deactivateRoom } = useRoomStore();
   const [currentTime, setCurrentTime] = useState(roomBilling.currentDuration);
+  
+  const handleToggleActive = () => {
+    if (roomBilling.isActive) {
+      deactivateRoom(roomBilling.roomId);
+      socketService.deactivateRoom(roomBilling.roomId);
+    } else {
+      activateRoom(roomBilling.roomId);
+      socketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
+    }
+  };
   
   useEffect(() => {
     if (roomBilling.status === 'playing') {
@@ -61,13 +75,26 @@ export function RoomCard({ roomBilling, agent }: RoomCardProps) {
       icon: <Pause className="w-4 h-4" />,
       text: 'DIJEDA',
       glow: 'shadow-yellow-500/20'
+    },
+    waiting: { 
+      bg: 'bg-orange-500/20 border-orange-500/50 text-orange-400',
+      icon: <Clock className="w-4 h-4" />,
+      text: 'MENUNGGU',
+      glow: 'shadow-orange-500/20'
     }
   };
   
-  const status = statusConfig[roomBilling.status];
+  // Check agent status for waiting state
+  const agentStatus = agent?.status;
+  const isWaiting = agentStatus === 'WAITING';
+  const status = isWaiting ? statusConfig.waiting : statusConfig[roomBilling.status];
 
+  // If billing is disabled, rooms are always unlocked (active)
+  // If billing is enabled, check roomBilling.isActive
+  const isLocked = billingConfig.enabled ? !roomBilling.isActive : false;
+  
   return (
-    <div className={`neon-card rounded-xl p-6 border-l-4 ${roomBilling.status === 'playing' ? 'border-l-green-500' : roomBilling.status === 'paused' ? 'border-l-yellow-500' : 'border-l-gray-500'} ${status.glow}`}>
+    <div className={`neon-card rounded-xl p-6 border-l-4 ${isLocked ? 'border-l-red-500 opacity-60' : roomBilling.status === 'playing' ? 'border-l-green-500' : roomBilling.status === 'paused' ? 'border-l-yellow-500' : 'border-l-gray-500'} ${status.glow}`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className={`p-3 rounded-xl ${roomBilling.status === 'playing' ? 'bg-gradient-to-br from-green-500/30 to-green-600/10' : roomBilling.status === 'paused' ? 'bg-gradient-to-br from-yellow-500/30 to-yellow-600/10' : 'bg-gradient-to-br from-gray-500/30 to-gray-600/10'}`}>
@@ -77,12 +104,30 @@ export function RoomCard({ roomBilling, agent }: RoomCardProps) {
             <h3 className="text-xl font-bold text-white">
               {roomBilling.roomName}
             </h3>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.bg} mt-1`}>
-              {status.icon}
-              {status.text}
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${isLocked ? 'bg-red-500/20 border border-red-500/50 text-red-400' : status.bg} mt-1`}>
+              {isLocked ? <PowerOff className="w-4 h-4" /> : status.icon}
+              {isLocked ? 'TERKUNCI' : status.text}
             </span>
           </div>
         </div>
+        {/* Activation Button - only show when billing is enabled */}
+        {billingConfig.enabled && (
+          <button
+            onClick={handleToggleActive}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              roomBilling.isActive 
+                ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
+                : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
+            }`}
+            title={roomBilling.isActive ? 'Nonaktifkan Ruangan' : 'Aktifkan Ruangan'}
+          >
+            {roomBilling.isActive ? (
+              <PowerOff className="w-5 h-5" />
+            ) : (
+              <Power className="w-5 h-5" />
+            )}
+          </button>
+        )}
         <div className="text-right">
           <p className="text-xs text-gray-400 uppercase tracking-wider">Total Tagihan</p>
           <p className="text-2xl font-bold text-yellow-400 neon-text">
@@ -91,7 +136,17 @@ export function RoomCard({ roomBilling, agent }: RoomCardProps) {
         </div>
       </div>
       
-      {agent?.player?.title && (
+      {/* Show music info only if active */}
+      {isLocked && (
+        <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+          <div className="flex items-center justify-center gap-2 text-gray-400">
+            <PowerOff className="w-5 h-5" />
+            <p className="text-sm font-medium">Ruangan terkunci - Aktifkan untuk memulai</p>
+          </div>
+        </div>
+      )}
+      
+      {agent?.player?.title && !isLocked && (
         <div className="mb-4 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
           <div className="flex items-center gap-2 mb-1">
             <Music className="w-4 h-4 text-purple-400" />

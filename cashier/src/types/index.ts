@@ -1,6 +1,6 @@
 // Types for Cashier Application
 
-export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'PLAYING' | 'PAUSED';
+export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'PLAYING' | 'PAUSED' | 'WAITING';
 
 export interface Room {
   id: string;
@@ -21,6 +21,7 @@ export interface RoomBilling {
   totalPrice: number;
   status: RoomStatus;
   pricePerHour?: number;
+  isActive: boolean; // apakah ruangan sudah diaktifkan oleh cashier
 }
 
 // Match server's PlayerState
@@ -46,4 +47,5 @@ export interface AgentInfo {
   connectedAt: number;
   player?: PlayerState;
   connected?: boolean;
+  isActive?: boolean;
 }

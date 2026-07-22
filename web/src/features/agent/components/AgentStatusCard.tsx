@@ -19,7 +19,7 @@ export default function AgentStatusCard({
 }: Props) {
 
     const online =
-        agent.status === "ONLINE";
+        (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true;
 
     return (
 

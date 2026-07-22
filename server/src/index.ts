@@ -8,12 +8,13 @@ import { ServiceContainer } from "./container/ServiceContainer";
 import { registerRoutes } from "./bootstrap/registerRoutes";
 
 const PORT = process.env.PORT || 53331;
+const BILLING_ENABLED = process.env.BILLING_ENABLED !== 'false';
 
 const app = createApp();
 
 const httpServer = createServer(app);
 
-const container = new ServiceContainer(httpServer);
+const container = new ServiceContainer(httpServer, BILLING_ENABLED);
 
 registerRoutes(app, container);
 

@@ -94,12 +94,40 @@ class SocketService {
   onAgentUpdate(callback: AgentUpdateCallback) {
     this.agentUpdateCallbacks.push(callback);
     
-    // Immediately request current state
-    this.socket?.emit('cashier:request-agents');
+    // Ensure socket is connected first
+    this.connect();
+    
+    // If already connected, request immediately
+    if (this.socket?.connected) {
+      console.log('[Cashier] Already connected, requesting agents...');
+      this.socket.emit('cashier:request-agents');
+    } else {
+      console.log('[Cashier] Not connected yet, waiting for connect...');
+      // Wait for connection, then request
+      const onConnect = () => {
+        console.log('[Cashier] Connected, requesting agents...');
+        this.socket?.emit('cashier:request-agents');
+        // Remove this listener after first connect
+        this.socket?.off('connect', onConnect);
+      };
+      this.socket?.on('connect', onConnect);
+    }
     
     return () => {
       this.agentUpdateCallbacks = this.agentUpdateCallbacks.filter(cb => cb !== callback);
     };
+  }
+
+  // Activate a room (send to server)
+  activateRoom(roomId: string, roomName: string) {
+    console.log('[Cashier] Activating room:', roomId, roomName);
+    this.socket?.emit('cashier:activate-room', { roomId, roomName });
+  }
+
+  // Deactivate a room (send to server)
+  deactivateRoom(roomId: string) {
+    console.log('[Cashier] Deactivating room:', roomId);
+    this.socket?.emit('cashier:deactivate-room', { roomId });
   }
 
   disconnect() {

@@ -4,6 +4,10 @@
     "name": "Room 1"
   },
 
+  "billing": {
+    "enabled": true
+  },
+
   "browser": {
     "headless": false,
     "channel": "chrome",

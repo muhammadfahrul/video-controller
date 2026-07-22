@@ -6,8 +6,13 @@ export interface Agent {
 
     status:
         | "ONLINE"
-        | "OFFLINE";
+        | "OFFLINE"
+        | "WAITING"
+        | "PLAYING"
+        | "PAUSED";
 
     lastHeartbeat: number;
+
+    isActive?: boolean;
 
 }
