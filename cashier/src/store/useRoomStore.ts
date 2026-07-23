@@ -13,6 +13,7 @@ interface RoomStore {
   setRoomConnected: (roomId: string, connected: boolean) => void;
   getRoomConfig: (roomId: string) => RoomConfig | undefined;
   reconnectAll: () => void;
+  initFromEnv: () => void;
 }
 
 // Generate unique ID
@@ -27,6 +28,27 @@ function normalizeConnectionStatus(status: unknown): Map<string, boolean> {
     return new Map(Object.entries(status as Record<string, boolean>));
   }
   return new Map();
+}
+
+// Load rooms from .env
+function loadRoomsFromEnv(): RoomConfig[] {
+  try {
+    const envRooms = import.meta.env.VITE_ROOMS;
+    if (!envRooms) return [];
+    
+    const parsed = JSON.parse(envRooms);
+    if (!Array.isArray(parsed)) return [];
+    
+    return parsed.map((room: { name: string; ip: string; port: number }, index: number) => ({
+      id: `env-room-${index}`,
+      name: room.name || `Room ${index + 1}`,
+      ip: room.ip || '127.0.0.1',
+      port: room.port || 53331,
+    }));
+  } catch (e) {
+    console.error('[Store] Failed to parse VITE_ROOMS:', e);
+    return [];
+  }
 }
 
 export const useRoomStore = create<RoomStore>()(
@@ -75,6 +97,21 @@ export const useRoomStore = create<RoomStore>()(
         roomConfigs.forEach(config => {
           multiSocketService.addRoom(config);
         });
+      },
+      
+      initFromEnv: () => {
+        const envRooms = loadRoomsFromEnv();
+        const { roomConfigs: existingConfigs } = get();
+        
+        // Only add env rooms if no existing configs
+        if (existingConfigs.length === 0 && envRooms.length > 0) {
+          console.log('[Store] Initializing rooms from .env:', envRooms);
+          set({ roomConfigs: envRooms });
+          // Connect to all env rooms
+          envRooms.forEach(config => {
+            multiSocketService.addRoom(config);
+          });
+        }
       },
     }),
     {

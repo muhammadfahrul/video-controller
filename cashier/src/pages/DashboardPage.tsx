@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
 import { multiSocketService } from '../services/MultiSocketService';
-import { AddRoomForm } from '../components/AddRoomForm';
 import { RoomCard } from '../components/RoomCard';
 import { RefreshCw, Mic, Users, Tv, TrendingUp, Zap, Wifi, WifiOff, Server } from 'lucide-react';
 
@@ -24,8 +23,13 @@ export default function DashboardPage() {
       setRoomConnected(roomId, connected);
     });
     
-    // Reconnect to all saved rooms
-    useRoomStore.getState().reconnectAll();
+    // Initialize from .env or reconnect to saved rooms
+    const store = useRoomStore.getState();
+    if (store.roomConfigs.length === 0) {
+      store.initFromEnv();
+    } else {
+      store.reconnectAll();
+    }
   }, [setRoomConnected]);
   
   const roomList = Array.from(roomBillings?.values?.() || []);
@@ -147,15 +151,12 @@ export default function DashboardPage() {
 
       {/* Room List Section */}
       <div className="w-full">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Mic className="w-5 h-5 text-pink-400" />
-            <h2 className="text-lg font-semibold text-white">Ruangan Karaoke</h2>
-            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-              {roomList.length} ruangan
-            </span>
-          </div>
-          <AddRoomForm />
+        <div className="flex items-center gap-2 mb-4">
+          <Mic className="w-5 h-5 text-pink-400" />
+          <h2 className="text-lg font-semibold text-white">Ruangan Karaoke</h2>
+          <span className="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
+            {roomList.length} ruangan
+          </span>
         </div>
 
         {isLoading ? (
