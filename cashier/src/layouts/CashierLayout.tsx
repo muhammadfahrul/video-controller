@@ -36,9 +36,9 @@ export default function CashierLayout() {
   });
 
   return (
-    <div className="min-h-screen bg-[#0a0a14] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0a0a14] relative overflow-hidden w-full">
       {/* Background Effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none w-full h-full">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-pink-500/10 rounded-full blur-3xl" />
       </div>
@@ -46,7 +46,7 @@ export default function CashierLayout() {
       {/* Connection Status Banner */}
       <div
         className={`
-          relative z-10 flex items-center justify-between px-4 py-2 text-sm font-medium backdrop-blur-sm
+          relative z-10 flex items-center justify-between px-6 py-2 text-sm font-medium backdrop-blur-sm w-full
           ${isConnected 
             ? 'bg-green-500/10 border-b border-green-500/30 text-green-400' 
             : 'bg-red-500/10 border-b border-red-500/30 text-red-400'
@@ -71,10 +71,10 @@ export default function CashierLayout() {
         </div>
       </div>
 
-      {/* Main Container */}
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-40px)] flex-col bg-[#12121f] md:max-w-5xl lg:max-w-6xl xl:max-w-7xl md:my-3 md:min-h-[calc(100vh-24px)] border-x border-[#2a2a4a] md:rounded-2xl md:shadow-[0_0_50px_rgba(139,92,246,0.15),0_0_100px_rgba(236,72,153,0.1)]">
+      {/* Main Container - Full width for monitor display */}
+      <div className="relative z-10 flex min-h-[calc(100vh-40px)] flex-col bg-[#12121f] w-full">
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/30 px-4 py-4 bg-gradient-to-r from-purple-900/20 via-pink-900/10 to-transparent">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/30 px-6 py-4 bg-gradient-to-r from-purple-900/20 via-pink-900/10 to-transparent">
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className="p-3 bg-gradient-to-br from-purple-600 via-pink-600 to-purple-600 rounded-xl shadow-lg shadow-purple-500/30">
@@ -101,12 +101,12 @@ export default function CashierLayout() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-4">
+        <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-purple-500/20 px-4 py-3 text-center">
+        <footer className="border-t border-purple-500/20 px-6 py-3 text-center">
           <p className="text-xs text-gray-500">
             🎤 Video Controller - Karaoke Billing System
           </p>

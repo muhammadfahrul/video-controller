@@ -90,9 +90,9 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6">
       {/* Connection Status Banner */}
-      <div className={`flex items-center justify-between px-4 py-2 rounded-lg ${
+      <div className={`flex items-center justify-between px-6 py-2 rounded-lg ${
         connectionStatus === 'connected' ? 'bg-green-500/20 border border-green-500/30' : 
         connectionStatus === 'connecting' ? 'bg-yellow-500/20 border border-yellow-500/30' :
         'bg-red-500/20 border border-red-500/30'
@@ -120,8 +120,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Stats Grid - Responsive for large monitors */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {stats.map((stat, index) => {
           const Icon = stat.icon;
           return (
@@ -151,7 +151,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Room List Section */}
-      <div>
+      <div className="w-full">
         <div className="flex items-center gap-2 mb-4">
           <Mic className="w-5 h-5 text-pink-400" />
           <h2 className="text-lg font-semibold text-white">Ruangan Karaoke</h2>
@@ -177,7 +177,7 @@ export default function DashboardPage() {
             <p className="text-gray-400 text-sm">Pastikan agent telah berjalan di setiap PC ruangan</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {roomList.map((roomBilling) => (
               <RoomCard 
                 key={roomBilling.roomId}

@@ -4,6 +4,7 @@ import DashboardPage from "./pages/DashboardPage";
 
 export default function App() {
   return (
+    <div style={{ width: '100vw', maxWidth: '100vw', overflowX: 'hidden', margin: 0, padding: 0 }}>
     <Routes>
       <Route
         element={<CashierLayout />}
@@ -14,5 +15,6 @@ export default function App() {
         />
       </Route>
     </Routes>
+    </div>
   );
 }
