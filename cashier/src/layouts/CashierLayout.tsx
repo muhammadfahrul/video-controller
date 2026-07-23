@@ -1,26 +1,37 @@
 import { Outlet } from "react-router-dom";
 import { useState, useEffect } from 'react';
-import { socketService } from '../services/SocketService';
+import { useRoomStore } from '../store/useRoomStore';
 import { Wifi, WifiOff, Mic, Crown } from 'lucide-react';
 
 export default function CashierLayout() {
+  const connectionStatus = useRoomStore((state) => state.connectionStatus);
   const [isConnected, setIsConnected] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const checkConnection = setInterval(() => {
-      setIsConnected(socketService.isConnected());
-    }, 1000);
+    const checkConnection = () => {
+      // Check if any room is connected
+      let connected = false;
+      if (connectionStatus instanceof Map) {
+        connected = Array.from(connectionStatus.values()).some(v => v === true);
+      } else if (connectionStatus && typeof connectionStatus === 'object') {
+        connected = Object.values(connectionStatus).some(v => v === true);
+      }
+      setIsConnected(connected);
+    };
+
+    checkConnection();
+    const checkInterval = setInterval(checkConnection, 1000);
 
     const timeInterval = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
     return () => {
-      clearInterval(checkConnection);
+      clearInterval(checkInterval);
       clearInterval(timeInterval);
     };
-  }, []);
+  }, [connectionStatus]);
 
   const formattedTime = currentTime.toLocaleTimeString('id-ID', {
     hour: '2-digit',
@@ -57,12 +68,12 @@ export default function CashierLayout() {
           {isConnected ? (
             <>
               <Wifi className="w-4 h-4 animate-pulse" />
-              <span>TERHUBUNG KE SERVER</span>
+              <span>TERHUBUNG</span>
             </>
           ) : (
             <>
               <WifiOff className="w-4 h-4" />
-              <span>TERPUTUS DARI SERVER</span>
+              <span>TIDAK TERHUBUNG</span>
             </>
           )}
         </div>

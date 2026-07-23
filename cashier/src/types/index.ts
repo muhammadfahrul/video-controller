@@ -2,9 +2,20 @@
 
 export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'PLAYING' | 'PAUSED' | 'WAITING';
 
+// Room configuration - stored in localStorage
+export interface RoomConfig {
+  id: string;
+  name: string;
+  ip: string;
+  port: number;
+}
+
+// Room from agent connection
 export interface Room {
   id: string;
   name: string;
+  ip?: string;
+  port?: number;
   status: RoomStatus;
   startTime: number | null;
   elapsedSeconds: number;

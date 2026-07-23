@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { RoomBilling, AgentInfo } from '../types';
-import { useRoomStore } from '../store/useRoomStore';
-import { socketService } from '../services/SocketService';
+import type { RoomBilling } from '../types';
+import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
 import { Play, Pause, Square, Clock, Wallet, Music, Disc3, Power, PowerOff } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
-  agent?: AgentInfo;
 }
 
 function formatDuration(seconds: number): string {
@@ -29,17 +27,15 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-export function RoomCard({ roomBilling, agent }: RoomCardProps) {
-  const { activateRoom, deactivateRoom } = useRoomStore();
+export function RoomCard({ roomBilling }: RoomCardProps) {
   const [currentTime, setCurrentTime] = useState(roomBilling.currentDuration);
   
-  const handleToggleActive = () => {
+  const handleToggleActive = async () => {
+    // Use multiSocketService to activate/deactivate room by roomId
     if (roomBilling.isActive) {
-      deactivateRoom(roomBilling.roomId);
-      socketService.deactivateRoom(roomBilling.roomId);
+      await multiSocketService.deactivateRoom(roomBilling.roomId);
     } else {
-      activateRoom(roomBilling.roomId);
-      socketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
+      await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
     }
   };
   
@@ -84,10 +80,8 @@ export function RoomCard({ roomBilling, agent }: RoomCardProps) {
     }
   };
   
-  // Check agent status for waiting state
-  const agentStatus = agent?.status;
-  const isWaiting = agentStatus === 'WAITING';
-  const status = isWaiting ? statusConfig.waiting : statusConfig[roomBilling.status];
+  // Use roomBilling status directly
+  const status = statusConfig[roomBilling.status];
 
   // If billing is disabled, rooms are always unlocked (active)
   // If billing is enabled, check roomBilling.isActive
@@ -146,14 +140,15 @@ export function RoomCard({ roomBilling, agent }: RoomCardProps) {
         </div>
       )}
       
-      {agent?.player?.title && !isLocked && (
+      {/* Show music info from player if available */}
+      {!isLocked && roomBilling.status === 'playing' && (
         <div className="mb-4 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
           <div className="flex items-center gap-2 mb-1">
             <Music className="w-4 h-4 text-purple-400" />
             <p className="text-xs text-purple-400 uppercase tracking-wider">Sedang Diputar</p>
           </div>
           <p className="font-medium text-white truncate">
-            {agent.player.title}
+            {roomBilling.roomName}
           </p>
         </div>
       )}
