@@ -42,6 +42,8 @@ class MultiSocketService {
 
     this.setupSocketEvents(connection);
     this.connections.set(config.id, connection);
+    this.notifyStatus(config.id, false);
+    this.notifyUpdate();
   }
 
   // Remove a room connection
@@ -131,10 +133,20 @@ class MultiSocketService {
 
     for (const connection of this.connections.values()) {
       const agent = connection.agents[0]; // One agent per room server
-      if (!agent) continue;
+      const roomId = agent?.roomId || connection.config.id;
+      const billing = agent
+        ? this.agentToBilling(agent, connection.config)
+        : {
+            roomId: connection.config.id,
+            roomName: connection.config.name,
+            startTime: null,
+            currentDuration: 0,
+            totalPrice: 0,
+            status: 'idle' as const,
+            pricePerHour: 50000,
+            isActive: false,
+          };
 
-      const roomId = agent.roomId || connection.config.id;
-      const billing = this.agentToBilling(agent, connection.config);
       billings.set(roomId, billing);
     }
 

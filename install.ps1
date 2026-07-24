@@ -1,189 +1,326 @@
 # Video Controller - Deploy Script for Windows
-# Auto-installs EVERYTHING - just run .\deploy.ps1
+# Auto-installs dependencies and starts the selected services
 
 param(
-    [switch]$SkipInstall
+    [switch]$SkipInstall,
+    [string]$Mode
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Starting Video Controller (Production)..." -ForegroundColor Cyan
+function Show-Menu {
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host "   Video Controller - Deploy Script" -ForegroundColor Cyan
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Pilih aplikasi yang ingin diinstall:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  [1] Room App       - Agent, Server, Web PWA" -ForegroundColor White
+    Write-Host "  [2] Kasir          - Aplikasi Kasir (Cashier)" -ForegroundColor White
+    Write-Host "  [3] Semua          - Room App + Kasir" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  [0] Keluar" -ForegroundColor White
+    Write-Host ""
 
-$PROJECT_ROOT = $PSScriptRoot
-
-# ============================================
-# Auto-install Git if needed
-# ============================================
-function Install-Git {
-    Write-Host "🔧 Installing Git..." -ForegroundColor Yellow
-    
-    # Download Git for Windows
-    $gitUrl = "https://github.com/git-for-windows/git/releases/download/v2.46.0.windows.1/Git-2.46.0-64-bit.exe"
-    $gitInstaller = "$env:TEMP\git-installer.exe"
-    
-    Write-Host "⬇️ Downloading Git..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $gitUrl -OutFile $gitInstaller -UseBasicParsing
-    
-    Write-Host "📥 Installing Git (this may take a moment)..." -ForegroundColor Yellow
-    Start-Process -FilePath $gitInstaller -ArgumentList "/S" -Wait
-    
-    # Refresh environment
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    
-    Write-Host "✅ Git installed" -ForegroundColor Green
+    $choice = Read-Host "Masukkan pilihan [1-3]"
+    return $choice
 }
 
-# Check for Git
-$gitPath = Get-Command git -ErrorAction SilentlyContinue
-if (-not $gitPath) {
-    Write-Host "❌ Git is not installed!" -ForegroundColor Red
-    Install-Git
-}
+function Get-InstallMode {
+    param([string]$RequestedMode)
 
-Write-Host "✅ Git $(git --version) detected" -ForegroundColor Green
-
-# ============================================
-# Auto-install Node.js if needed
-# ============================================
-function Install-NodeJS {
-    Write-Host "🔧 Installing Node.js..." -ForegroundColor Yellow
-    
-    $nodeUrl = "https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi"
-    $nodeInstaller = "$env:TEMP\node-installer.msi"
-    
-    Write-Host "⬇️ Downloading Node.js..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeInstaller -UseBasicParsing
-    
-    Write-Host "📥 Installing Node.js..." -ForegroundColor Yellow
-    Start-Process -FilePath msiexec.exe -ArgumentList "/i `"$nodeInstaller`" /quiet /norestart" -Wait
-    
-    # Refresh environment
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    
-    Write-Host "✅ Node.js installed" -ForegroundColor Green
-}
-
-# Check Node.js version
-$nodeVersion = & node --version 2>$null
-$nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
-
-if (-not $nodeVersion -or $nodeMajorVersion -lt 16) {
-    Write-Host "❌ Node.js $nodeVersion is too old or not installed!" -ForegroundColor Red
-    Install-NodeJS
-}
-
-# Refresh PATH
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-
-Write-Host "✅ Node.js $(node --version) and npm $(npm --version) detected" -ForegroundColor Green
-
-# ============================================
-# Check project files
-# ============================================
-if (-not (Test-Path "$PROJECT_ROOT\package.json")) {
-    Write-Host "📥 Project files not found. Downloading..." -ForegroundColor Yellow
-    
-    $zipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
-    $zipFile = "$env:TEMP\video-controller.zip"
-    $extractPath = "$env:TEMP\video-controller-main"
-    
-    Write-Host "⬇️ Downloading project..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
-    
-    Write-Host "📦 Extracting..." -ForegroundColor Yellow
-    Expand-Archive -Path $zipFile -DestinationPath $env:TEMP -Force
-    
-    # Move to project root
-    $targetPath = Split-Path $PROJECT_ROOT -Parent
-    $repoName = Split-Path $PROJECT_ROOT -Leaf
-    
-    if (Test-Path "$targetPath\$repoName") {
-        Remove-Item "$targetPath\$repoName" -Recurse -Force
+    if ($RequestedMode) {
+        switch ($RequestedMode.ToLower()) {
+            '1' { return 'room' }
+            'room' { return 'room' }
+            '2' { return 'kasir' }
+            'kasir' { return 'kasir' }
+            '3' { return 'all' }
+            'all' { return 'all' }
+            '0' { exit 0 }
+            default {
+                Write-Host "Pilihan tidak valid: $RequestedMode" -ForegroundColor Red
+                exit 1
+            }
+        }
     }
-    
-    Move-Item -Path $extractPath -Destination "$targetPath\$repoName"
-    $PROJECT_ROOT = "$targetPath\$repoName"
-    
-    Remove-Item $zipFile -Force
-    
-    Write-Host "✅ Project extracted to $PROJECT_ROOT" -ForegroundColor Green
+
+    $choice = Show-Menu
+
+    switch ($choice) {
+        '1' { return 'room' }
+        '2' { return 'kasir' }
+        '3' { return 'all' }
+        '0' { exit 0 }
+        default {
+            Write-Host "Pilihan tidak valid!" -ForegroundColor Red
+            exit 1
+        }
+    }
 }
 
-# ============================================
-# Clean node_modules if needed
-# ============================================
-Write-Host "🧹 Checking dependencies..." -ForegroundColor Yellow
+function Install-Git {
+    Write-Host "[INFO] Installing Git..." -ForegroundColor Yellow
 
-if (Test-Path "$PROJECT_ROOT\web\node_modules") {
-    Write-Host "🧹 Cleaning web node_modules..." -ForegroundColor Yellow
-    Remove-Item -Path "$PROJECT_ROOT\web\node_modules" -Recurse -Force
-    Remove-Item -Path "$PROJECT_ROOT\web\package-lock.json" -Force -ErrorAction SilentlyContinue
+    $gitUrl = 'https://github.com/git-for-windows/git/releases/download/v2.46.0.windows.1/Git-2.46.0-64-bit.exe'
+    $gitInstaller = "$env:TEMP\git-installer.exe"
+
+    Write-Host "[INFO] Downloading Git..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $gitUrl -OutFile $gitInstaller -UseBasicParsing
+
+    Write-Host "[INFO] Installing Git (this may take a moment)..." -ForegroundColor Yellow
+    Start-Process -FilePath $gitInstaller -ArgumentList '/S' -Wait
+
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+
+    Write-Host "[OK] Git installed" -ForegroundColor Green
 }
 
-# ============================================
-# Install dependencies
-# ============================================
-Write-Host "📦 Installing dependencies..." -ForegroundColor Yellow
+function Install-NodeJS {
+    Write-Host "[INFO] Installing Node.js..." -ForegroundColor Yellow
 
-function Install-Deps {
-    param([string]$Path, [string]$Name)
-    
-    if (-not (Test-Path "$Path\node_modules")) {
-        Write-Host "📦 Installing $Name dependencies..." -ForegroundColor Yellow
+    $nodeUrl = 'https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi'
+    $nodeInstaller = "$env:TEMP\node-installer.msi"
+
+    Write-Host "[INFO] Downloading Node.js..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeInstaller -UseBasicParsing
+
+    Write-Host "[INFO] Installing Node.js..." -ForegroundColor Yellow
+    Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', "`"$nodeInstaller`"", '/quiet', '/norestart') -Wait
+
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+
+    Write-Host "[OK] Node.js installed" -ForegroundColor Green
+}
+
+function Install-Dependencies {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+
+    if (-not (Test-Path (Join-Path $Path 'node_modules'))) {
+        Write-Host "[INFO] Installing $Name dependencies..." -ForegroundColor Yellow
         Push-Location $Path
-        npm install
+        & npm install
         Pop-Location
     }
 }
 
-Install-Deps -Path $PROJECT_ROOT -Name "root"
-Install-Deps -Path "$PROJECT_ROOT\agent" -Name "agent"
-Install-Deps -Path "$PROJECT_ROOT\server" -Name "server"
-Install-Deps -Path "$PROJECT_ROOT\web" -Name "web"
+function Remove-NodeModules {
+    param([string]$Path)
 
-# ============================================
-# Build all services
-# ============================================
-Write-Host "🔨 Building all services..." -ForegroundColor Yellow
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Recurse -Force
+    }
+}
 
-Push-Location $PROJECT_ROOT
-npm run build
-Pop-Location
+function Remove-FileIfExists {
+    param([string]$Path)
 
-# ============================================
-# Start all services
-# ============================================
-Write-Host "▶️ Starting all services..." -ForegroundColor Yellow
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Force
+    }
+}
 
-# Start server
-Start-Process -FilePath "npm" -ArgumentList "run","start" -WorkingDirectory "$PROJECT_ROOT\server" -NoNewWindow
-$serverPid = $LASTEXITCODE
+function Ensure-PlaywrightBrowsers {
+    $agentPath = Join-Path $PROJECT_ROOT 'agent'
+    if (Test-Path $agentPath) {
+        Write-Host "[INFO] Installing Playwright browsers..." -ForegroundColor Yellow
+        Push-Location $agentPath
+        & npx playwright install chromium
+        Pop-Location
+    }
+}
 
-# Start agent
-Start-Process -FilePath "npm" -ArgumentList "run","start" -WorkingDirectory "$PROJECT_ROOT\agent" -NoNewWindow
-$agentPid = $LASTEXITCODE
+Write-Host "[INFO] Starting Video Controller..." -ForegroundColor Cyan
 
-# Start web (preview)
-Start-Process -FilePath "npm" -ArgumentList "run","preview:host" -WorkingDirectory "$PROJECT_ROOT\web" -NoNewWindow
-$webPid = $LASTEXITCODE
+$PROJECT_ROOT = $PSScriptRoot
+$INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
+
+switch ($INSTALL_MODE) {
+    'all' {
+        Write-Host "[INFO] Mode: Semua layanan (Room App + Kasir)" -ForegroundColor Yellow
+    }
+    'room' {
+        Write-Host "[INFO] Mode: Room App saja (agent, server, web)" -ForegroundColor Yellow
+    }
+    'kasir' {
+        Write-Host "[INFO] Mode: Kasir saja (cashier)" -ForegroundColor Yellow
+    }
+}
 
 Write-Host ""
-Write-Host "✅ All services started!" -ForegroundColor Green
-Write-Host "   - Server: http://localhost:3000" -ForegroundColor Cyan
-Write-Host "   - Agent: http://localhost:3001" -ForegroundColor Cyan
-Write-Host "   - Web: http://localhost:4173" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Press Ctrl+C to stop" -ForegroundColor Yellow
 
-# Wait for interrupt
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Host "[ERROR] Git is not installed!" -ForegroundColor Red
+    Install-Git
+}
+
+Write-Host "[OK] Git $(git --version) detected" -ForegroundColor Green
+
+$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCommand) {
+    Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
+    Install-NodeJS
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+}
+
+if (-not $nodeCommand) {
+    Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+    exit 1
+}
+
+$nodeVersion = & $nodeCommand.Source --version 2>$null
+$nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
+
+if (-not $nodeVersion -or $nodeMajorVersion -lt 16) {
+    Write-Host "[ERROR] Node.js $nodeVersion is too old or not installed!" -ForegroundColor Red
+    Install-NodeJS
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCommand) {
+        Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+        exit 1
+    }
+    $nodeVersion = & $nodeCommand.Source --version 2>$null
+    $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
+}
+
+$npmCommand = Get-Command npm -ErrorAction SilentlyContinue
+if (-not $npmCommand) {
+    Write-Host "[ERROR] npm is not available." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "[OK] Node.js $(node --version) and npm $(npm --version) detected" -ForegroundColor Green
+
+if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
+    Write-Host "[INFO] Project files not found. Downloading..." -ForegroundColor Yellow
+
+    $repoUrl = 'https://github.com/muhammadfahrul/video-controller.git'
+    $parentDir = Split-Path $PROJECT_ROOT -Parent
+    $repoName = Split-Path $PROJECT_ROOT -Leaf
+
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "[ERROR] Git is not available after installation attempt." -ForegroundColor Red
+        exit 1
+    }
+
+    if (-not (Test-Path (Join-Path $parentDir $repoName))) {
+        Write-Host "[INFO] Cloning repository..." -ForegroundColor Yellow
+        Push-Location $parentDir
+        & git clone $repoUrl $repoName
+        Pop-Location
+    }
+
+    $PROJECT_ROOT = Join-Path $parentDir $repoName
+    Write-Host "[OK] Project ready at $PROJECT_ROOT" -ForegroundColor Green
+}
+
+Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+
+Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'web/node_modules')
+Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
+Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'cashier/node_modules')
+Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+
+if (-not (Test-Path (Join-Path $PROJECT_ROOT 'node_modules'))) {
+    Write-Host "[INFO] Removing old workspace node_modules..." -ForegroundColor Yellow
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'node_modules')
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'agent/node_modules')
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'server/node_modules')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'package-lock.json')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'agent/package-lock.json')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'server/package-lock.json')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+}
+
+Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+Install-Dependencies -Path $PROJECT_ROOT -Name 'root'
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent'
+    Ensure-PlaywrightBrowsers
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server'
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web'
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier'
+}
+
+Write-Host "[INFO] Building services..." -ForegroundColor Yellow
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Write-Host "[INFO] Building Room App (agent, server, web)..." -ForegroundColor Yellow
+    Push-Location (Join-Path $PROJECT_ROOT 'server')
+    & npm run build
+    Pop-Location
+
+    Push-Location (Join-Path $PROJECT_ROOT 'agent')
+    & npm run build
+    Pop-Location
+
+    Push-Location (Join-Path $PROJECT_ROOT 'web')
+    & npm run build
+    Pop-Location
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Write-Host "[INFO] Building Kasir (cashier)..." -ForegroundColor Yellow
+    Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+    & npm run build
+    Pop-Location
+}
+
+Write-Host "[INFO] Starting services..." -ForegroundColor Yellow
+
+$processes = @()
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
+
+    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -PassThru
+    $processes += $serverProcess
+    Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
+
+    $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
+    $processes += $agentProcess
+    Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
+
+    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -PassThru
+    $processes += $webProcess
+    Write-Host "   - Web: PID $($webProcess.Id)" -ForegroundColor Cyan
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Write-Host "[INFO] Starting Kasir service..." -ForegroundColor Yellow
+
+    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -PassThru
+    $processes += $cashierProcess
+    Write-Host "   - Cashier: PID $($cashierProcess.Id)" -ForegroundColor Cyan
+}
+
+Write-Host ""
+Write-Host "[OK] All selected services started!" -ForegroundColor Green
+Write-Host ""
+Write-Host "Press Ctrl+C to stop all services" -ForegroundColor Yellow
+
 try {
     while ($true) { Start-Sleep -Seconds 1 }
 }
 finally {
     Write-Host ""
-    Write-Host "🛑 Stopping all services..." -ForegroundColor Yellow
-    
-    Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    
-    Write-Host "✅ All services stopped" -ForegroundColor Green
+    Write-Host "[INFO] Stopping all services..." -ForegroundColor Yellow
+
+    foreach ($process in $processes) {
+        if ($null -ne $process -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host "[OK] All services stopped" -ForegroundColor Green
 }

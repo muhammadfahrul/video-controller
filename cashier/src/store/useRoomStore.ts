@@ -51,6 +51,17 @@ function loadRoomsFromEnv(): RoomConfig[] {
   }
 }
 
+function roomsEqual(left: RoomConfig[], right: RoomConfig[]): boolean {
+  if (left.length !== right.length) return false;
+
+  return left.every((room, index) => {
+    const other = right[index];
+    if (!other) return false;
+
+    return room.name === other.name && room.ip === other.ip && room.port === other.port;
+  });
+}
+
 export const useRoomStore = create<RoomStore>()(
   persist(
     (set, get) => ({
@@ -102,14 +113,33 @@ export const useRoomStore = create<RoomStore>()(
       initFromEnv: () => {
         const envRooms = loadRoomsFromEnv();
         const { roomConfigs: existingConfigs } = get();
-        
-        // Only add env rooms if no existing configs
-        if (existingConfigs.length === 0 && envRooms.length > 0) {
-          console.log('[Store] Initializing rooms from .env:', envRooms);
-          set({ roomConfigs: envRooms });
-          // Connect to all env rooms
-          envRooms.forEach(config => {
-            multiSocketService.addRoom(config);
+
+        if (envRooms.length > 0) {
+          const shouldReplace = existingConfigs.length === 0 || !roomsEqual(existingConfigs, envRooms);
+          if (shouldReplace) {
+            console.log('[Store] Initializing rooms from .env:', envRooms);
+            set({ roomConfigs: envRooms, connectionStatus: new Map() });
+            multiSocketService.disconnectAll();
+            envRooms.forEach(config => {
+              multiSocketService.addRoom(config);
+            });
+          } else {
+            console.log('[Store] Env rooms already match current config');
+            envRooms.forEach(config => {
+              if (!multiSocketService.isConnected(config.id)) {
+                multiSocketService.addRoom(config);
+              }
+            });
+          }
+          return;
+        }
+
+        if (existingConfigs.length > 0) {
+          console.log('[Store] No env rooms configured, reconnecting existing rooms');
+          existingConfigs.forEach(config => {
+            if (!multiSocketService.isConnected(config.id)) {
+              multiSocketService.addRoom(config);
+            }
           });
         }
       },

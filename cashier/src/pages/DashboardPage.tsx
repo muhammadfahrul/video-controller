@@ -23,13 +23,9 @@ export default function DashboardPage() {
       setRoomConnected(roomId, connected);
     });
     
-    // Initialize from .env or reconnect to saved rooms
+    // Initialize from .env first, then fall back to saved rooms if needed
     const store = useRoomStore.getState();
-    if (store.roomConfigs.length === 0) {
-      store.initFromEnv();
-    } else {
-      store.reconnectAll();
-    }
+    store.initFromEnv();
   }, [setRoomConnected]);
   
   const roomList = Array.from(roomBillings?.values?.() || []);
@@ -176,7 +172,7 @@ export default function DashboardPage() {
             <p className="text-gray-400 text-sm">Klik "Tambah Ruangan" untuk menambahkan PC ruangan</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 items-stretch">
             {roomList.map((roomBilling) => (
               <RoomCard 
                 key={roomBilling.roomId}
