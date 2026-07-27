@@ -143,7 +143,9 @@ export class Agent {
             new SocketClient(
                 serverUrl,
                 this.identity,
-                this.commandRouter
+                this.commandRouter,
+                this.playerRepository,
+                this.playlist.getRepository()
             );
 
     }
@@ -201,6 +203,9 @@ export class Agent {
                 this.browser.getPage(),
                 this.playerRepository
             );
+
+        // Set player service in socket client for clear data functionality
+        this.socketClient?.setPlayerService(this.player);
 
         this.health = new HealthService(
 

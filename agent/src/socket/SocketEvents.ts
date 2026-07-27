@@ -32,6 +32,14 @@ export enum SocketEvents {
 
     PLAYLIST_STATE = "playlist:state",
 
-    PLAYLIST_UPDATE = "playlist:update"
+    PLAYLIST_UPDATE = "playlist:update",
+
+
+
+    CASHIER_DEACTIVATE_ROOM = "cashier:deactivate-room",
+
+
+
+    AGENT_CLEAR_DATA = "agent:clear-data"
 
 }

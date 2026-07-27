@@ -386,6 +386,11 @@ export class SocketServer {
                                 SocketEvents.COMMAND,
                                 { type: "STOP" }
                             );
+                            // Clear player and playlist data
+                            this.io.to(agent.socketId).emit(
+                                SocketEvents.AGENT_CLEAR_DATA,
+                                {}
+                            );
                             this.broadcastAgents(registry.getAll());
                         }
                     }

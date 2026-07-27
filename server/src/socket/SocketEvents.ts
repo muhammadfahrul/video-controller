@@ -40,6 +40,10 @@ export enum SocketEvents {
 
 
 
-    CASHIER_DEACTIVATE_ROOM = "cashier:deactivate-room"
+    CASHIER_DEACTIVATE_ROOM = "cashier:deactivate-room",
+
+
+
+    AGENT_CLEAR_DATA = "agent:clear-data"
 
 }

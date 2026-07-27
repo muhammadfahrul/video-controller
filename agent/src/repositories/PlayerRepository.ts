@@ -60,4 +60,30 @@ export class PlayerRepository {
 
     }
 
+    clear() {
+
+        return this.storage.save({
+
+            player: {
+
+                playing: false,
+
+                currentTime: 0,
+
+                duration: 0,
+
+                volume: 100,
+
+                muted: false,
+
+                fullscreen: false,
+
+                videoId: ""
+
+            }
+
+        });
+
+    }
+
 }

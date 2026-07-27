@@ -11,6 +11,10 @@ export class PlaylistService {
         private readonly repository: PlaylistRepository
 
     ) {}
+
+    getRepository(): PlaylistRepository {
+        return this.repository;
+    }
     
     private items: PlaylistItem[] = [];
 

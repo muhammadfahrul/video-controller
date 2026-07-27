@@ -21,6 +21,9 @@ import {
     AgentSnapshot
 
 } from "../types/AgentSnapshot";
+import { PlayerRepository } from "../repositories/PlayerRepository";
+import { PlaylistRepository } from "../repositories/PlaylistRepository";
+import { PlayerService } from "../services/PlayerService";
 
 export class SocketClient {
 
@@ -31,14 +34,22 @@ export class SocketClient {
     private commandRouter?:
         CommandRouter;
 
+    private playerRepository?: PlayerRepository;
+    private playlistRepository?: PlaylistRepository;
+    private playerService?: PlayerService;
+
 
     constructor(
         private readonly serverUrl: string,
         private readonly identity: AgentIdentity,
-        commandRouter: CommandRouter
+        commandRouter: CommandRouter,
+        playerRepository?: PlayerRepository,
+        playlistRepository?: PlaylistRepository
     ) {
 
         this.commandRouter = commandRouter;
+        this.playerRepository = playerRepository;
+        this.playlistRepository = playlistRepository;
         // Note: setupActivationListener is called in connect() after socket is created
 
     }
@@ -196,6 +207,37 @@ export class SocketClient {
             }
         );
 
+        // Set up clear data listener
+        this.setupClearDataListener();
+    }
+
+    private setupClearDataListener() {
+        this.socket?.off(SocketEvents.AGENT_CLEAR_DATA);
+        
+        this.socket?.on(
+            SocketEvents.AGENT_CLEAR_DATA,
+            async () => {
+                console.log("Received clear-data event, clearing player and playlist data");
+                
+                try {
+                    // Clear player data using PlayerService (sets clearing flag to prevent overwriting)
+                    if (this.playerService) {
+                        await this.playerService.clearData();
+                        console.log("Player data cleared");
+                    }
+                    
+                    // Clear playlist data
+                    if (this.playlistRepository) {
+                        await this.playlistRepository.clear();
+                        console.log("Playlist data cleared");
+                    }
+                    
+                    console.log("All data cleared successfully");
+                } catch (err) {
+                    console.error("Error clearing data:", err);
+                }
+            }
+        );
     }
 
 
@@ -279,6 +321,11 @@ export class SocketClient {
                 });
             }
         });
+    }
+
+    // Set player service for clear data functionality
+    public setPlayerService(playerService: PlayerService): void {
+        this.playerService = playerService;
     }
 
 

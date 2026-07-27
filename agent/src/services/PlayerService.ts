@@ -25,6 +25,8 @@ export class PlayerService {
 
     private restoring = false;
 
+    private clearing = false;
+
     private onEnded?: () => void;
 
 
@@ -52,6 +54,15 @@ export class PlayerService {
 
     }
 
+    async clearData() {
+        this.clearing = true;
+        try {
+            await this.repository?.clear();
+        } finally {
+            this.clearing = false;
+        }
+    }
+
     private isHealthySnapshot(
         snapshot: PlayerSnapshot
     ): boolean {
@@ -70,7 +81,7 @@ export class PlayerService {
 
     private async persist() {
 
-        if (this.restoring) {
+        if (this.restoring || this.clearing) {
 
             return;
 

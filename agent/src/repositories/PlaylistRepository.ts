@@ -52,4 +52,20 @@ export class PlaylistRepository {
 
     }
 
+    clear() {
+
+        return this.storage.save({
+
+            items: [],
+
+            currentIndex: -1,
+
+            repeat: RepeatMode.OFF,
+
+            shuffle: false
+
+        });
+
+    }
+
 }
