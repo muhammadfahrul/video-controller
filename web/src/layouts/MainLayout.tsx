@@ -1,58 +1,31 @@
 import { Outlet } from "react-router-dom";
 
 import Footer from "./Footer";
+import AppHeader from "./AppHeader";
 
 import FullPageLoading from "../shared/components/FullPageLoading";
 
 import { useAppStore } from "../store/appStore";
+import { useAgent } from "../hooks/useAgent";
 
 export default function MainLayout() {
+
+    useAgent();
 
     const globalLoading = useAppStore((state)=>state.globalLoading);
     const initialLoading = useAppStore((state)=>state.initialLoading);
 
     return (
 
-        <div
-            className="
-                min-h-screen
-                bg-[#0a0a14]
-            "
-        >
+        <div className="min-h-dvh">
 
             {(globalLoading || initialLoading) && <FullPageLoading />}
 
-            {/* Mobile: Full width | Tablet/Desktop: Centered container */}
-            <div
-                className="
-                    mx-auto
-                    flex
-                    min-h-screen
-                    flex-col
-                    bg-[#12121f]
-                    md:max-w-2xl
-                    lg:max-w-4xl
-                    xl:max-w-5xl
-                    md:shadow-[0_0_30px_rgba(255,45,149,0.2)]
-                    md:my-4
-                    md:rounded-xl
-                    md:min-h-[calc(100vh-32px)]
-                    lg:min-h-[calc(100vh-48px)]
-                    pt-[env(safe-area-inset-top)]
-                    border-x border-[#2a2a4a]
-                "
-            >
+            <div className="glass-shell mx-auto flex min-h-dvh max-w-5xl flex-col sm:min-h-[calc(100dvh-32px)] sm:my-4 sm:rounded-3xl sm:border sm:border-white/8">
 
-                <main
-                    className="
-                        flex-1
-                        overflow-y-auto
-                        p-4
-                        pb-20
-                        md:pb-4
-                        lg:p-6
-                    "
-                >
+                <AppHeader />
+
+                <main className="flex-1 px-4 py-5 pb-28 sm:px-6 sm:py-6 sm:pb-28 lg:px-8">
 
                     <Outlet />
 

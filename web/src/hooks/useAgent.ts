@@ -3,20 +3,20 @@ import { useEffect } from "react";
 import { agentService } from "../services";
 import { socketService } from "../services";
 import { useAppStore } from "../store/appStore";
+import type { AgentDto } from "../services/agent/AgentService";
 
 export function useAgent() {
 
-    const {
-
-        loadAgent
-
-    } = useAppStore();
-
     useEffect(() => {
 
-        console.log(
-            "useAgent mounted"
-        );
+        const loadAgent = (agent: AgentDto) => {
+            useAppStore.getState().loadAgent({
+                id: agent.id,
+                name: agent.name,
+                online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
+                lastHeartbeat: agent.lastHeartbeat
+            });
+        };
 
         async function load() {
 
@@ -30,26 +30,17 @@ export function useAgent() {
 
                 }
 
-                const agent = agents[0];
-
-                loadAgent({
-
-                    id: agent.id,
-
-                    name: agent.name,
-
-                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
-                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
-
-                    lastHeartbeat: agent.lastHeartbeat
-
-                });
+                loadAgent(agents[0]);
 
             }
 
             catch (err) {
 
                 console.error(err);
+
+            } finally {
+
+                useAppStore.getState().setInitialLoading(false);
 
             }
 
@@ -59,7 +50,7 @@ export function useAgent() {
 
         socketService.connect();
 
-        socketService.on<any[]>(
+        socketService.on<AgentDto[]>(
 
             "agents:update",
 
@@ -67,7 +58,7 @@ export function useAgent() {
 
                 if (agents.length === 0) {
                     
-                    loadAgent({
+                    useAppStore.getState().loadAgent({
 
                         id: "",
 
@@ -83,30 +74,13 @@ export function useAgent() {
 
                 }
 
-                const agent = agents[0];
-
-                loadAgent({
-
-                    id: agent.id,
-
-                    name: agent.name,
-
-                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
-                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
-
-                    lastHeartbeat: agent.lastHeartbeat
-
-                });
+                loadAgent(agents[0]);
 
             }
 
         );
 
         return () => {
-
-            console.log(
-                "useAgent unmounted"
-            );
 
             socketService.off(
                 "agents:update"

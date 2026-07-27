@@ -51,7 +51,7 @@ export default function AgentStatusCard({
                         className="
                             mt-1
                             text-sm
-                            text-[#b8b8d0]
+                            break-all text-slate-400
                         "
                     >
 
@@ -76,8 +76,8 @@ export default function AgentStatusCard({
                             rounded-full
                             ${
                                 online
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
+                                    ? "bg-teal-300"
+                                    : "bg-slate-500"
                             }
                         `}
                     />
@@ -100,7 +100,7 @@ export default function AgentStatusCard({
             <div
                 className="
                     mt-5
-                    border-t
+                    border-t border-white/8
                     pt-4
                 "
             >
@@ -108,11 +108,11 @@ export default function AgentStatusCard({
                 <p
                     className="
                         text-xs
-                        text-[#b8b8d0]
+                        text-slate-400
                     "
                 >
 
-                    Last Heartbeat
+                    Pembaruan terakhir
 
                 </p>
 

@@ -271,27 +271,17 @@ create<AppStore>((set)=>({
 
     setProcessing:(key, value)=>
 
-        set(state=>{
+        set(state=>({
 
-            const newProcessing = {
+            processing:{
 
                 ...state.processing,
 
                 [key]:value
 
-            };
+            }
 
-            const hasAnyProcessing = Object.values(newProcessing).some(v=>v);
-
-            return {
-
-                processing:newProcessing,
-
-                globalLoading:hasAnyProcessing
-
-            };
-
-        }),
+        })),
 
     setRemovingItemId:(id)=>
 
@@ -307,9 +297,7 @@ create<AppStore>((set)=>({
 
         set(() => ({
 
-            addingToPlaylist: value,
-
-            globalLoading: value
+            addingToPlaylist: value
 
         })),
 

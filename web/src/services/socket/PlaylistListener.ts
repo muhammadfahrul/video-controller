@@ -20,15 +20,6 @@ export function registerPlaylistListener(){
         (snapshot: PlaylistState) => {
 
 
-            console.log(
-
-                "[PWA] Playlist State",
-
-                snapshot
-
-            );
-
-
             useAppStore
                 .getState()
                 .setPlaylist(
@@ -36,13 +27,6 @@ export function registerPlaylistListener(){
                     snapshot
 
                 );
-
-            console.log(
-                "[PlaylistListener] Updated playlist state:",
-                snapshot.currentIndex,
-                snapshot.items.length
-            );
-
 
         }
 
@@ -57,15 +41,6 @@ export function registerPlaylistListener(){
         (snapshot: PlaylistState) => {
 
 
-            console.log(
-
-                "[PWA] Playlist Update",
-
-                snapshot
-
-            );
-
-
             useAppStore
                 .getState()
                 .setPlaylist(
@@ -73,13 +48,6 @@ export function registerPlaylistListener(){
                     snapshot
 
                 );
-
-            console.log(
-                "[PlaylistListener] Updated playlist from update:",
-                snapshot.currentIndex,
-                snapshot.items.length
-            );
-
 
         }
 

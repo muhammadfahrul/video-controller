@@ -1,6 +1,4 @@
-import { useNavigate } from "react-router-dom";
-
-import { useAppStore } from "../../store/appStore";
+import { Link } from "react-router-dom";
 
 interface Props {
 
@@ -22,38 +20,16 @@ export default function MenuLink({
 
 }: Props) {
 
-    const navigate = useNavigate();
-
-    const setGlobalLoading = useAppStore((state)=>state.setGlobalLoading);
-
-    const handleClick = (e: React.MouseEvent) => {
-
-        e.preventDefault();
-
-        setGlobalLoading(true);
-
-        // Small delay to show loading before navigation
-        setTimeout(() => {
-
-            navigate(to);
-
-            setTimeout(() => setGlobalLoading(false), 300);
-
-        }, 100);
-
-    };
-
     return (
 
-        <a
-            href={to}
-            onClick={handleClick}
+        <Link
+            to={to}
             className={className}
         >
 
             {children}
 
-        </a>
+        </Link>
 
     );
 

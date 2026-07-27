@@ -24,14 +24,6 @@ export class PlayerCommandService {
 
     ): void {
 
-        console.log(
-
-            "[PlayerCommand]",
-
-            command
-
-        );
-
         socketService.emit(
 
             "player:command",

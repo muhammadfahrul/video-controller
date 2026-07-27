@@ -1,11 +1,14 @@
 {
   "player": {
     "playing": false,
-    "currentTime": 0,
-    "duration": 0,
-    "volume": 100,
+    "currentTime": 2.363693,
+    "duration": 373.821,
+    "volume": 45,
     "muted": false,
-    "fullscreen": false,
-    "videoId": ""
+    "fullscreen": true,
+    "videoId": "0FiJfOviW4U",
+    "title": "Hindia ft. Rara Sekar - Membasuh (Official Lyric & Commentary Video)",
+    "channel": "Hindia",
+    "thumbnail": "https://img.youtube.com/vi/0FiJfOviW4U/mqdefault.jpg"
   }
 }

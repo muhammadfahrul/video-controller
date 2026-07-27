@@ -4,11 +4,11 @@ export default function PlaylistEmpty() {
 
     return (
 
-        <Card>
+        <Card className="border-dashed text-center">
 
             <p
                 className="
-                    text-lg
+                    text-3xl
                 "
             >
 
@@ -24,7 +24,7 @@ export default function PlaylistEmpty() {
                 "
             >
 
-                Empty playlist
+                Antrean masih kosong
 
             </p>
 
@@ -32,11 +32,11 @@ export default function PlaylistEmpty() {
                 className="
                     mt-1
                     text-sm
-                    text-[#b8b8d0]
+                    text-slate-400
                 "
             >
 
-                Search for videos and add them to the playlist.
+                Cari lagu karaoke lalu tambahkan ke antrean.
 
             </p>
 

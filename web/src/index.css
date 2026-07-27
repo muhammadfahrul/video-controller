@@ -1,206 +1,150 @@
+@import "tailwindcss";
+
 :root {
-  /* Karaoke Theme - Dark with Neon Accents */
-  --text: #b8b8d0;
-  --text-h: #ffffff;
-  --bg: #0a0a14;
-  --border: #2a2a4a;
-  --code-bg: #151528;
-  --accent: #ff2d95;
-  --accent-bg: rgba(255, 45, 149, 0.15);
-  --accent-border: rgba(255, 45, 149, 0.6);
-  --secondary: #00f0ff;
-  --secondary-bg: rgba(0, 240, 255, 0.1);
-  --tertiary: #a855f7;
-  --tertiary-bg: rgba(168, 85, 247, 0.1);
-  --card-bg: #12121f;
-  --card-hover: #1a1a2e;
-  --neon-glow: 0 0 10px rgba(255, 45, 149, 0.5), 0 0 20px rgba(255, 45, 149, 0.3), 0 0 30px rgba(255, 45, 149, 0.1);
-  --neon-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
-  --social-bg: rgba(42, 42, 74, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
-
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: dark;
-  color: var(--text);
-  background: var(--bg);
+  color: #fdf4ff;
+  background: #120817;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
-}
-
-/* Karaoke theme - always dark mode */
-:root {
-  --text: #b8b8d0;
-  --text-h: #ffffff;
-  --bg: #0a0a14;
-  --border: #2a2a4a;
-  --code-bg: #151528;
-  --accent: #ff2d95;
-  --accent-bg: rgba(255, 45, 149, 0.15);
-  --accent-border: rgba(255, 45, 149, 0.6);
-  --secondary: #00f0ff;
-  --secondary-bg: rgba(0, 240, 255, 0.1);
-  --tertiary: #a855f7;
-  --tertiary-bg: rgba(168, 85, 247, 0.1);
-  --card-bg: #12121f;
-  --card-hover: #1a1a2e;
-  --neon-glow: 0 0 10px rgba(255, 45, 149, 0.5), 0 0 20px rgba(255, 45, 149, 0.3), 0 0 30px rgba(255, 45, 149, 0.1);
-  --neon-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
-  --social-bg: rgba(42, 42, 74, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
-@import "tailwindcss";
-
-/* ===========================================
-   Mobile/Tablet Optimizations
-   =========================================== */
-
-/* Prevent text size adjustment on orientation change */
-html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
-/* Improve tap highlight on mobile */
 * {
+  box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
 }
 
-/* Better touch targets for mobile */
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 15% 5%, rgba(236, 72, 153, 0.32), transparent 27rem),
+    radial-gradient(circle at 90% 15%, rgba(192, 132, 252, 0.27), transparent 28rem),
+    radial-gradient(circle at 55% 100%, rgba(168, 85, 247, 0.2), transparent 32rem),
+    linear-gradient(145deg, #120817 0%, #1d0b27 48%, #100817 100%);
+}
+
 button,
 a,
 input,
 select {
-  min-height: 44px;
-  min-width: 44px;
+  touch-action: manipulation;
 }
 
-/* Touch-friendly scrollbar for mobile */
-::-webkit-scrollbar {
-  width: 6px;
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(244, 114, 182, 0.8);
+  outline-offset: 3px;
+}
+
+input[type="range"] {
+  appearance: none;
   height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f472b6, #c084fc);
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 3px solid #f8fafc;
+  border-radius: 50%;
+  background: #7e255d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #f8fafc;
+  border-radius: 50%;
+  background: #7e255d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
+input[type="range"]:disabled {
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.45;
 }
 
-/* Safe area padding for notched devices */
-@supports (padding: max(0px)) {
-  body {
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
+.glass-shell {
+  background: linear-gradient(135deg, rgba(47, 17, 55, 0.78), rgba(20, 12, 34, 0.7)) !important;
+  box-shadow: 0 28px 70px rgba(8, 2, 12, 0.45), inset 0 1px rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(24px) saturate(145%);
+}
+
+.glass-header {
+  border-color: rgba(253, 244, 255, 0.13) !important;
+  background: linear-gradient(90deg, rgba(50, 18, 59, 0.88), rgba(31, 17, 54, 0.78)) !important;
+  backdrop-filter: blur(24px) saturate(160%);
+}
+
+.glass-card,
+main > div > section {
+  border-color: rgba(253, 244, 255, 0.14) !important;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(192, 132, 252, 0.07)) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 16px 32px rgba(22, 4, 30, 0.2) !important;
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.glass-card:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(244, 114, 182, 0.11)) !important;
+}
+
+/* Keep existing compact components on the karaoke palette without extra assets. */
+.bg-teal-300 { background-color: #f472b6 !important; }
+.text-teal-200, .text-teal-100 { color: #f5d0fe !important; }
+.text-teal-300 { color: #f0abfc !important; }
+.bg-teal-300\/10, .bg-teal-300\/8, .bg-teal-300\/12 { background-color: rgba(244, 114, 182, 0.13) !important; }
+.border-teal-300\/20, .border-teal-300\/35, .border-teal-300\/15 { border-color: rgba(244, 114, 182, 0.36) !important; }
+.shadow-teal-400\/20, .shadow-teal-400\/15 { --tw-shadow-color: rgba(236, 72, 153, 0.26) !important; }
+
+@media (min-width: 900px) and (orientation: landscape) {
+  .tablet-landscape-text {
+    font-size: 1.05rem !important;
+    line-height: 1.75 !important;
+  }
+
+  .tablet-landscape-heading {
+    font-size: 1.15rem !important;
+    line-height: 1.4 !important;
+  }
+
+  .tablet-landscape-text p,
+  .tablet-landscape-text span,
+  .tablet-landscape-text label {
+    font-size: 1rem !important;
+    line-height: 1.75 !important;
   }
 }
 
-/* PWA splash screen background */
-@media (display-mode: standalone) {
-  body {
-    background: #16171d;
-  }
-}
-
-/* Landscape orientation adjustments */
-@media (orientation: landscape) and (max-height: 500px) {
-  #root {
-    min-height: 100vh;
-  }
-}
-
-/* Landscape mode - adjust root for wider screens */
-@media (orientation: landscape) {
-  #root {
-    max-width: 100%;
-  }
-}
-
-/* Large landscape - constrain width for readability */
-@media (orientation: landscape) and (min-width: 1024px) {
-  #root {
-    max-width: 900px;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -8,6 +8,7 @@ import {
 } from "../../store/appStore";
 
 import type { PlayerState } from "../../types/app/PlayerState";
+import type { PlaylistState } from "../../types/app/PlaylistState";
 
 
 export class PlayerStateListener {
@@ -20,16 +21,7 @@ export class PlayerStateListener {
 
             "player:state",
 
-            (payload: { player: PlayerState }) => {
-
-
-                console.log(
-
-                    "[PWA] Player State",
-
-                    payload
-
-                );
+            (payload: { player: PlayerState; playlist?: PlaylistState }) => {
 
 
                 const {
@@ -97,13 +89,9 @@ export class PlayerStateListener {
 
                     );
 
-                console.log(
-                    "[PlayerStateListener] Updated player state:",
-                    player.videoId,
-                    player.title,
-                    player.channel
-                );
-
+                if (payload.playlist) {
+                    useAppStore.getState().setPlaylist(payload.playlist);
+                }
 
             }
 
@@ -115,16 +103,7 @@ export class PlayerStateListener {
 
             "player:update",
 
-            (payload: { player: PlayerState }) => {
-
-
-                console.log(
-
-                    "[PWA] Player Update",
-
-                    payload
-
-                );
+            (payload: { player: PlayerState; playlist?: PlaylistState }) => {
 
 
                 const {
@@ -191,6 +170,10 @@ export class PlayerStateListener {
                         }
 
                     );
+
+                if (payload.playlist) {
+                    useAppStore.getState().setPlaylist(payload.playlist);
+                }
 
 
             }

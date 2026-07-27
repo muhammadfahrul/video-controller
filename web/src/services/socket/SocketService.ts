@@ -20,17 +20,9 @@ export class SocketService {
 
         if (this.socket) {
 
-            console.log(
-                "[Socket] Already initialized"
-            );
-
             return;
 
         }
-
-        console.log(
-            "[Socket] Creating socket"
-        );
 
         this.socket = io(env.apiUrl, {
 
@@ -39,14 +31,6 @@ export class SocketService {
         });
 
         this.socket.on("connect", () => {
-
-            console.log(
-                "[Socket] Connected",
-            );
-
-            console.log(
-                this.socket?.id
-            );
 
             // Register pending handlers after connection
             this.registerPendingHandlers();
@@ -58,17 +42,7 @@ export class SocketService {
 
         });
 
-        this.socket.on("disconnect", (reason) => {
-
-            console.log(
-
-                "[Socket] Disconnected",
-
-                reason
-
-            );
-
-        });
+        this.socket.on("disconnect", () => undefined);
 
     }
 
@@ -76,22 +50,11 @@ export class SocketService {
 
         for (const handler of this.pendingHandlers) {
             
-            console.log(
-                "[Socket] Register pending handler:",
-                handler.event
-            );
-
             const originalCallback = handler.callback;
             
             this.socket?.on(
                 handler.event,
                 (payload: unknown) => {
-
-                    console.log(
-                        "[Socket] Receive",
-                        handler.event,
-                        payload
-                    );
 
                     originalCallback(payload);
 
@@ -116,11 +79,6 @@ export class SocketService {
         callback: (payload: T) => void
     ) {
 
-        console.log(
-            "[Socket] Register",
-            event
-        );
-
         // If socket is already connected, register immediately
         if (this.socket?.connected) {
             
@@ -128,13 +86,6 @@ export class SocketService {
                 event,
                 (payload: T) => {
 
-                    console.log(
-                        "[Socket] Receive",
-                        event,
-                        payload
-                    );
-                    // Debug: Log ALL events
-                    console.log("[Socket] All events - event:", event, "payload:", payload);
                     callback(payload);
 
                 }
@@ -157,6 +108,10 @@ export class SocketService {
         event: string
 
     ) {
+
+        this.pendingHandlers = this.pendingHandlers.filter(
+            (handler) => handler.event !== event
+        );
 
         this.socket?.off(event);
 

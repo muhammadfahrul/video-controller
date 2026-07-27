@@ -41,16 +41,16 @@ export default function PlaylistPanel() {
 
         <section
             className="
-                space-y-4
-                bg-[#12121f]
-                p-4
-                rounded-xl
-                border border-[#2a2a4a]
-                shadow-[0_0_20px_rgba(168,85,247,0.15)]
+                space-y-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:p-5
             "
         >
 
-            <PlaylistToolbar/>
+            <div className="flex items-center justify-between gap-3">
+                <h2 className="font-semibold text-white">{totalItems} lagu dalam antrean</h2>
+                <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-xs font-medium text-slate-400">{playlist.repeat === "OFF" ? "Tanpa pengulangan" : `Ulang ${playlist.repeat === "ONE" ? "satu" : "semua"}`}</span>
+            </div>
+
+            <PlaylistToolbar />
 
             {playlist.items.length === 0 ? (
                 <PlaylistEmpty />

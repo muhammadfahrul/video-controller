@@ -1,18 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
 import Pagination from "../shared/components/Pagination";
 import { useAppStore } from "../store/appStore";
-import { useAgent } from "../hooks/useAgent";
-import { usePlaylist } from "../hooks/usePlaylist";
-import { agentService } from "../services";
 import { searchService } from "../services/search";
 import type { SearchResult } from "../features/search/types/SearchResult";
 
 export default function SearchPage(){
-
-    useAgent();
-    usePlaylist();
 
     const [keyword, setKeyword] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -23,7 +17,7 @@ export default function SearchPage(){
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
     
-    const { loadAgent, setProcessing, agent } = useAppStore();
+    const { setProcessing, agent } = useAppStore();
 
     const search = async () => {
         if (!keyword.trim()) {
@@ -63,29 +57,12 @@ export default function SearchPage(){
     const endIndex = startIndex + itemsPerPage;
     const paginatedResults = results.slice(startIndex, endIndex);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const agents = await agentService.list();
-                if (agents.length === 0) return;
-                const agent = agents[0];
-                loadAgent({
-                    id: agent.id,
-                    name: agent.name,
-                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
-                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
-                    lastHeartbeat: agent.lastHeartbeat
-                });
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        load();
-    }, []);
-
     return (
-        <div className="space-y-5 landscape:space-y-6">
+        <div className="space-y-5 tablet-landscape-text">
+
+            <div>
+                <p className="text-sm text-slate-400 tablet-landscape-text">Temukan lagu karaoke favorit dan masukkan ke daftar nyanyi.</p>
+            </div>
 
             <SearchBar
                 value={keyword}
@@ -95,20 +72,20 @@ export default function SearchPage(){
             />
 
             {loading && (
-                <div className="rounded-xl bg-[#12121f] border border-[#2a2a4a] p-4 text-center text-[#ff2d95]">
-                    Searching...
+                <div className="rounded-2xl border border-teal-300/15 bg-teal-300/5 p-5 text-center text-sm text-teal-100">
+                    Mencari lagu karaoke...
                 </div>
             )}
 
             {!loading && results.length === 0 && keyword && (
-                <div className="rounded-xl border border-[#2a2a4a] bg-[#12121f] p-6 text-center text-[#b8b8d0]">
-                    No videos found
+                <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-8 text-center text-slate-400">
+                    Lagu tidak ditemukan. Coba judul atau nama penyanyi lain.
                 </div>
             )}
 
             {error && (
-                <div className="rounded-xl bg-[#1a1a2e] border border-red-500 p-4 text-red-400">
-                    {error}
+                <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200">
+                    Pencarian gagal. Silakan coba lagi.
                 </div>
             )}
 

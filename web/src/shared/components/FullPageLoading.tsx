@@ -8,11 +8,11 @@ export default function FullPageLoading() {
             className="
                 fixed
                 inset-0
-                z-100
+                z-[100]
                 flex
                 items-center
                 justify-center
-                bg-black/50
+                bg-[#090b12]/75
                 backdrop-blur-sm
             "
         >
@@ -23,10 +23,7 @@ export default function FullPageLoading() {
                     flex-col
                     items-center
                     gap-4
-                    rounded-xl
-                    bg-[#12121f]
-                    p-8
-                    shadow-2xl
+                    rounded-2xl border border-white/10 bg-[#151a28] p-7 shadow-2xl
                 "
             >
 
@@ -35,7 +32,7 @@ export default function FullPageLoading() {
                         h-12
                         w-12
                         animate-spin
-                        text-blue-600
+                        text-teal-300
                     "
                 />
 
