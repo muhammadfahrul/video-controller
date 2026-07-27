@@ -59,21 +59,21 @@ function Get-InstallMode {
     }
 }
 
-function Install-Git {
-    Write-Host "[INFO] Installing Git..." -ForegroundColor Yellow
+function Install-7Zip {
+    Write-Host "[INFO] Installing 7-Zip..." -ForegroundColor Yellow
 
-    $gitUrl = 'https://github.com/git-for-windows/git/releases/download/v2.46.0.windows.1/Git-2.46.0-64-bit.exe'
-    $gitInstaller = "$env:TEMP\git-installer.exe"
+    $sevenZipUrl = 'https://www.7-zip.org/a/7z2408-x64.exe'
+    $sevenZipInstaller = "$env:TEMP\7z-installer.exe"
 
-    Write-Host "[INFO] Downloading Git..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $gitUrl -OutFile $gitInstaller -UseBasicParsing
+    Write-Host "[INFO] Downloading 7-Zip..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipInstaller -UseBasicParsing
 
-    Write-Host "[INFO] Installing Git (this may take a moment)..." -ForegroundColor Yellow
-    Start-Process -FilePath $gitInstaller -ArgumentList '/S' -Wait
+    Write-Host "[INFO] Installing 7-Zip (this may take a moment)..." -ForegroundColor Yellow
+    Start-Process -FilePath $sevenZipInstaller -ArgumentList '/S' -Wait
 
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
 
-    Write-Host "[OK] Git installed" -ForegroundColor Green
+    Write-Host "[OK] 7-Zip installed" -ForegroundColor Green
 }
 
 function Install-NodeJS {
@@ -152,13 +152,6 @@ switch ($INSTALL_MODE) {
 
 Write-Host ""
 
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Host "[ERROR] Git is not installed!" -ForegroundColor Red
-    Install-Git
-}
-
-Write-Host "[OK] Git $(git --version) detected" -ForegroundColor Green
-
 $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
 if (-not $nodeCommand) {
     Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
@@ -197,25 +190,38 @@ if (-not $npmCommand) {
 Write-Host "[OK] Node.js $(node --version) and npm $(npm --version) detected" -ForegroundColor Green
 
 if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
-    Write-Host "[INFO] Project files not found. Downloading..." -ForegroundColor Yellow
+    Write-Host "[INFO] Project files not found. Downloading ZIP archive..." -ForegroundColor Yellow
 
-    $repoUrl = 'https://github.com/muhammadfahrul/video-controller.git'
     $parentDir = Split-Path $PROJECT_ROOT -Parent
-    $repoName = Split-Path $PROJECT_ROOT -Leaf
+    $archiveUrl = 'https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip'
+    $archivePath = Join-Path $env:TEMP 'video-controller-main.zip'
+    $extractDir = Join-Path $parentDir 'video-controller-main'
+    $destDir = Join-Path $parentDir 'video-controller'
 
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        Write-Host "[ERROR] Git is not available after installation attempt." -ForegroundColor Red
-        exit 1
+    if (-not (Get-Command Expand-Archive -ErrorAction SilentlyContinue)) {
+        Write-Host "[ERROR] PowerShell archive support is unavailable." -ForegroundColor Red
+        Install-7Zip
     }
 
-    if (-not (Test-Path (Join-Path $parentDir $repoName))) {
-        Write-Host "[INFO] Cloning repository..." -ForegroundColor Yellow
-        Push-Location $parentDir
-        & git clone $repoUrl $repoName
-        Pop-Location
+    if (Test-Path $destDir) {
+        Remove-Item -Path $destDir -Recurse -Force
     }
 
-    $PROJECT_ROOT = Join-Path $parentDir $repoName
+    if (Test-Path $extractDir) {
+        Remove-Item -Path $extractDir -Recurse -Force
+    }
+
+    Write-Host "[INFO] Downloading repository archive..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath -UseBasicParsing
+
+    Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
+    Expand-Archive -Path $archivePath -DestinationPath $parentDir -Force
+
+    if (Test-Path $extractDir) {
+        Rename-Item -Path $extractDir -NewName 'video-controller'
+    }
+
+    $PROJECT_ROOT = $destDir
     Write-Host "[OK] Project ready at $PROJECT_ROOT" -ForegroundColor Green
 }
 

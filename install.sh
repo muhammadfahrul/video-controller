@@ -100,19 +100,19 @@ esac
 echo ""
 
 # ============================================
-# Auto-install Git if needed
+# Ensure unzip is available
 # ============================================
-install_git() {
-    echo "🔧 Installing Git..."
+install_unzip() {
+    echo "🔧 Installing unzip..."
     
     if command -v apt-get &> /dev/null; then
-        sudo apt-get update && sudo apt-get install -y git
+        sudo apt-get update && sudo apt-get install -y unzip
     elif command -v yum &> /dev/null; then
-        sudo yum install -y git
+        sudo yum install -y unzip
     elif command -v dnf &> /dev/null; then
-        sudo dnf install -y git
+        sudo dnf install -y unzip
     elif command -v brew &> /dev/null; then
-        brew install git
+        brew install unzip
     fi
 }
 
@@ -123,60 +123,40 @@ if [ -f "$PROJECT_ROOT/package.json" ]; then
     echo "📁 Project files found in current directory"
 fi
 
-# Try to get files - git clone, zip download, or use existing files
+# Download repository archive directly as ZIP when project files are not present
 if [ "$HAS_PROJECT_FILES" = false ]; then
-    # Try git first
-    if command -v git &> /dev/null; then
-        echo "✅ Git $(git --version) detected"
-        
-        REPO_URL="https://github.com/muhammadfahrul/video-controller.git"
-        PARENT_DIR="$(dirname "$PROJECT_ROOT")"
-        REPO_NAME="video-controller"
-        
-        if [ ! -d "$PARENT_DIR/$REPO_NAME" ]; then
-            echo "📥 Cloning repository..."
-            cd "$PARENT_DIR"
-            git clone "$REPO_URL" "$REPO_NAME"
-        fi
-        
-        PROJECT_ROOT="$PARENT_DIR/$REPO_NAME"
-        cd "$PROJECT_ROOT"
-        HAS_PROJECT_FILES=true
-    else
-        # Try installing git
-        echo "❌ Git is not installed!"
-        install_git
-        
-        if command -v git &> /dev/null; then
-            echo "✅ Git installed"
-            
-            REPO_URL="https://github.com/muhammadfahrul/video-controller.git"
-            PARENT_DIR="$(dirname "$PROJECT_ROOT")"
-            REPO_NAME="video-controller"
-            
-            echo "📥 Cloning repository..."
-            cd "$PARENT_DIR"
-            git clone "$REPO_URL" "$REPO_NAME"
-            
-            PROJECT_ROOT="$PARENT_DIR/$REPO_NAME"
-            cd "$PROJECT_ROOT"
-            HAS_PROJECT_FILES=true
-        else
-            # Download as ZIP as last resort
-            echo "⬇️ Downloading as ZIP..."
-            
-            PARENT_DIR="$(dirname "$PROJECT_ROOT")"
-            cd /tmp
-            curl -fsSL "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip" -o video-controller.zip
-            unzip -q video-controller.zip
-            mv video-controller-main "$PARENT_DIR/video-controller"
-            rm video-controller.zip
-            
-            PROJECT_ROOT="$PARENT_DIR/video-controller"
-            cd "$PROJECT_ROOT"
-            HAS_PROJECT_FILES=true
-        fi
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ unzip is not installed!"
+        install_unzip
     fi
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ Cannot install unzip!"
+        exit 1
+    fi
+
+    echo "⬇️ Downloading repository archive..."
+
+    PARENT_DIR="$(dirname "$PROJECT_ROOT")"
+    REPO_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+    ARCHIVE_NAME="video-controller-main.zip"
+    EXTRACT_DIR="$PARENT_DIR/video-controller-main"
+    DEST_DIR="$PARENT_DIR/video-controller"
+
+    cd /tmp
+    rm -f "$ARCHIVE_NAME"
+    curl -fsSL "$REPO_URL" -o "$ARCHIVE_NAME"
+
+    if [ -d "$DEST_DIR" ]; then
+        rm -rf "$DEST_DIR"
+    fi
+
+    unzip -q "$ARCHIVE_NAME" -d "$PARENT_DIR"
+    mv "$EXTRACT_DIR" "$DEST_DIR"
+
+    PROJECT_ROOT="$DEST_DIR"
+    cd "$PROJECT_ROOT"
+    HAS_PROJECT_FILES=true
 fi
 
 if [ "$HAS_PROJECT_FILES" = false ]; then
