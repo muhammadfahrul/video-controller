@@ -58,6 +58,11 @@ export class SocketService {
 
         });
 
+        // Global listener for ALL events to debug what's coming through
+        this.socket?.onAny((event, ...args) => {
+            console.log("[Socket] ANY event received:", event, args);
+        });
+
         this.socket.on("disconnect", (reason) => {
 
             console.log(

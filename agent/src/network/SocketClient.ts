@@ -24,6 +24,8 @@ import {
 import { PlayerRepository } from "../repositories/PlayerRepository";
 import { PlaylistRepository } from "../repositories/PlaylistRepository";
 import { PlayerService } from "../services/PlayerService";
+import { PlaylistService } from "../services/PlaylistService";
+import { Agent } from "../core/Agent";
 
 export class SocketClient {
 
@@ -37,6 +39,8 @@ export class SocketClient {
     private playerRepository?: PlayerRepository;
     private playlistRepository?: PlaylistRepository;
     private playerService?: PlayerService;
+    private playlistService?: PlaylistService;
+    private agent?: Agent;
 
 
     constructor(
@@ -61,7 +65,14 @@ export class SocketClient {
 
         this.socket =
             io(
-                this.serverUrl
+                this.serverUrl,
+                {
+                    transports: ["websocket", "polling"],
+                    reconnection: true,
+                    reconnectionAttempts: 10,
+                    reconnectionDelay: 1000,
+                    timeout: 10000
+                }
             );
 
         // Set up activation listener AFTER socket is created
@@ -203,6 +214,10 @@ export class SocketClient {
                     } catch (err) {
                         console.error("Error stopping playback:", err);
                     }
+                } else if (data.isActive) {
+                    // Room was reactivated - resume state sync
+                    console.log("Room reactivated, resuming state sync");
+                    this.resumeStateSync();
                 }
             }
         );
@@ -220,6 +235,9 @@ export class SocketClient {
                 console.log("Received clear-data event, clearing player and playlist data");
                 
                 try {
+                    // Pause state sync to prevent overwriting with old data during clearing
+                    this.pauseStateSync();
+                    
                     // Clear player data using PlayerService (sets clearing flag to prevent overwriting)
                     if (this.playerService) {
                         await this.playerService.clearData();
@@ -229,10 +247,55 @@ export class SocketClient {
                     // Clear playlist data
                     if (this.playlistRepository) {
                         await this.playlistRepository.clear();
-                        console.log("Playlist data cleared");
+                    }
+                    // Also clear in-memory playlist state
+                    if (this.playlistService) {
+                        await this.playlistService.clear();
+                        console.log("Playlist in-memory state cleared");
                     }
                     
                     console.log("All data cleared successfully");
+                    
+                    // Navigate to YouTube home after clearing
+                    if (this.playerService) {
+                        await this.playerService.openVideo("");
+                        console.log("Navigated to YouTube home");
+                    }
+                    
+                    // Send empty state to update UI on cashier and web PWA
+                    // Use setTimeout to ensure data is fully cleared first
+                    setTimeout(() => {
+                        this.sendPlayerState({
+                            player: {
+                                playing: false,
+                                currentTime: 0,
+                                duration: 0,
+                                volume: 100,
+                                muted: false,
+                                fullscreen: false,
+                                videoId: undefined,
+                                title: undefined
+                            },
+                            playlist: {
+                                items: [],
+                                currentIndex: -1,
+                                repeat: "off",
+                                shuffle: false
+                            }
+                        });
+                        
+                        this.sendPlaylistState({
+                            items: [],
+                            currentIndex: -1,
+                            repeat: "off",
+                            shuffle: false
+                        });
+                        
+                        console.log("[SocketClient] Empty state sent to cashier and PWA");
+                        
+                        // NOTE: Do NOT resume sync here!
+                        // Sync will be resumed when the room is reactivated (agent:activation with isActive: true)
+                    }, 100);
                 } catch (err) {
                     console.error("Error clearing data:", err);
                 }
@@ -326,6 +389,26 @@ export class SocketClient {
     // Set player service for clear data functionality
     public setPlayerService(playerService: PlayerService): void {
         this.playerService = playerService;
+    }
+
+    // Set playlist service for clear data functionality
+    public setPlaylistService(playlistService: PlaylistService): void {
+        this.playlistService = playlistService;
+    }
+
+    // Set agent reference for sync control
+    public setAgent(agent: Agent): void {
+        this.agent = agent;
+    }
+
+    // Pause state sync during data clearing
+    private pauseStateSync(): void {
+        this.agent?.pauseStateSync();
+    }
+
+    // Resume state sync after data is cleared
+    private resumeStateSync(): void {
+        this.agent?.resumeStateSync();
     }
 
 

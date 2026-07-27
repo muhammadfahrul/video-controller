@@ -211,6 +211,10 @@ export class PlaylistService {
         this.items = [];
 
         this.currentIndex = -1;
+        
+        this.repeatMode = RepeatMode.OFF;
+        
+        this.shuffleEnabled = false;
 
         await this.persist();
 

@@ -96,7 +96,8 @@ export class ConfigService {
 
     public getServerUrl(): string {
 
-        const ip = getLocalIpAddress();
+        // Use SERVER_IP if explicitly set in environment, otherwise auto-detect
+        const ip = process.env.SERVER_IP || getLocalIpAddress();
 
         const port = process.env.PORT || 53331;
 

@@ -375,23 +375,54 @@ export class SocketServer {
                         this.activatedRooms.delete(data.roomId);
                         
                         const registry = this.manager.getRegistry();
+                        console.log("[SERVER] All registered agents:", Array.from(registry.getAll().map(a => ({ id: a.id, roomId: a.roomId, socketId: a.socketId }))));
                         const agent = registry.getByRoomId(data.roomId);
+                        console.log("[SERVER] Found agent for room:", agent ? { id: agent.id, roomId: agent.roomId, socketId: agent.socketId } : "NOT FOUND");
                         
                         if (agent) {
                             agent.isActive = false;
+                            console.log("[SERVER] Emitting agent:activation to socketId:", agent.socketId);
                             // Notify the specific agent
                             this.io.to(agent.socketId).emit("agent:activation", { isActive: false });
-                            // Stop playback when deactivated
-                            this.io.to(agent.socketId).emit(
-                                SocketEvents.COMMAND,
-                                { type: "STOP" }
-                            );
                             // Clear player and playlist data
+                            console.log("[SERVER] Emitting AGENT_CLEAR_DATA to socketId:", agent.socketId);
                             this.io.to(agent.socketId).emit(
                                 SocketEvents.AGENT_CLEAR_DATA,
                                 {}
                             );
+                            
+                            // Broadcast empty state to ALL clients (cashier + web PWA)
+                            // This ensures web PWA gets cleared state even if agent is disconnected
+                            const emptyPlayerState = {
+                                player: {
+                                    playing: false,
+                                    currentTime: 0,
+                                    duration: 0,
+                                    volume: 100,
+                                    muted: false,
+                                    fullscreen: false,
+                                    videoId: undefined,
+                                    title: undefined,
+                                    channel: undefined,
+                                    thumbnail: undefined
+                                },
+                                playlist: {
+                                    items: [],
+                                    currentIndex: -1,
+                                    repeat: "off",
+                                    shuffle: false
+                                }
+                            };
+                            console.log("[SERVER] Broadcasting empty player state to all clients");
+                            this.io.emit(SocketEvents.PLAYER_STATE, emptyPlayerState);
+                            this.io.emit(SocketEvents.PLAYLIST_STATE, { items: [], currentIndex: -1, repeat: "off", shuffle: false });
+                            
+                            // Update registry with empty state to ensure web PWA and API get cleared data
+                            registry.updateSnapshot(agent.id, emptyPlayerState);
+                            
                             this.broadcastAgents(registry.getAll());
+                        } else {
+                            console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
                     }
                 );

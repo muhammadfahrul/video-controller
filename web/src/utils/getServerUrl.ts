@@ -1,6 +1,6 @@
 export function getServerUrl(): string {
   const protocol = window.location.protocol;
-  const hostname = window.location.hostname;
+  const hostname = import.meta.env.VITE_SERVER_IP || window.location.hostname;
   const port = window.location.port;
   
   // Development: Vite typically runs on 53332, API server on 53331

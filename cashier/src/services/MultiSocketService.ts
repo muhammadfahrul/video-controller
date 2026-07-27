@@ -101,11 +101,19 @@ class MultiSocketService {
   // Deactivate a specific room - finds connection by roomId (from agent)
   async deactivateRoom(roomId: string): Promise<void> {
     console.log('[MultiSocket] deactivateRoom called with roomId:', roomId);
+    console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({
+      key: k,
+      configId: v.config.id,
+      configName: v.config.name,
+      agentRoomId: v.agents[0]?.roomId,
+      agentRoomName: v.agents[0]?.roomName
+    })));
     
     let connection: RoomConnection | undefined;
     
     // Find connection by matching roomId (from agent) or config.id
     for (const conn of this.connections.values()) {
+      console.log('[MultiSocket] Checking connection - configId:', conn.config.id, 'agentRoomId:', conn.agents[0]?.roomId, 'lookingFor:', roomId);
       if (conn.agents[0]?.roomId === roomId || conn.config.id === roomId) {
         connection = conn;
         break;
@@ -123,6 +131,7 @@ class MultiSocketService {
     }
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
+    console.log('[MultiSocket] Emitting deactivate-room with roomId:', agentRoomId);
     connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId });
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
   }

@@ -56,11 +56,25 @@ export class PlayerService {
 
     async clearData() {
         this.clearing = true;
-        try {
-            await this.repository?.clear();
-        } finally {
-            this.clearing = false;
-        }
+        
+        // Clear storage data
+        await this.repository?.clear();
+        
+        // Clear in-memory state
+        this.restoredSnapshot = undefined;
+        this.lastHealthySnapshot = undefined;
+        
+        console.log("[PlayerService] All player state cleared");
+        
+        // Do NOT set clearing to false here!
+        // Keep clearing = true to prevent sending invalid snapshots
+        // until a new valid video is loaded
+    }
+    
+    // Call this when a new valid video is loaded
+    public endClearing(): void {
+        this.clearing = false;
+        console.log("[PlayerService] Clearing mode ended");
     }
 
     private isHealthySnapshot(
@@ -129,6 +143,9 @@ export class PlayerService {
         await this.play();
 
         await this.fullscreen();
+        
+        // End clearing mode since we have a valid video now
+        this.endClearing();
 
     }
 
@@ -253,6 +270,22 @@ export class PlayerService {
     }
 
     public async getSnapshot(): Promise<PlayerSnapshot> {
+
+        // If clearing, return empty state to prevent old data from being sent
+        if (this.clearing) {
+            return {
+                playing: false,
+                currentTime: 0,
+                duration: 0,
+                volume: 100,
+                muted: false,
+                fullscreen: false,
+                videoId: undefined,
+                title: undefined,
+                channel: undefined,
+                thumbnail: undefined
+            };
+        }
 
         const snapshot =
             await this.player.getSnapshot();

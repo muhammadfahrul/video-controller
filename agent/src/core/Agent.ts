@@ -95,6 +95,9 @@ export class Agent {
 
     private autoSkipEnabled = true;
 
+    // Flag to pause state sync during data clearing
+    private isSyncingPaused = false;
+
     private identity:
         AgentIdentity;
 
@@ -147,6 +150,9 @@ export class Agent {
                 this.playerRepository,
                 this.playlist.getRepository()
             );
+
+        // Set agent reference in socket client for sync control
+        this.socketClient?.setAgent(this);
 
     }
 
@@ -206,6 +212,9 @@ export class Agent {
 
         // Set player service in socket client for clear data functionality
         this.socketClient?.setPlayerService(this.player);
+        
+        // Set playlist service in socket client for clear data functionality
+        this.socketClient?.setPlaylistService(this.playlist);
 
         this.health = new HealthService(
 
@@ -515,6 +524,24 @@ export class Agent {
 
     }
 
+    // Pause state sync during data clearing
+    public pauseStateSync(): void {
+        this.isSyncingPaused = true;
+        console.log("[AGENT] State sync paused, isSyncingPaused:", this.isSyncingPaused);
+    }
+
+    // Resume state sync when data is cleared or room is reactivated
+    public resumeStateSync(): void {
+        this.isSyncingPaused = false;
+        console.log("[AGENT] State sync resumed, isSyncingPaused:", this.isSyncingPaused);
+    }
+
+    // Check if sync is paused
+    public isSyncPaused(): boolean {
+        console.log("[AGENT] Checking isSyncPaused:", this.isSyncingPaused);
+        return this.isSyncingPaused;
+    }
+
     public async stop() {
 
         this.heartbeat?.stop();
@@ -558,6 +585,12 @@ export class Agent {
             async () => {
 
                 try {
+
+                    // Skip sending state if sync is paused (during data clearing)
+                    if (this.isSyncingPaused) {
+                        console.log("[AGENT] Skipping state sync - isSyncingPaused is true");
+                        return;
+                    }
 
                     if (
                         !this.player ||
