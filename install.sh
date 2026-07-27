@@ -4,10 +4,17 @@
 # Run selected services with a single command
 # Auto-installs dependencies - just run ./install.sh
 
-set -e
-
 # Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+# Source NVM for proper Node.js version (hardcoded path for reliability)
+export NVM_DIR="/home/parkee/.nvm"
+# Try to source NVM if it exists, use default version if available
+\. "$NVM_DIR/nvm.sh" 2>/dev/null && nvm use default >/dev/null 2>&1 || true
+# Ensure NVM node is first in PATH
+export PATH="$NVM_DIR/versions/node/$(nvm version default 2>/dev/null || echo 'v22.18.0')/bin:$PATH"
+
+set -e
 
 # ============================================
 # Interactive menu
@@ -23,9 +30,12 @@ show_menu() {
     echo "  [2] Kasir          - Aplikasi Kasir (Cashier)"
     echo "  [3] Semua          - Room App + Kasir"
     echo ""
+    echo "  [A] Auto-start     - Setup auto-start (systemd)"
+    echo "  [R] Remove Auto-start - Hapus auto-start"
+    echo ""
     echo "  [0] Keluar"
     echo ""
-    echo -n "Masukkan pilihan [1-3]: "
+    echo -n "Masukkan pilihan [0-A]: "
 }
 
 # ============================================
@@ -44,6 +54,12 @@ if [[ $# -gt 0 ]]; then
             ;;
         3|all)
             INSTALL_MODE="all"
+            ;;
+        a|autostart)
+            INSTALL_MODE="autostart"
+            ;;
+        r|remove)
+            INSTALL_MODE="remove-autostart"
             ;;
         0|exit)
             echo "Keluar..."
@@ -70,6 +86,12 @@ else
         3)
             INSTALL_MODE="all"
             ;;
+        a|A)
+            INSTALL_MODE="autostart"
+            ;;
+        r|R)
+            INSTALL_MODE="remove-autostart"
+            ;;
         0)
             echo "Keluar..."
             exit 0
@@ -95,6 +117,12 @@ case $INSTALL_MODE in
         ;;
     kasir)
         echo "📦 Mode: Kasir saja (cashier)"
+        ;;
+    autostart)
+        echo "📦 Mode: Setup Auto-start (systemd)"
+        ;;
+    remove-autostart)
+        echo "📦 Mode: Hapus Auto-start"
         ;;
 esac
 echo ""
@@ -411,6 +439,207 @@ cleanup() {
 }
 
 trap cleanup SIGINT SIGTERM
+
+# ============================================
+# Auto-start setup (systemd)
+# ============================================
+setup_autostart() {
+    echo "📝 Membuat systemd service files..."
+    
+    # Source NVM to get correct Node.js and npm paths
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    # Get current user
+    CURRENT_USER=$(whoami)
+    
+    # Find Node.js and npm full path (from NVM)
+    NODE_PATH=$(which node)
+    NPM_PATH=$(which npm)
+    XVFB_PATH=$(which xvfb-run 2>/dev/null || echo "")
+    
+    # Create systemd service directory
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    mkdir -p "$SYSTEMD_USER_DIR"
+    
+    # Get system PATH for systemd
+    SYSTEMD_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    
+    # Server service
+    cat > "$SYSTEMD_USER_DIR/video-controller-server.service" << EOF
+[Unit]
+Description=Video Controller Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/server
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run start'
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
+EOF
+    echo "   ✅ video-controller-server.service"
+    
+    # Agent service (with xvfb for headless)
+    AGENT_EXEC="'source \$NVM_DIR/nvm.sh && npm run start'"
+    
+    cat > "$SYSTEMD_USER_DIR/video-controller-agent.service" << EOF
+[Unit]
+Description=Video Controller Agent
+After=network.target video-controller-server.service
+Wants=video-controller-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/agent
+ExecStart=/bin/bash -l -c 'source /home/parkee/.nvm/nvm.sh && xvfb-run -a npm run start'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    echo "   ✅ video-controller-agent.service"
+    
+    # Web service
+    cat > "$SYSTEMD_USER_DIR/video-controller-web.service" << EOF
+[Unit]
+Description=Video Controller Web
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/web
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run preview:host'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    echo "   ✅ video-controller-web.service"
+    
+    # Cashier service
+    cat > "$SYSTEMD_USER_DIR/video-controller-cashier.service" << EOF
+[Unit]
+Description=Video Controller Cashier
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/cashier
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run preview:host'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+    echo "   ✅ video-controller-cashier.service"
+    
+    # Reload systemd
+    systemctl --user daemon-reload
+    
+    echo ""
+    echo "✅ Systemd services dibuat!"
+    echo ""
+    echo "Untuk mengaktifkan auto-start:"
+    echo "  systemctl --user enable video-controller-server.service"
+    echo "  systemctl --user enable video-controller-agent.service"
+    echo "  systemctl --user enable video-controller-web.service"
+    echo "  systemctl --user enable video-controller-cashier.service"
+    echo ""
+    echo "Untuk memulai sekarang:"
+    echo "  systemctl --user start video-controller-server.service"
+    echo "  systemctl --user start video-controller-agent.service"
+    echo "  systemctl --user start video-controller-web.service"
+    echo "  systemctl --user start video-controller-cashier.service"
+    echo ""
+    
+    # Ask to enable now
+    echo -n "Aktifkan auto-start sekarang? [y/N]: "
+    read -r enable_now
+    
+    if [[ "$enable_now" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "🔄 Mengaktifkan services..."
+        systemctl --user enable video-controller-server.service
+        systemctl --user enable video-controller-agent.service
+        systemctl --user enable video-controller-web.service
+        systemctl --user enable video-controller-cashier.service
+        
+        echo ""
+        echo "▶️ Memulai services..."
+        systemctl --user start video-controller-server.service
+        sleep 2
+        systemctl --user start video-controller-agent.service
+        sleep 1
+        systemctl --user start video-controller-web.service
+        systemctl --user start video-controller-cashier.service
+        
+        echo ""
+        echo "✅ Auto-start diaktifkan!"
+        echo ""
+        echo "Cek status: systemctl --user status video-controller-server.service"
+    fi
+}
+
+# Remove auto-start
+remove_autostart() {
+    echo "🗑️ Menghapus auto-start..."
+    
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    
+    # Stop services
+    systemctl --user stop video-controller-server.service 2>/dev/null || true
+    systemctl --user stop video-controller-agent.service 2>/dev/null || true
+    systemctl --user stop video-controller-web.service 2>/dev/null || true
+    systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+    
+    # Disable services
+    systemctl --user disable video-controller-server.service 2>/dev/null || true
+    systemctl --user disable video-controller-agent.service 2>/dev/null || true
+    systemctl --user disable video-controller-web.service 2>/dev/null || true
+    systemctl --user disable video-controller-cashier.service 2>/dev/null || true
+    
+    # Remove service files
+    rm -f "$SYSTEMD_USER_DIR/video-controller-server.service"
+    rm -f "$SYSTEMD_USER_DIR/video-controller-agent.service"
+    rm -f "$SYSTEMD_USER_DIR/video-controller-web.service"
+    rm -f "$SYSTEMD_USER_DIR/video-controller-cashier.service"
+    
+    # Reload systemd
+    systemctl --user daemon-reload
+    
+    echo "✅ Auto-start dihapus!"
+}
+
+# Handle auto-start modes
+if [ "$INSTALL_MODE" = "autostart" ]; then
+    # Install dependencies for all services first
+    echo "📦 Installing dependencies for auto-start..."
+    cd "$PROJECT_ROOT/agent" && npm install
+    cd "$PROJECT_ROOT/server" && npm install
+    cd "$PROJECT_ROOT/web" && npm install
+    cd "$PROJECT_ROOT/cashier" && npm install
+    
+    # Build services
+    echo "🔨 Building services..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    
+    setup_autostart
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart" ]; then
+    remove_autostart
+    exit 0
+fi
 
 # Wait for any process to exit
 wait $PIDS
