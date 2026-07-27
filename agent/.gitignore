@@ -16,3 +16,6 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Browser profile (contains cookies/login session)
+browser-profile/
