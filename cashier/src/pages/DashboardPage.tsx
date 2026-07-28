@@ -24,7 +24,18 @@ export default function DashboardPage() {
   const statusMap = connectionStatus instanceof Map ? connectionStatus : new Map();
   const connectedCount = Array.from(statusMap.values()).filter(Boolean).length;
   const totalCount = roomConfigs.length;
-  const connectionStatusDisplay = totalCount === 0 ? 'disconnected' : connectedCount === totalCount ? 'connected' : 'connecting';
+  
+  // Check if any connection is currently in progress
+  const isAnyConnecting = Array.from(statusMap.values()).some(v => v === null);
+  const connectionStatusDisplay = totalCount === 0 
+    ? 'disconnected' 
+    : connectedCount === totalCount 
+      ? 'connected' 
+      : connectedCount > 0 
+        ? 'partial'  // Some connected, some not - don't show "connecting" 
+        : isAnyConnecting 
+          ? 'connecting' 
+          : 'disconnected';
 
   const activeRooms = roomList.filter(r => r.status === 'playing').length;
   const connectedAgents = roomList.filter(r => r.isActive).length;
@@ -50,6 +61,7 @@ export default function DashboardPage() {
       <div className={`flex items-center justify-between px-4 py-2 rounded-lg text-xs ${
         connectionStatusDisplay === 'connected' ? 'bg-green-500/20 border border-green-500/30 text-green-400' : 
         connectionStatusDisplay === 'connecting' ? 'bg-yellow-500/20 border border-yellow-500/30 text-yellow-400' :
+        connectionStatusDisplay === 'partial' ? 'bg-orange-500/20 border border-orange-500/30 text-orange-400' :
         'bg-red-500/20 border border-red-500/30 text-red-400'
       }`}>
         <div className="flex items-center gap-2">
@@ -57,11 +69,13 @@ export default function DashboardPage() {
           <span className="hidden sm:inline">
             {connectionStatusDisplay === 'connected' ? `${connectedCount} server terhubung` : 
              connectionStatusDisplay === 'connecting' ? `Menghubungkan...` :
+             connectionStatusDisplay === 'partial' ? `${connectedCount}/${totalCount} terhubung` :
              totalCount === 0 ? 'Belum ada ruangan' : `${connectedCount}/${totalCount} terhubung`}
           </span>
           <span className="sm:hidden">
             {connectionStatusDisplay === 'connected' ? `${connectedCount} trhubung` : 
              connectionStatusDisplay === 'connecting' ? `Menghubungkan...` :
+             connectionStatusDisplay === 'partial' ? `${connectedCount}/${totalCount}` :
              totalCount === 0 ? 'Belum ada' : `${connectedCount}/${totalCount}`}
           </span>
         </div>
