@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
-import { Play, Pause, Square, Clock, Wallet, Music, Disc3, Power, PowerOff } from 'lucide-react';
+import { Clock, Wallet, Disc3, Power, PowerOff } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -12,10 +12,7 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
-  if (hours > 0) {
-    return `${hours}j ${minutes}m ${secs}d`;
-  }
+  if (hours > 0) return `${hours}j ${minutes}m`;
   return `${minutes}m ${secs}d`;
 }
 
@@ -31,7 +28,6 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const [currentTime, setCurrentTime] = useState(roomBilling.currentDuration);
   
   const handleToggleActive = async () => {
-    // Use multiSocketService to activate/deactivate room by roomId
     if (roomBilling.isActive) {
       await multiSocketService.deactivateRoom(roomBilling.roomId);
     } else {
@@ -41,10 +37,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   
   useEffect(() => {
     if (roomBilling.status === 'playing') {
-      const interval = setInterval(() => {
-        setCurrentTime(prev => prev + 1);
-      }, 1000);
-      
+      const interval = setInterval(() => setCurrentTime(p => p + 1), 1000);
       return () => clearInterval(interval);
     }
   }, [roomBilling.status]);
@@ -53,135 +46,79 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const pricePerHour = 50000;
   const currentPrice = Math.ceil(displayDuration / 3600) * pricePerHour;
   
-  const statusConfig = {
-    idle: { 
-      bg: 'bg-gray-500/20 border-gray-500/50 text-gray-400',
-      icon: <Square className="w-4 h-4" />,
-      text: 'TIDAK AKTIF',
-      glow: 'shadow-gray-500/20'
-    },
-    playing: { 
-      bg: 'bg-green-500/20 border-green-500/50 text-green-400',
-      icon: <Play className="w-4 h-4" />,
-      text: 'SEDANG DIPUTAR',
-      glow: 'shadow-green-500/30'
-    },
-    paused: { 
-      bg: 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400',
-      icon: <Pause className="w-4 h-4" />,
-      text: 'DIJEDA',
-      glow: 'shadow-yellow-500/20'
-    },
-    waiting: { 
-      bg: 'bg-orange-500/20 border-orange-500/50 text-orange-400',
-      icon: <Clock className="w-4 h-4" />,
-      text: 'MENUNGGU',
-      glow: 'shadow-orange-500/20'
-    }
-  };
-  
-  // Use roomBilling status directly
-  const status = statusConfig[roomBilling.status];
-
-  // If billing is disabled, rooms are always unlocked (active)
-  // If billing is enabled, check roomBilling.isActive
   const isLocked = billingConfig.enabled ? !roomBilling.isActive : false;
+  const status = roomBilling.status;
+  
+  const borderColor = isLocked ? 'border-l-red-500' : status === 'playing' ? 'border-l-green-500' : status === 'paused' ? 'border-l-yellow-500' : 'border-l-gray-500';
+  const iconColor = status === 'playing' ? 'text-green-400 bg-green-500/20' : status === 'paused' ? 'text-yellow-400 bg-yellow-500/20' : 'text-gray-400 bg-gray-500/20';
+  const badgeColor = isLocked ? 'bg-red-500/20 text-red-400' : status === 'playing' ? 'bg-green-500/20 text-green-400' : status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400';
+  const badgeText = isLocked ? 'TERKUNCI' : status === 'playing' ? 'DIPUTAR' : status === 'paused' ? 'DIJEDA' : 'TIDAK AKTIF';
   
   return (
-    <div className={`neon-card w-full rounded-xl p-6 border-l-4 h-full flex flex-col overflow-hidden ${isLocked ? 'border-l-red-500 opacity-60' : roomBilling.status === 'playing' ? 'border-l-green-500' : roomBilling.status === 'paused' ? 'border-l-yellow-500' : 'border-l-gray-500'} ${status.glow}`}>
-      <div className="grid gap-4 mb-4 [grid-template-columns:minmax(0,1fr)_auto]">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className={`p-3 rounded-xl shrink-0 ${roomBilling.status === 'playing' ? 'bg-gradient-to-br from-green-500/30 to-green-600/10' : roomBilling.status === 'paused' ? 'bg-gradient-to-br from-yellow-500/30 to-yellow-600/10' : 'bg-gradient-to-br from-gray-500/30 to-gray-600/10'}`}>
-            <Disc3 className={`w-6 h-6 ${roomBilling.status === 'playing' ? 'text-green-400 animate-spin' : roomBilling.status === 'paused' ? 'text-yellow-400' : 'text-gray-400'}`} />
+    <div className={`bg-[#1a1a2e] rounded-lg border-l-4 flex flex-col ${borderColor} ${isLocked ? 'opacity-60' : ''} hover:brightness-110 transition-all`}>
+      {/* Header - Row 1: Icon + Name + Button */}
+      <div className="p-3 pb-2 flex items-center justify-between">
+        {/* Left: Icon + Name - aligned center */}
+        <div className="flex items-center gap-2">
+          <div className={`w-6 h-6 flex items-center justify-center rounded ${iconColor}`}>
+            <Disc3 className={`w-4 h-4 ${status === 'playing' ? 'animate-spin' : ''}`} />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-xl font-bold text-white break-words">
-              {roomBilling.roomName}
-            </h3>
-            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${isLocked ? 'bg-red-500/20 border border-red-500/50 text-red-400' : status.bg} mt-1`}>
-              {isLocked ? <PowerOff className="w-4 h-4" /> : status.icon}
-              {isLocked ? 'TERKUNCI' : status.text}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-start justify-end gap-2 shrink-0">
-          {/* Activation Button - only show when billing is enabled */}
-          {billingConfig.enabled && (
-            <button
-              onClick={handleToggleActive}
-              className={`p-2 rounded-lg transition-all duration-200 ${
-                roomBilling.isActive 
-                  ? 'bg-red-500/20 hover:bg-red-500/30 text-red-400' 
-                  : 'bg-green-500/20 hover:bg-green-500/30 text-green-400'
-              }`}
-              title={roomBilling.isActive ? 'Nonaktifkan Ruangan' : 'Aktifkan Ruangan'}
-            >
-              {roomBilling.isActive ? (
-                <PowerOff className="w-5 h-5" />
-              ) : (
-                <Power className="w-5 h-5" />
-              )}
-            </button>
-          )}
-          <div className="text-right min-w-[110px] max-w-[130px]">
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Total Tagihan</p>
-            <p className="text-2xl font-bold text-yellow-400 neon-text break-words">
-              {formatPrice(currentPrice)}
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Show music info only if active */}
-      {isLocked && (
-        <div className="mb-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-          <div className="flex items-center justify-center gap-2 text-gray-400">
-            <PowerOff className="w-5 h-5" />
-            <p className="text-sm font-medium">Ruangan terkunci - Aktifkan untuk memulai</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Show music info from player if available */}
-      {!isLocked && roomBilling.status === 'playing' && (
-        <div className="mb-4 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-          <div className="flex items-center gap-2 mb-1">
-            <Music className="w-4 h-4 text-purple-400" />
-            <p className="text-xs text-purple-400 uppercase tracking-wider">Sedang Diputar</p>
-          </div>
-          <p className="font-medium text-white truncate">
-            {roomBilling.roomName}
-          </p>
-        </div>
-      )}
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-auto">
-        <div className="flex items-center gap-3 p-3 bg-black/20 rounded-lg">
-          <Clock className="w-5 h-5 text-cyan-400" />
-          <div>
-            <p className="text-xs text-gray-400">Durasi</p>
-            <p className="font-bold text-white text-lg">
-              {formatDuration(displayDuration)}
-            </p>
-          </div>
+          <h3 className="text-sm font-semibold text-white">{roomBilling.roomName}</h3>
         </div>
         
-        <div className="flex items-center gap-3 p-3 bg-black/20 rounded-lg">
-          <Wallet className="w-5 h-5 text-pink-400" />
-          <div>
-            <p className="text-xs text-gray-400">Tarif</p>
-            <p className="font-bold text-white text-lg">
-              {formatPrice(pricePerHour)}
-            </p>
-            <p className="text-xs text-gray-500">per jam</p>
-          </div>
+        {/* Right: Button - same height as icon */}
+        {billingConfig.enabled && (
+          <button onClick={handleToggleActive} className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+            {roomBilling.isActive ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+          </button>
+        )}
+      </div>
+      
+      {/* Header - Row 2 */}
+      <div className="px-3 pb-2 flex items-center justify-between">
+        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>
+          {badgeText}
+        </span>
+        <div className="text-right">
+          <p className="text-[9px] text-gray-500 uppercase">Tagihan</p>
+          <p className="text-sm font-bold text-yellow-400">{formatPrice(currentPrice)}</p>
         </div>
       </div>
       
-      {roomBilling.startTime && (
-        <div className="mt-4 pt-4 border-t border-purple-500/20">
-          <p className="text-sm text-gray-400">
-            <span className="text-purple-400">Mulai:</span> {new Date(roomBilling.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      {/* Locked Message */}
+      {isLocked && (
+        <div className="px-3 pb-3">
+          <div className="py-2 px-3 bg-red-500/10 rounded border border-red-500/20 text-center">
+            <p className="text-[10px] text-red-400">Ruangan terkunci</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Info Rows */}
+      {!isLocked && (
+        <div className="px-3 pb-3 space-y-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="text-[10px] text-gray-400">Durasi:</span>
+            </div>
+            <span className="text-xs font-semibold text-white">{formatDuration(displayDuration)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Wallet className="w-3.5 h-3.5 text-pink-400" />
+              <span className="text-[10px] text-gray-400">Tarif:</span>
+            </div>
+            <span className="text-xs font-semibold text-white">{formatPrice(pricePerHour)}/jam</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Start Time */}
+      {roomBilling.startTime && !isLocked && (
+        <div className="px-3 pb-2 mt-auto border-t border-white/5">
+          <p className="text-[9px] text-gray-500">
+            <span className="text-purple-400">Mulai:</span> {new Date(roomBilling.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
           </p>
         </div>
       )}

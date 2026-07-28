@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
+import { Plus, X, Server } from 'lucide-react';
 
 export function AddRoomForm() {
   const addRoom = useRoomStore((state) => state.addRoom);
@@ -10,19 +11,8 @@ export function AddRoomForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!name.trim() || !ip.trim()) {
-      alert('Nama ruangan dan IP wajib diisi');
-      return;
-    }
-    
-    addRoom({
-      name: name.trim(),
-      ip: ip.trim(),
-      port: parseInt(port, 10) || 53331,
-    });
-    
-    // Reset form
+    if (!name.trim() || !ip.trim()) return;
+    addRoom({ name: name.trim(), ip: ip.trim(), port: parseInt(port, 10) || 53331 });
     setName('');
     setIp('');
     setPort('53331');
@@ -33,113 +23,61 @@ export function AddRoomForm() {
     return (
       <button
         onClick={() => setShowForm(true)}
-        className="btn btn-primary"
-        style={{
-          padding: '10px 20px',
-          fontSize: '14px',
-          borderRadius: '8px',
-        }}
+        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-colors"
       >
-        + Tambah Ruangan
+        <Plus className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Tambah Ruangan</span>
+        <span className="sm:hidden">Tambah</span>
       </button>
     );
   }
 
   return (
-    <div
-      style={{
-        background: '#fff',
-        padding: '20px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        marginBottom: '20px',
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: '16px' }}>Tambah Ruangan</h3>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>
-            Nama Ruangan *
-          </label>
+    <div className="bg-[#1a1a2e] rounded-lg border border-purple-500/30 p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Server className="w-4 h-4 text-purple-400" />
+          <h3 className="text-sm font-semibold text-white">Tambah Ruangan</h3>
+        </div>
+        <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-white">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Nama Ruangan *</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Contoh: Room 1, Ruang Tamu, dll"
-            style={{
-              width: '100%',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #ddd',
-              fontSize: '14px',
-            }}
+            placeholder="Room 1"
+            className="w-full px-3 py-2 bg-[#0a0a14] border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
           />
         </div>
-        
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>
-            IP Address *
-          </label>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">IP Address *</label>
           <input
             type="text"
             value={ip}
             onChange={(e) => setIp(e.target.value)}
-            placeholder="Contoh: 192.168.1.10"
-            style={{
-              width: '100%',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #ddd',
-              fontSize: '14px',
-            }}
+            placeholder="192.168.1.10"
+            className="w-full px-3 py-2 bg-[#0a0a14] border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
           />
         </div>
-        
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: 500 }}>
-            Port
-          </label>
+        <div>
+          <label className="block text-xs text-gray-400 mb-1">Port</label>
           <input
             type="number"
             value={port}
             onChange={(e) => setPort(e.target.value)}
-            placeholder="53331"
-            style={{
-              width: '100%',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #ddd',
-              fontSize: '14px',
-            }}
+            className="w-full px-3 py-2 bg-[#0a0a14] border border-gray-700 rounded-lg text-sm text-white focus:outline-none focus:border-purple-500"
           />
-          <small style={{ color: '#666' }}>Default: 53331</small>
         </div>
-        
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              borderRadius: '6px',
-            }}
-          >
+        <div className="flex gap-2 pt-2">
+          <button type="submit" className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
             Simpan
           </button>
-          <button
-            type="button"
-            onClick={() => setShowForm(false)}
-            className="btn"
-            style={{
-              padding: '10px 20px',
-              fontSize: '14px',
-              borderRadius: '6px',
-              background: '#f0f0f0',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
+          <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
             Batal
           </button>
         </div>
