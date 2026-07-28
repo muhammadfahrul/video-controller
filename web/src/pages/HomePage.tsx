@@ -5,12 +5,10 @@ import VolumeSlider from "../features/player/components/VolumeSlider";
 import CurrentVideo from "../features/player/components/CurrentVideo";
 import { useAppStore } from "../store/appStore";
 import { playerCommandService } from "../services";
-import { useAgent } from "../hooks/useAgent";
 import { usePlayer } from "../hooks/usePlayer";
 
 export default function HomePage(){
 
-    useAgent();
     usePlayer();
 
     const { agent, player } = useAppStore();

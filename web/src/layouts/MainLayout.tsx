@@ -5,8 +5,13 @@ import Footer from "./Footer";
 import FullPageLoading from "../shared/components/FullPageLoading";
 
 import { useAppStore } from "../store/appStore";
+import { useAgent } from "../hooks/useAgent";
 
 export default function MainLayout() {
+
+    // Initialize agent connection and state - must be called at layout level
+    // so socket listener is always active across all pages
+    useAgent();
 
     const globalLoading = useAppStore((state)=>state.globalLoading);
     const initialLoading = useAppStore((state)=>state.initialLoading);

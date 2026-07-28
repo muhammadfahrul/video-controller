@@ -3,7 +3,6 @@ import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
 import Pagination from "../shared/components/Pagination";
 import { useAppStore } from "../store/appStore";
-import { useAgent } from "../hooks/useAgent";
 import { usePlaylist } from "../hooks/usePlaylist";
 import { agentService } from "../services";
 import { searchService } from "../services/search";
@@ -11,7 +10,6 @@ import type { SearchResult } from "../features/search/types/SearchResult";
 
 export default function SearchPage(){
 
-    useAgent();
     usePlaylist();
 
     const [keyword, setKeyword] = useState("");
