@@ -10,7 +10,8 @@ export class SearchService {
 
     async search(
 
-        keyword: string
+        keyword: string,
+        signal?: AbortSignal
 
     ): Promise<SearchResult[]> {
 
@@ -18,7 +19,8 @@ export class SearchService {
 
             await fetch(
 
-                `${getServerUrl()}/api/search?keyword=${encodeURIComponent(keyword)}`
+                `${getServerUrl()}/api/search?keyword=${encodeURIComponent(keyword)}`,
+                { signal }
 
             );
 

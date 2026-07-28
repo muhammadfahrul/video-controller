@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Loader2, Play, Plus } from "lucide-react";
 import Card from "../../../shared/components/Card";
 import type { SearchResult } from "../types/SearchResult";
@@ -8,14 +9,16 @@ import { playerCommandService } from "../../../services/player";
 interface Props { result: SearchResult; }
 
 export default function SearchResultCard({ result }: Props) {
-    const { agent, playlist, setPlaylist, addingToPlaylist, setAddingToPlaylist, setProcessing, processing } = useAppStore();
+    const { agent, playlist, setPlaylist } = useAppStore();
+    const [localAdding, setLocalAdding] = useState(false);
+    const [localPlaying, setLocalPlaying] = useState(false);
     const disabled = !agent.id || !agent.online;
 
     const play = () => {
         if (disabled) return;
-        setProcessing("play", true);
+        setLocalPlaying(true);
         playerCommandService.openVideo(agent.id, result.videoId);
-        window.setTimeout(() => setProcessing("play", false), 500);
+        window.setTimeout(() => setLocalPlaying(false), 500);
     };
 
     const addPlaylist = () => {
@@ -38,7 +41,7 @@ export default function SearchResultCard({ result }: Props) {
             currentIndex: playlist.currentIndex === -1 ? 0 : playlist.currentIndex
         });
 
-        setAddingToPlaylist(true);
+        setLocalAdding(true);
         playerCommandService.addPlaylist(agent.id, {
             videoId: result.videoId,
             title: result.title,
@@ -46,7 +49,7 @@ export default function SearchResultCard({ result }: Props) {
             thumbnail: result.thumbnail,
             duration: result.duration
         });
-        window.setTimeout(() => setAddingToPlaylist(false), 500);
+        window.setTimeout(() => setLocalAdding(false), 500);
     };
 
     return (
@@ -57,12 +60,12 @@ export default function SearchResultCard({ result }: Props) {
                 <p className="mt-1 truncate text-sm text-slate-400">{result.channel}</p>
                 <p className="mt-1 text-xs font-medium text-teal-200">{result.duration}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" onClick={play} disabled={disabled || processing.play} className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-teal-300 px-3 text-sm font-semibold text-slate-950 transition ${disabled || processing.play ? "cursor-not-allowed opacity-45" : "hover:bg-teal-200"}`}>
-                        {processing.play ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
+                    <button type="button" onClick={play} disabled={disabled || localPlaying} className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-teal-300 px-3 text-sm font-semibold text-slate-950 transition ${disabled || localPlaying ? "cursor-not-allowed opacity-45" : "hover:bg-teal-200"}`}>
+                        {localPlaying ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} fill="currentColor" />}
                         Putar sekarang
                     </button>
-                    <button type="button" onClick={addPlaylist} disabled={disabled || addingToPlaylist} className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-teal-300/35 bg-teal-300/8 px-3 text-sm font-semibold text-teal-100 transition ${disabled || addingToPlaylist ? "cursor-not-allowed opacity-45" : "hover:bg-teal-300/16"}`}>
-                        {addingToPlaylist ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                    <button type="button" onClick={addPlaylist} disabled={disabled || localAdding} className={`inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-teal-300/35 bg-teal-300/8 px-3 text-sm font-semibold text-teal-100 transition ${disabled || localAdding ? "cursor-not-allowed opacity-45" : "hover:bg-teal-300/16"}`}>
+                        {localAdding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                         Tambah lagu
                     </button>
                 </div>

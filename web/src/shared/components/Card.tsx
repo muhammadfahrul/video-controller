@@ -1,14 +1,17 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-interface Props {
+interface Props extends ComponentPropsWithoutRef<"div"> {
     children: ReactNode;
     className?: string;
-    onClick?(): void;
 }
 
-export default function Card({ children, className = "", onClick }: Props) {
+export default function Card({ children, className = "", onClick, ...rest }: Props) {
     return (
-        <div onClick={onClick} className={`glass-card rounded-2xl border p-4 transition-colors ${onClick ? "cursor-pointer" : ""} ${className}`}>
+        <div
+            onClick={onClick}
+            className={`glass-card rounded-2xl border p-4 transition-colors ${onClick ? "cursor-pointer" : ""} ${className}`}
+            {...rest}
+        >
             {children}
         </div>
     );

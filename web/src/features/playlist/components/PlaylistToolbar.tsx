@@ -19,13 +19,13 @@ export default function PlaylistToolbar() {
 
     return (
         <div className="flex flex-wrap items-center gap-3 border-b border-white/8 pb-4">
-            <button type="button" onClick={() => command("shufflePlaylist", () => playerCommandService.shufflePlaylist(agent.id))} disabled={disabled || processing.shufflePlaylist} className={`${buttonClass} bg-white/[0.07] text-slate-100 hover:bg-white/[0.12]`}>
+            <button type="button" onClick={() => command("shufflePlaylist", () => playerCommandService.shufflePlaylist(agent.id))} disabled={disabled || processing.shufflePlaylist || playlist.items.length === 0} className={`${buttonClass} bg-white/[0.07] text-slate-100 hover:bg-white/[0.12]`}>
                 <Shuffle size={18} /> {processing.shufflePlaylist ? "Mengacak..." : "Acak"}
             </button>
             <button type="button" onClick={() => command("repeat", () => playerCommandService.repeat(agent.id, repeatMode))} disabled={disabled || processing.repeat} className={`${buttonClass} ${playlist.repeat === "OFF" ? "bg-white/[0.07] text-slate-200 hover:bg-white/[0.12]" : "bg-teal-300/12 text-teal-100"}`}>
                 {playlist.repeat === "ONE" ? <ListRestart size={16} /> : <Repeat size={16} />} {processing.repeat ? "Memuat..." : repeatLabel}
             </button>
-            <button type="button" onClick={() => command("clearPlaylist", () => playerCommandService.clearPlaylist(agent.id))} disabled={disabled || processing.clearPlaylist} className={`${buttonClass} ml-auto bg-rose-400/10 text-rose-200 hover:bg-rose-400/18`}>
+            <button type="button" onClick={() => command("clearPlaylist", () => playerCommandService.clearPlaylist(agent.id))} disabled={disabled || processing.clearPlaylist || playlist.items.length === 0} className={`${buttonClass} ml-auto bg-rose-400/10 text-rose-200 hover:bg-rose-400/18`}>
                 <Trash2 size={16} /> {processing.clearPlaylist ? "Menghapus..." : "Kosongkan"}
             </button>
         </div>

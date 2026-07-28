@@ -50,40 +50,43 @@ export function useAgent() {
 
         socketService.connect();
 
+        const handleAgentsUpdate = (agents: AgentDto[]) => {
+
+            if (agents.length === 0) {
+                
+                useAppStore.getState().loadAgent({
+
+                    id: "",
+
+                    name: "",
+
+                    online: false,
+
+                    lastHeartbeat: 0
+
+                });
+
+                return;
+
+            }
+
+            loadAgent(agents[0]);
+
+        };
+
         socketService.on<AgentDto[]>(
 
             "agents:update",
 
-            (agents) => {
-
-                if (agents.length === 0) {
-                    
-                    useAppStore.getState().loadAgent({
-
-                        id: "",
-
-                        name: "",
-
-                        online: false,
-
-                        lastHeartbeat: 0
-
-                    });
-
-                    return;
-
-                }
-
-                loadAgent(agents[0]);
-
-            }
+            handleAgentsUpdate
 
         );
 
         return () => {
 
             socketService.off(
-                "agents:update"
+                "agents:update",
+                handleAgentsUpdate
             );
 
         };

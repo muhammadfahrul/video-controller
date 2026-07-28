@@ -1,23 +1,36 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAppStore } from "../../../store/appStore";
 import { playerCommandService } from "../../../services/player";
 
 export default function ProgressBar() {
     const { player, agent } = useAppStore();
     const [dragValue, setDragValue] = useState<number | null>(null);
-    const localValue = dragValue ?? player.currentTime;
+    const isDragging = dragValue !== null;
+
+    // While dragging, show drag position; otherwise show server position
+    const localValue = isDragging ? dragValue : player.currentTime;
+
+    // Ref to hold latest localValue for use in async callbacks
+    const localValueRef = useRef(localValue);
+    localValueRef.current = localValue;
 
     const handleChangeEnd = () => {
+        const value = localValueRef.current;
         if (agent.online && agent.id && player.duration > 0) {
-            playerCommandService.seek(agent.id, localValue);
+            playerCommandService.seek(agent.id, value);
         }
+        // Small delay before resetting to avoid slider snapping back before server ack
+        setTimeout(() => setDragValue(null), 300);
     };
 
     return (
         <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-center justify-between text-xs font-medium text-slate-400">
                 <span>Posisi video</span>
-                <span className="text-slate-200">{formatTime(player.currentTime)} / {formatTime(player.duration)}</span>
+                {/* Use localValue during drag so time display is realtime, not server-lagged */}
+                <span className={`text-slate-200 transition-colors ${isDragging ? "text-teal-300" : ""}`}>
+                    {formatTime(localValue)} / {formatTime(player.duration)}
+                </span>
             </div>
             <input
                 type="range"
@@ -26,8 +39,9 @@ export default function ProgressBar() {
                 value={localValue}
                 disabled={!agent.online || player.duration <= 0}
                 onChange={(event) => setDragValue(Number(event.target.value))}
-                onMouseUp={() => { handleChangeEnd(); setDragValue(null); }}
-                onTouchEnd={() => { handleChangeEnd(); setDragValue(null); }}
+                onMouseUp={handleChangeEnd}
+                onTouchEnd={handleChangeEnd}
+                onKeyUp={handleChangeEnd}
                 className="w-full"
                 aria-label="Posisi video"
             />

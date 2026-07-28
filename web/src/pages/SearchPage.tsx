@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
 import Pagination from "../shared/components/Pagination";
@@ -18,6 +18,7 @@ export default function SearchPage(){
     const itemsPerPage = 5;
     
     const { setProcessing, agent } = useAppStore();
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const search = async () => {
         if (!keyword.trim()) {
@@ -30,19 +31,41 @@ export default function SearchPage(){
             return;
         }
 
+        // Cancel previous pending search request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         try {
             setLoading(true);
             setProcessing("search", true);
             setError("");
-            const response = await searchService.search(keyword);
+            const response = await searchService.search(keyword, controller.signal);
             setResults(response);
-        } catch {
+        } catch (err: any) {
+            if (err.name === "AbortError") {
+                return; // Ignore aborted requests
+            }
             setError("Search failed");
         } finally {
-            setLoading(false);
-            setProcessing("search", false);
+            if (abortControllerRef.current === controller) {
+                setLoading(false);
+                setProcessing("search", false);
+            }
         }
     };
+
+    // Abort pending requests when component unmounts
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
     // Reset to page 1 when search results change
     const handleSearch = async () => {

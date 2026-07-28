@@ -6,7 +6,7 @@ import CurrentVideo from "../features/player/components/CurrentVideo";
 import { useAppStore } from "../store/appStore";
 import { playerCommandService } from "../services";
 
-export default function HomePage(){
+export default function HomePage() {
 
     const { agent, player } = useAppStore();
 

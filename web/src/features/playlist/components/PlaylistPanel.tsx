@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PlaylistEmpty from "./PlaylistEmpty";
 import PlaylistItemCard from "./PlaylistItem";
 import Pagination from "../../../shared/components/Pagination";
@@ -33,7 +33,15 @@ export default function PlaylistPanel() {
     // Calculate pagination
     const totalItems = playlist.items.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
+    const activePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
+
+    const startIndex = (activePage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginatedItems = playlist.items.slice(startIndex, endIndex);
 
@@ -87,7 +95,7 @@ export default function PlaylistPanel() {
                     </div>
 
                     <Pagination
-                        currentPage={currentPage}
+                        currentPage={activePage}
                         totalPages={totalPages}
                         onPageChange={setCurrentPage}
                         itemsPerPage={itemsPerPage}
