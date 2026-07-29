@@ -156,6 +156,8 @@ export class SocketClient {
 
 
     private activationResolve?: (isActive: boolean) => void;
+    // Track if activation was already handled by setupActivationListener
+    private activationHandled = false;
     
     // Promise that resolves when room is activated
     public waitForActivation(): Promise<boolean> {
@@ -163,6 +165,14 @@ export class SocketClient {
             // If already active, resolve immediately
             if (this.identity.isActive) {
                 console.log("[SOCKET] Already active, resolving immediately");
+                resolve(true);
+                return;
+            }
+            
+            // Check if setupActivationListener already handled activation
+            // (handles race between register() and activation event)
+            if (this.identity.isActive) {
+                console.log("[SOCKET] Activation already handled, resolving immediately");
                 resolve(true);
                 return;
             }
@@ -184,6 +194,15 @@ export class SocketClient {
             };
             
             this.socket?.on("agent:activation", onActivation);
+            
+            // Double-check after a small delay in case event arrived while setting up
+            setTimeout(() => {
+                if (this.identity.isActive && !this.activationHandled) {
+                    this.activationHandled = true;
+                    resolve(true);
+                    this.socket?.off("agent:activation", onActivation);
+                }
+            }, 100);
         });
     }
 

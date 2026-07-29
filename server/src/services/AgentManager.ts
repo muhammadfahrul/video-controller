@@ -53,9 +53,12 @@ export class AgentManager {
 
         const now = Date.now();
 
+        // Create a snapshot to prevent iteration issues during concurrent modifications
+        const agents = [...this.registry.getAll()];
+
         let changed = false;
 
-        for (const agent of this.registry.getAll()) {
+        for (const agent of agents) {
 
             const diff = now - agent.lastHeartbeat;
 

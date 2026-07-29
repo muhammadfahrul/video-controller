@@ -175,7 +175,8 @@ export class SocketServer {
 
                         // Also update status - if was WAITING and still not active, keep WAITING
                         // otherwise set to ONLINE
-                        const agent = registry.get(data.id);
+                        // Use ref method for mutation
+                        const agent = registry.getRef(data.id);
                         if (agent) {
                             // If agent is waiting and not yet activated, keep as WAITING
                             // Otherwise set to ONLINE
@@ -367,7 +368,8 @@ export class SocketServer {
                         this.activatedRooms.set(data.roomId, true);
                         
                         const registry = this.manager.getRegistry();
-                        const agent = registry.getByRoomId(data.roomId);
+                        // Use ref method for mutation
+                        const agent = registry.getByRoomIdRef(data.roomId);
                         
                         // Calculate expiry time if duration is provided
                         const expiresAt = data.durationMinutes 
@@ -435,7 +437,8 @@ export class SocketServer {
                         
                         const registry = this.manager.getRegistry();
                         console.log("[SERVER] All registered agents:", Array.from(registry.getAll().map(a => ({ id: a.id, roomId: a.roomId, socketId: a.socketId }))));
-                        const agent = registry.getByRoomId(data.roomId);
+                        // Use ref method for mutation
+                        const agent = registry.getByRoomIdRef(data.roomId);
                         console.log("[SERVER] Found agent for room:", agent ? { id: agent.id, roomId: agent.roomId, socketId: agent.socketId } : "NOT FOUND");
                         
                         if (agent) {
@@ -506,7 +509,8 @@ export class SocketServer {
                         console.log("[SERVER] Cashier extends room time:", data);
                         
                         const registry = this.manager.getRegistry();
-                        const agent = registry.getByRoomId(data.roomId);
+                        // Use ref method for mutation
+                        const agent = registry.getByRoomIdRef(data.roomId);
                         
                         if (!agent) {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
@@ -707,7 +711,8 @@ export class SocketServer {
         this.activatedRooms.delete(roomId);
         
         const registry = this.manager.getRegistry();
-        const agent = registry.getByRoomId(roomId);
+        // Use ref method for mutation
+        const agent = registry.getByRoomIdRef(roomId);
         
         if (agent) {
             agent.isActive = false;

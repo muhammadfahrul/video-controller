@@ -86,4 +86,8 @@ export interface AgentInfo {
   isActive?: boolean;
   expiresAt?: number | null; // Timestamp when room expires
   startTime?: number | null; // Timestamp when room was activated (for billing)
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerNote?: string;
 }

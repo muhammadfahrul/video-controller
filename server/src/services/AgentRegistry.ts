@@ -127,7 +127,16 @@ export class AgentRegistry {
         id:string
     ){
 
-        return this.agents.get(id);
+        const agent = this.agents.get(id);
+        
+        if (!agent) return undefined;
+        
+        // Return clone to prevent external modification
+        return {
+            ...agent,
+            player: agent.player ? { ...agent.player } : undefined,
+            playlist: agent.playlist ? { ...agent.playlist, items: agent.playlist.items?.map(item => ({ ...item })) } : undefined
+        };
 
     }
 
@@ -137,9 +146,16 @@ export class AgentRegistry {
 
     getAll(){
 
-        return Array.from(
+        const agents = Array.from(
             this.agents.values()
         );
+
+        // Return deep clone to prevent external modification
+        return agents.map(agent => ({
+            ...agent,
+            player: agent.player ? { ...agent.player } : undefined,
+            playlist: agent.playlist ? { ...agent.playlist, items: agent.playlist.items?.map(item => ({ ...item })) } : undefined
+        }));
 
     }
 
@@ -239,7 +255,12 @@ export class AgentRegistry {
 
             if (agent.roomId === roomId) {
 
-                return agent;
+                // Return clone to prevent external modification
+                return {
+                    ...agent,
+                    player: agent.player ? { ...agent.player } : undefined,
+                    playlist: agent.playlist ? { ...agent.playlist, items: agent.playlist.items?.map(item => ({ ...item })) } : undefined
+                };
 
             }
 
@@ -247,5 +268,20 @@ export class AgentRegistry {
 
         return undefined;
 
+    }
+
+    // Internal method that returns the actual reference - use only for mutations
+    public getByRoomIdRef(roomId: string): AgentInfo | undefined {
+        for (const agent of this.agents.values()) {
+            if (agent.roomId === roomId) {
+                return agent;
+            }
+        }
+        return undefined;
+    }
+
+    // Internal method that returns the actual reference by ID - use only for mutations
+    public getRef(id: string): AgentInfo | undefined {
+        return this.agents.get(id);
     }
 }

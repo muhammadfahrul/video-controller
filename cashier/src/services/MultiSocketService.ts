@@ -10,6 +10,10 @@ interface RoomConnection {
   socket: Socket;
   config: RoomConfig;
   agents: AgentInfo[];
+  // Queue to process agent updates sequentially to prevent race conditions
+  agentUpdateQueue: Promise<void>;
+  // Track last update timestamp to handle out-of-order events
+  lastAgentUpdate: number;
 }
 
 class MultiSocketService {
@@ -41,12 +45,43 @@ class MultiSocketService {
       socket,
       config,
       agents: [],
+      agentUpdateQueue: Promise.resolve(),
+      lastAgentUpdate: 0,
     };
 
     this.setupSocketEvents(connection);
     this.connections.set(config.id, connection);
     this.notifyStatus(config.id, false);
     this.notifyUpdate();
+  }
+
+  // Helper to process agent updates sequentially to prevent race conditions
+  private async queueAgentUpdate(
+    connection: RoomConnection,
+    updateFn: (agent: AgentInfo, existingAgent: AgentInfo | undefined) => AgentInfo
+  ): Promise<void> {
+    // Chain to existing queue
+    connection.agentUpdateQueue = connection.agentUpdateQueue.then(async () => {
+      const now = Date.now();
+      const timestamp = now;
+      
+      // Get current state
+      const existingAgent = connection.agents[0];
+      
+      // Apply update
+      const newAgent = updateFn(existingAgent ? { ...existingAgent } : {} as AgentInfo, existingAgent);
+      
+      // Only update if this is newer than the last update (prevent stale updates)
+      if (timestamp >= connection.lastAgentUpdate) {
+        connection.agents = [newAgent];
+        connection.lastAgentUpdate = timestamp;
+        this.notifyUpdate();
+      } else {
+        console.log('[MultiSocket] Skipping stale agent update:', { timestamp, lastUpdate: connection.lastAgentUpdate });
+      }
+    });
+    
+    await connection.agentUpdateQueue;
   }
 
   // Remove a room connection
@@ -278,227 +313,270 @@ class MultiSocketService {
     // Listen for agent registration
     socket.on('agent:register', (newAgent: AgentInfo) => {
       console.log('[MultiSocket] Agent registered:', config.name, newAgent);
-      // Preserve billing-related data from existing agent if reconnecting
-      const existingAgent = connection.agents[0] as any;
-      if (existingAgent) {
-        if (existingAgent.startTime && !newAgent.startTime) {
-          newAgent.startTime = existingAgent.startTime;
+      this.queueAgentUpdate(connection, (agent, existingAgent) => {
+        // Merge new agent data with preservation of billing-related data
+        const merged = { ...agent, ...newAgent };
+        const existing = existingAgent as any;
+        
+        if (existing) {
+          if (existing.startTime && !merged.startTime) merged.startTime = existing.startTime;
+          if (existing.expiresAt && !merged.expiresAt) merged.expiresAt = existing.expiresAt;
+          if (existing.isActive && !merged.isActive) merged.isActive = existing.isActive;
+          // Preserve customer info
+          if (existing.customerName && !merged.customerName) merged.customerName = existing.customerName;
+          if (existing.customerPhone && !merged.customerPhone) merged.customerPhone = existing.customerPhone;
+          if (existing.customerEmail && !merged.customerEmail) merged.customerEmail = existing.customerEmail;
+          if (existing.customerNote && !merged.customerNote) merged.customerNote = existing.customerNote;
         }
-        if (existingAgent.expiresAt && !newAgent.expiresAt) {
-          newAgent.expiresAt = existingAgent.expiresAt;
-        }
-        if (existingAgent.isActive && !newAgent.isActive) {
-          newAgent.isActive = existingAgent.isActive;
-        }
-        // Preserve customer info
-        if (existingAgent.customerName && !(newAgent as any).customerName) (newAgent as any).customerName = existingAgent.customerName;
-        if (existingAgent.customerPhone && !(newAgent as any).customerPhone) (newAgent as any).customerPhone = existingAgent.customerPhone;
-        if (existingAgent.customerEmail && !(newAgent as any).customerEmail) (newAgent as any).customerEmail = existingAgent.customerEmail;
-        if (existingAgent.customerNote && !(newAgent as any).customerNote) (newAgent as any).customerNote = existingAgent.customerNote;
-      }
-      connection.agents = [newAgent];
-      this.notifyUpdate();
+        return merged;
+      });
     });
 
     // Listen for agent status updates
     socket.on('agent:status', (data: { agent: AgentInfo }) => {
-      // Preserve billing-related data - use later expiry, earlier startTime
-      const existingAgent = connection.agents[0] as any;
-      if (existingAgent) {
-        // Use later expiresAt (more time remaining)
-        if (existingAgent.expiresAt && (!data.agent.expiresAt || existingAgent.expiresAt > data.agent.expiresAt)) {
-          data.agent.expiresAt = existingAgent.expiresAt;
+      this.queueAgentUpdate(connection, (agent, existingAgent) => {
+        const merged = { ...agent, ...data.agent };
+        const existing = existingAgent as any;
+        
+        // Preserve billing data - use later expiry, earlier startTime
+        if (existing) {
+          if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
+            merged.expiresAt = existing.expiresAt;
+          }
+          if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
+            merged.startTime = existing.startTime;
+          }
+          if (existing.isActive) merged.isActive = existing.isActive;
+          if (existing.customerName) merged.customerName = existing.customerName;
+          if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
+          if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
+          if (existing.customerNote) merged.customerNote = existing.customerNote;
         }
-        // Use earlier startTime (first activation)
-        if (existingAgent.startTime && (!data.agent.startTime || existingAgent.startTime < data.agent.startTime)) {
-          data.agent.startTime = existingAgent.startTime;
-        }
-        if (existingAgent.isActive) data.agent.isActive = existingAgent.isActive;
-        if (existingAgent.customerName) (data.agent as any).customerName = existingAgent.customerName;
-        if (existingAgent.customerPhone) (data.agent as any).customerPhone = existingAgent.customerPhone;
-        if (existingAgent.customerEmail) (data.agent as any).customerEmail = existingAgent.customerEmail;
-        if (existingAgent.customerNote) (data.agent as any).customerNote = existingAgent.customerNote;
-      }
-      connection.agents = [data.agent];
-      this.notifyUpdate();
+        return merged;
+      });
     });
 
     // Listen for heartbeat updates
     socket.on('agent:heartbeat', (data: { agent: AgentInfo }) => {
-      // Preserve billing-related data - use later expiry, earlier startTime
-      const existingAgent = connection.agents[0] as any;
-      if (existingAgent) {
-        // Use later expiresAt (more time remaining)
-        if (existingAgent.expiresAt && (!data.agent.expiresAt || existingAgent.expiresAt > data.agent.expiresAt)) {
-          data.agent.expiresAt = existingAgent.expiresAt;
+      this.queueAgentUpdate(connection, (agent, existingAgent) => {
+        const merged = { ...agent, ...data.agent };
+        const existing = existingAgent as any;
+        
+        // Preserve billing data - use later expiry, earlier startTime
+        if (existing) {
+          if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
+            merged.expiresAt = existing.expiresAt;
+          }
+          if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
+            merged.startTime = existing.startTime;
+          }
+          if (existing.isActive) merged.isActive = existing.isActive;
+          if (existing.customerName) merged.customerName = existing.customerName;
+          if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
+          if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
+          if (existing.customerNote) merged.customerNote = existing.customerNote;
         }
-        // Use earlier startTime (first activation)
-        if (existingAgent.startTime && (!data.agent.startTime || existingAgent.startTime < data.agent.startTime)) {
-          data.agent.startTime = existingAgent.startTime;
-        }
-        if (existingAgent.isActive) data.agent.isActive = existingAgent.isActive;
-        if (existingAgent.customerName) (data.agent as any).customerName = existingAgent.customerName;
-        if (existingAgent.customerPhone) (data.agent as any).customerPhone = existingAgent.customerPhone;
-        if (existingAgent.customerEmail) (data.agent as any).customerEmail = existingAgent.customerEmail;
-        if (existingAgent.customerNote) (data.agent as any).customerNote = existingAgent.customerNote;
-      }
-      connection.agents = [data.agent];
-      this.notifyUpdate();
+        return merged;
+      });
     });
 
     // Listen for player state updates
     socket.on('player:state', (data: { roomId: string; player: PlayerState }) => {
-      if (connection.agents[0]) {
-        connection.agents[0].player = data.player;
-        this.notifyUpdate();
-      }
+      this.queueAgentUpdate(connection, (agent, existingAgent) => {
+        if (existingAgent) {
+          existingAgent.player = data.player;
+          return existingAgent;
+        }
+        return { ...agent, player: data.player } as AgentInfo;
+      });
     });
 
     // Listen for bulk agent list
     socket.on('agents:update', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents update for room:', config.name, agents);
-      // Don't overwrite billing-related data from agents:update - rely on room:activation for that
-      // Just update basic agent info - use later expiry, earlier startTime
-      for (let i = 0; i < agents.length; i++) {
-        const incomingAgent = agents[i];
-        const existingAgent = connection.agents[i] as any;
-        if (incomingAgent && existingAgent) {
-          const existingExpiresAt = existingAgent.expiresAt;
-          const incomingExpiresAt = incomingAgent.expiresAt;
-          // Use later expiresAt (more time remaining)
-          if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
-            incomingAgent.expiresAt = existingExpiresAt;
-          }
-          // Use earlier startTime (first activation)
-          const existingStartTime = existingAgent.startTime;
-          const incomingStartTime = incomingAgent.startTime;
-          if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
-            incomingAgent.startTime = existingStartTime;
-          }
-          if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
-          // Preserve customer info
-          if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
-          if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
-          if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
-          if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+      
+      // Use queue to process updates sequentially
+      const now = Date.now();
+      const timestamp = now;
+      
+      connection.agentUpdateQueue = connection.agentUpdateQueue.then(async () => {
+        // Skip if there's a newer update waiting
+        if (timestamp < connection.lastAgentUpdate) {
+          console.log('[MultiSocket] Skipping stale agents:update');
+          return;
         }
-      }
-      connection.agents = agents;
-      this.notifyUpdate();
+        
+        // Merge with existing billing data
+        for (let i = 0; i < agents.length; i++) {
+          const incomingAgent = agents[i];
+          const existingAgent = connection.agents[i] as any;
+          if (incomingAgent && existingAgent) {
+            const existingExpiresAt = existingAgent.expiresAt;
+            const incomingExpiresAt = incomingAgent.expiresAt;
+            // Use later expiresAt (more time remaining)
+            if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+              incomingAgent.expiresAt = existingExpiresAt;
+            }
+            // Use earlier startTime (first activation)
+            const existingStartTime = existingAgent.startTime;
+            const incomingStartTime = incomingAgent.startTime;
+            if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+              incomingAgent.startTime = existingStartTime;
+            }
+            if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
+            // Preserve customer info
+            if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+            if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+            if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+            if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+          }
+        }
+        
+        connection.agents = agents;
+        connection.lastAgentUpdate = timestamp;
+        this.notifyUpdate();
+      });
     });
 
     socket.on('agents:list', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents list for room:', config.name, agents);
-      // Don't overwrite billing-related data from agents:list - rely on room:activation for that
-      // Use later expiry, earlier startTime
-      for (let i = 0; i < agents.length; i++) {
-        const incomingAgent = agents[i];
-        const existingAgent = connection.agents[i] as any;
-        if (incomingAgent && existingAgent) {
-          const existingExpiresAt = existingAgent.expiresAt;
-          const incomingExpiresAt = incomingAgent.expiresAt;
-          // Use later expiresAt (more time remaining)
-          if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
-            incomingAgent.expiresAt = existingExpiresAt;
-          }
-          // Use earlier startTime (first activation)
-          const existingStartTime = existingAgent.startTime;
-          const incomingStartTime = incomingAgent.startTime;
-          if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
-            incomingAgent.startTime = existingStartTime;
-          }
-          if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
-          // Preserve customer info
-          if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
-          if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
-          if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
-          if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+      
+      // Use queue to process updates sequentially
+      const now = Date.now();
+      const timestamp = now;
+      
+      connection.agentUpdateQueue = connection.agentUpdateQueue.then(async () => {
+        // Skip if there's a newer update waiting
+        if (timestamp < connection.lastAgentUpdate) {
+          console.log('[MultiSocket] Skipping stale agents:list');
+          return;
         }
-      }
-      connection.agents = agents;
-      this.notifyUpdate();
+        
+        // Merge with existing billing data
+        for (let i = 0; i < agents.length; i++) {
+          const incomingAgent = agents[i];
+          const existingAgent = connection.agents[i] as any;
+          if (incomingAgent && existingAgent) {
+            const existingExpiresAt = existingAgent.expiresAt;
+            const incomingExpiresAt = incomingAgent.expiresAt;
+            // Use later expiresAt (more time remaining)
+            if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+              incomingAgent.expiresAt = existingExpiresAt;
+            }
+            // Use earlier startTime (first activation)
+            const existingStartTime = existingAgent.startTime;
+            const incomingStartTime = incomingAgent.startTime;
+            if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+              incomingAgent.startTime = existingStartTime;
+            }
+            if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
+            // Preserve customer info
+            if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+            if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+            if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+            if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+          }
+        }
+        
+        connection.agents = agents;
+        connection.lastAgentUpdate = timestamp;
+        this.notifyUpdate();
+      });
     });
 
     // Listen for room activation updates (includes expiry info)
     socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string }) => {
       console.log('[MultiSocket] Room activation update:', config.name, data);
       
-      // Check if room was previously active and is now inactive (auto-deactivate)
-      const wasActive = connection.agents[0]?.isActive === true;
+      // Capture state BEFORE queuing for transaction recording
+      const existingAgent = connection.agents[0];
+      const wasActive = existingAgent?.isActive === true;
       const isNowInactive = data.isActive === false;
       
-      if (connection.agents[0]) {
-        // Record transaction if room goes from active to inactive (auto-deactivate)
-        if (wasActive && isNowInactive) {
-          const agent = connection.agents[0] as any;
-          const pricePerHour = 50000;
-          const startTime = agent.startTime || 0;
-          const endTime = Date.now();
-          const durationSeconds = Math.floor((endTime - startTime) / 1000);
-          const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
-          
-          console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
+      // Record transaction BEFORE queue (to capture current state)
+      if (existingAgent && wasActive && isNowInactive) {
+        const agent = existingAgent as any;
+        const pricePerHour = 50000;
+        const startTime = agent.startTime || 0;
+        const endTime = Date.now();
+        const durationSeconds = Math.floor((endTime - startTime) / 1000);
+        const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
+        
+        console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
+          roomId: data.roomId,
+          roomName: data.roomName || config.name,
+          startTime,
+          endTime,
+          duration: durationSeconds,
+          totalPrice,
+          customerName: agent.customerName
+        });
+        
+        if (startTime > 0 && durationSeconds > 0) {
+          useTransactionStore.getState().addTransaction({
             roomId: data.roomId,
             roomName: data.roomName || config.name,
+            customerName: agent.customerName,
+            customerPhone: agent.customerPhone,
+            customerEmail: agent.customerEmail,
+            customerNote: agent.customerNote,
             startTime,
             endTime,
             duration: durationSeconds,
+            pricePerHour,
             totalPrice,
-            customerName: agent.customerName
+            paidAt: endTime,
           });
-          
-          if (startTime > 0 && durationSeconds > 0) {
-            useTransactionStore.getState().addTransaction({
-              roomId: data.roomId,
-              roomName: data.roomName || config.name,
-              customerName: agent.customerName,
-              customerPhone: agent.customerPhone,
-              customerEmail: agent.customerEmail,
-              customerNote: agent.customerNote,
-              startTime,
-              endTime,
-              duration: durationSeconds,
-              pricePerHour,
-              totalPrice,
-              paidAt: endTime,
-            });
-          }
         }
-        
-        connection.agents[0].isActive = data.isActive;
+      }
+      
+      // Use queue for state update
+      this.queueAgentUpdate(connection, (agent, existing) => {
+        const merged = { ...agent, isActive: data.isActive };
+        const existingData = existing as any;
         
         // Use later expiresAt (more time remaining) - authoritative source from server
-        const currentExpiresAt = connection.agents[0].expiresAt;
+        const currentExpiresAt = merged.expiresAt;
         const newExpiresAt = data.expiresAt ?? null;
         if (!currentExpiresAt || (newExpiresAt && newExpiresAt > currentExpiresAt)) {
-          connection.agents[0].expiresAt = newExpiresAt;
+          merged.expiresAt = newExpiresAt;
         }
         
         // Use earlier startTime (first activation)
-        const currentStartTime = connection.agents[0].startTime;
         if (data.startTime && data.isActive) {
-          if (!currentStartTime || data.startTime < currentStartTime) {
-            connection.agents[0].startTime = data.startTime;
+          if (!merged.startTime || data.startTime < merged.startTime) {
+            merged.startTime = data.startTime;
           }
         }
         
-        // Store customer info
-        const agent = connection.agents[0] as any;
-        if (data.customerName) agent.customerName = data.customerName;
-        if (data.customerPhone) agent.customerPhone = data.customerPhone;
-        if (data.customerEmail) agent.customerEmail = data.customerEmail;
-        if (data.customerNote) agent.customerNote = data.customerNote;
-        this.notifyUpdate();
-      }
+        // Preserve existing customer info if not provided in update
+        if (existingData) {
+          if (!data.customerName && existingData.customerName) merged.customerName = existingData.customerName;
+          if (!data.customerPhone && existingData.customerPhone) merged.customerPhone = existingData.customerPhone;
+          if (!data.customerEmail && existingData.customerEmail) merged.customerEmail = existingData.customerEmail;
+          if (!data.customerNote && existingData.customerNote) merged.customerNote = existingData.customerNote;
+        }
+        
+        // Override with new customer info if provided
+        if (data.customerName) (merged as any).customerName = data.customerName;
+        if (data.customerPhone) (merged as any).customerPhone = data.customerPhone;
+        if (data.customerEmail) (merged as any).customerEmail = data.customerEmail;
+        if (data.customerNote) (merged as any).customerNote = data.customerNote;
+        
+        return merged;
+      });
     });
 
     // Listen for expiry warnings
     socket.on('room:expiry-warning', (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => {
       console.log('[MultiSocket] Expiry warning:', config.name, data);
-      if (connection.agents[0]) {
-        connection.agents[0].expiresAt = data.expiresAt;
-        this.notifyUpdate();
-      }
+      this.queueAgentUpdate(connection, (agent, existingAgent) => {
+        if (existingAgent) {
+          existingAgent.expiresAt = data.expiresAt;
+          return existingAgent;
+        }
+        return { ...agent, expiresAt: data.expiresAt } as AgentInfo;
+      });
       // Emit warning event for UI
       this.expiryWarningCallbacks.forEach(cb => cb(data));
     });
