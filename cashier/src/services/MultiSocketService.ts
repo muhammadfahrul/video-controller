@@ -218,22 +218,40 @@ class MultiSocketService {
     // Listen for bulk agent list
     socket.on('agents:update', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents update for room:', config.name, agents);
+      // Preserve startTime from existing agents
+      for (let i = 0; i < agents.length; i++) {
+        const existingAgent = connection.agents[i];
+        if (existingAgent?.startTime) {
+          agents[i].startTime = existingAgent.startTime;
+        }
+      }
       connection.agents = agents;
       this.notifyUpdate();
     });
 
     socket.on('agents:list', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents list for room:', config.name, agents);
+      // Preserve startTime from existing agents
+      for (let i = 0; i < agents.length; i++) {
+        const existingAgent = connection.agents[i];
+        if (existingAgent?.startTime) {
+          agents[i].startTime = existingAgent.startTime;
+        }
+      }
       connection.agents = agents;
       this.notifyUpdate();
     });
 
     // Listen for room activation updates (includes expiry info)
-    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string }) => {
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number }) => {
       console.log('[MultiSocket] Room activation update:', config.name, data);
       if (connection.agents[0]) {
         connection.agents[0].isActive = data.isActive;
         connection.agents[0].expiresAt = data.expiresAt ?? null;
+        // Store start time on the agent for billing calculation
+        if (data.startTime && data.isActive) {
+          connection.agents[0].startTime = data.startTime;
+        }
         this.notifyUpdate();
       }
     });
@@ -255,13 +273,16 @@ class MultiSocketService {
     const roomName = agent.roomName || config.name;
 
     let status: 'idle' | 'playing' | 'paused' = 'idle';
-    let startTime: number | null = null;
+    let startTime: number | null = agent.startTime ?? null;
     let currentDuration = 0;
 
     // Determine status from agent
     if (agent.status === 'PLAYING' || agent.player?.state === 'playing') {
       status = 'playing';
-      startTime = Date.now();
+      // Only set startTime to now if not already set (for timer-based billing)
+      if (!startTime) {
+        startTime = Date.now();
+      }
       currentDuration = agent.player?.currentTime || 0;
     } else if (agent.status === 'PAUSED' || agent.player?.state === 'paused') {
       status = 'paused';

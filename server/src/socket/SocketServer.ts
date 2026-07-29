@@ -387,11 +387,13 @@ export class SocketServer {
                         }
                         
                         // Broadcast activation to all clients
+                        const startTime = Date.now();
                         this.io.emit("room:activation", {
                             roomId: data.roomId,
                             roomName: data.roomName,
                             isActive: true,
-                            expiresAt: expiresAt
+                            expiresAt: expiresAt,
+                            startTime: startTime
                         });
                     }
                 );
