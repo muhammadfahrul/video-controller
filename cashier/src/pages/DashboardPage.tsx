@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { RoomCard } from '../components/RoomCard';
-import { Tv, Zap, Users, TrendingUp, Wifi, WifiOff, Server } from 'lucide-react';
+import { Tv, TrendingUp, Wifi, WifiOff, Server, CircleDot } from 'lucide-react';
 
 export default function DashboardPage() {
   const { roomConfigs, connectionStatus, setRoomConnected } = useRoomStore();
@@ -43,8 +43,8 @@ export default function DashboardPage() {
 
   const stats = [
     { label: 'Ruangan', value: roomConfigs.length, icon: Tv, color: 'blue' },
-    { label: 'Aktif', value: activeRooms, icon: Zap, color: 'green' },
-    { label: 'Online', value: connectedRooms, icon: Users, color: 'cyan' },
+    { label: 'Aktif', value: activeRooms, icon: CircleDot, color: 'green' },
+    { label: 'Online', value: connectedRooms, icon: Wifi, color: 'cyan' },
     { label: 'Pendapatan', value: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalRevenue), icon: TrendingUp, color: 'yellow', isFormatted: true }
   ];
 
