@@ -77,13 +77,13 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const pricePerHour = 50000;
   const currentPrice = Math.round((totalSeconds / 3600) * pricePerHour);
   
-  const isLocked = billingConfig.enabled ? !roomBilling.isActive : false;
+  const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;
   
-  const borderColor = isLocked ? 'border-l-red-500' : status === 'playing' ? 'border-l-green-500' : status === 'paused' ? 'border-l-yellow-500' : 'border-l-gray-500';
-  const iconColor = status === 'playing' ? 'text-green-400 bg-green-500/20' : status === 'paused' ? 'text-yellow-400 bg-yellow-500/20' : 'text-gray-400 bg-gray-500/20';
-  const badgeColor = isLocked ? 'bg-red-500/20 text-red-400' : status === 'playing' ? 'bg-green-500/20 text-green-400' : status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400';
-  const badgeText = isLocked ? 'TERKUNCI' : status === 'playing' ? 'DIPUTAR' : status === 'paused' ? 'DIJEDA' : 'TIDAK AKTIF';
+  const borderColor = !roomBilling.isConnected ? 'border-l-red-500' : roomBilling.isActive ? 'border-l-blue-500' : 'border-l-gray-500';
+  const iconColor = !roomBilling.isConnected ? 'text-red-400 bg-red-500/20' : roomBilling.isActive ? 'text-blue-400 bg-blue-500/20' : 'text-gray-400 bg-gray-500/20';
+  const badgeColor = !roomBilling.isConnected ? 'bg-red-500/20 text-red-400' : roomBilling.isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400';
+  const badgeText = !roomBilling.isConnected ? 'OFFLINE' : roomBilling.isActive ? 'AKTIF' : 'ONLINE';
   
   return (
     <div className={`bg-[#1a1a2e] rounded-lg border-l-4 flex flex-col ${borderColor} ${isLocked ? 'opacity-60' : ''} hover:brightness-110 transition-all`}>
@@ -98,7 +98,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         </div>
         
         {/* Right: Button - same height as icon */}
-        {billingConfig.enabled && (
+        {billingConfig.enabled && roomBilling.isConnected && (
           <button onClick={handleToggleActive} className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
             {roomBilling.isActive ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
           </button>
@@ -122,32 +122,13 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       {isLocked && (
         <div className="px-3 pb-3">
           <div className="py-2 px-3 bg-red-500/10 rounded border border-red-500/20 text-center">
-            <p className="text-[10px] text-red-400">Ruangan terkunci</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Duration Input (only when not active) */}
-      {!roomBilling.isActive && billingConfig.enabled && (
-        <div className="px-3 pb-2">
-          <div className="flex items-center gap-2">
-            <Timer className="w-3.5 h-3.5 text-orange-400" />
-            <input
-              type="number"
-              min="1"
-              max="24"
-              placeholder="Jam"
-              value={durationInput}
-              onChange={(e) => setDurationInput(e.target.value)}
-              className="w-16 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
-            />
-            <span className="text-[10px] text-gray-500">(opsional)</span>
+            <p className="text-[10px] text-red-400">Ruangan tidak terhubung</p>
           </div>
         </div>
       )}
       
       {/* Info Rows */}
-      {!isLocked && (
+      {!isLocked && roomBilling.isActive && (
         <div className="px-3 pb-3 space-y-1">
           {isTimerBased && countdown !== null && (
             <div className="flex items-center justify-between">
@@ -173,11 +154,30 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       )}
       
       {/* Start Time */}
-      {roomBilling.startTime && !isLocked && (
+      {roomBilling.startTime && !isLocked && roomBilling.isActive && (
         <div className="px-3 pb-2 mt-auto border-t border-white/5">
           <p className="text-[9px] text-gray-500">
             <span className="text-purple-400">Mulai:</span> {new Date(roomBilling.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
           </p>
+        </div>
+      )}
+      
+      {/* Duration Input (only when not active and connected) */}
+      {!roomBilling.isActive && !isLocked && billingConfig.enabled && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2">
+            <Timer className="w-3.5 h-3.5 text-orange-400" />
+            <input
+              type="number"
+              min="1"
+              max="24"
+              placeholder="Jam"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              className="w-16 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+            />
+            <span className="text-[10px] text-gray-500">(opsional)</span>
+          </div>
         </div>
       )}
     </div>

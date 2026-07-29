@@ -161,6 +161,7 @@ class MultiSocketService {
             pricePerHour: 50000,
             isActive: false,
             expiresAt: null,
+            isConnected: connection.socket.connected,
           };
 
       billings.set(roomId, billing);
@@ -303,6 +304,7 @@ class MultiSocketService {
       pricePerHour,
       isActive: agent.isActive ?? false,
       expiresAt: agent.expiresAt ?? null,
+      isConnected: true, // Agent exists = connected
     };
   }
 
