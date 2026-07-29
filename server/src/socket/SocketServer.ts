@@ -140,6 +140,8 @@ export class SocketServer {
 
                             isActive: initialActive,
                             
+                            startTime: null,
+                            
                             expiresAt: null
 
                         });
@@ -383,6 +385,7 @@ export class SocketServer {
                         if (agent) {
                             agent.isActive = true;
                             agent.expiresAt = expiresAt;
+                            agent.startTime = Date.now(); // Store start time
                             // Store customer info
                             Object.assign(agent, customerInfo);
                             
@@ -476,10 +479,74 @@ export class SocketServer {
                             // Update registry with empty state to ensure web PWA and API get cleared data
                             registry.updateSnapshot(agent.id, emptyPlayerState);
                             
+                            // Clear customer info
+                            (agent as any).customerName = undefined;
+                            (agent as any).customerPhone = undefined;
+                            (agent as any).customerEmail = undefined;
+                            (agent as any).customerNote = undefined;
+                            
                             this.broadcastAgents(registry.getAll());
                         } else {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
+                    }
+                );
+
+                // Extend room time
+                socket.on(
+                    SocketEvents.CASHIER_EXTEND_TIME,
+                    (data: { roomId: string; additionalMinutes: number }) => {
+                        console.log("[SERVER] Cashier extends room time:", data);
+                        
+                        const registry = this.manager.getRegistry();
+                        const agent = registry.getByRoomId(data.roomId);
+                        
+                        if (!agent) {
+                            console.log("[SERVER] Agent not found for room:", data.roomId);
+                            return;
+                        }
+                        
+                        if (!agent.isActive) {
+                            console.log("[SERVER] Room is not active:", data.roomId);
+                            return;
+                        }
+                        
+                        // Calculate new expiry time
+                        const currentExpiresAt = agent.expiresAt || Date.now();
+                        const additionalMs = data.additionalMinutes * 60 * 1000;
+                        const newExpiresAt = currentExpiresAt + additionalMs;
+                        
+                        agent.expiresAt = newExpiresAt;
+                        
+                        console.log("[SERVER] New expiry time:", new Date(newExpiresAt).toISOString());
+                        
+                        // Reset the auto-expiry timer with the new duration
+                        const remainingMs = newExpiresAt - Date.now();
+                        const remainingMinutes = remainingMs / 60000; // Keep as float for precision
+                        if (remainingMinutes > 0) {
+                            this.setupRoomTimer(data.roomId, remainingMinutes, agent.socketId);
+                        }
+                        
+                        // Notify the agent
+                        this.io.to(agent.socketId).emit("agent:activation", {
+                            isActive: true,
+                            expiresAt: newExpiresAt
+                        });
+                        
+                        // Broadcast update to all clients
+                        this.io.emit("room:activation", {
+                            roomId: agent.roomId,
+                            roomName: agent.roomName,
+                            isActive: true,
+                            expiresAt: newExpiresAt,
+                            startTime: agent.startTime,
+                            customerName: (agent as any).customerName,
+                            customerPhone: (agent as any).customerPhone,
+                            customerEmail: (agent as any).customerEmail,
+                            customerNote: (agent as any).customerNote,
+                        });
+                        
+                        this.broadcastAgents(registry.getAll());
                     }
                 );
 

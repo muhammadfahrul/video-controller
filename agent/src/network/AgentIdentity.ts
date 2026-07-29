@@ -23,6 +23,7 @@ export interface AgentIdentity {
     customerPhone?: string;
     customerEmail?: string;
     customerNote?: string;
+    expiresAt?: number;
 
 
 }

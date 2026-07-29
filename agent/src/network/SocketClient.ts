@@ -205,6 +205,12 @@ export class SocketClient {
                 console.log("Room activation updated:", data);
                 this.identity.isActive = data.isActive;
                 
+                // Set expiresAt if provided
+                if (data.expiresAt) {
+                    this.identity.expiresAt = data.expiresAt;
+                    console.log("[SOCKET] Expiry time set:", new Date(data.expiresAt).toISOString());
+                }
+                
                 // Set customer info if provided
                 if (data.customerName) {
                     this.identity.customerName = data.customerName;

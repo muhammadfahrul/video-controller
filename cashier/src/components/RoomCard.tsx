@@ -18,6 +18,7 @@ function formatPrice(price: number): string {
 
 export function RoomCard({ roomBilling }: RoomCardProps) {
   const [durationInput, setDurationInput] = useState('');
+  const [extendTimeInput, setExtendTimeInput] = useState('');
   const [customerNameInput, setCustomerNameInput] = useState('');
   const [customerPhoneInput, setCustomerPhoneInput] = useState('');
   const [customerEmailInput, setCustomerEmailInput] = useState('');
@@ -59,20 +60,28 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       setCustomerEmailInput('');
       setCustomerNoteInput('');
     } else {
-      const hours = durationInput ? parseInt(durationInput, 10) : undefined;
-      const duration = hours ? hours * 60 : undefined;
+      const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
       const customerName = customerNameInput.trim() || undefined;
       const customerPhone = customerPhoneInput.trim() || undefined;
       const customerEmail = customerEmailInput.trim() || undefined;
       const customerNote = customerNoteInput.trim() || undefined;
       
-      if (hours && hours > 0) {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, duration, customerName, customerPhone, customerEmail, customerNote);
+      if (minutes && minutes > 0) {
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote);
       } else {
         await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote);
       }
       setDurationInput('');
     }
+  };
+  
+  const handleExtendTime = async () => {
+    const minutes = extendTimeInput ? parseInt(extendTimeInput, 10) : undefined;
+    if (!minutes || minutes <= 0) {
+      return;
+    }
+    await multiSocketService.extendTime(roomBilling.roomId, minutes);
+    setExtendTimeInput('');
   };
   
   // Format countdown to MM:SS or HH:MM:SS
@@ -197,6 +206,32 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         </div>
       )}
       
+      {/* Extend Time (only when active) */}
+      {roomBilling.isActive && !isLocked && billingConfig.enabled && (
+        <div className="px-3 pb-2 space-y-2 border-t border-white/5">
+          <p className="text-[10px] text-gray-500 font-medium">Tambah Waktu</p>
+          <div className="flex items-center gap-2">
+            <Timer className="w-3.5 h-3.5 text-green-400 shrink-0" />
+            <input
+              type="number"
+              min="1"
+              max="480"
+              placeholder="Menit"
+              value={extendTimeInput}
+              onChange={(e) => setExtendTimeInput(e.target.value)}
+              className="w-20 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-green-500"
+            />
+            <button
+              onClick={handleExtendTime}
+              disabled={!extendTimeInput || parseInt(extendTimeInput, 10) <= 0}
+              className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-medium rounded hover:bg-green-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Tambah
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Duration Input (only when not active and connected) */}
       {!roomBilling.isActive && !isLocked && billingConfig.enabled && (
         <div className="px-3 pb-2 space-y-2">
@@ -254,13 +289,13 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             <input
               type="number"
               min="1"
-              max="24"
-              placeholder="Jam"
+              max="480"
+              placeholder="Menit"
               value={durationInput}
               onChange={(e) => setDurationInput(e.target.value)}
-              className="w-16 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+              className="w-20 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
             />
-            <span className="text-[10px] text-gray-500">(opsional)</span>
+            <span className="text-[10px] text-gray-500">(menit)</span>
           </div>
         </div>
       )}

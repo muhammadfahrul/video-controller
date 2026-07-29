@@ -154,6 +154,35 @@ class MultiSocketService {
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
   }
 
+  // Extend room time
+  async extendTime(roomId: string, additionalMinutes: number): Promise<void> {
+    console.log('[MultiSocket] extendTime called with roomId:', roomId, 'additionalMinutes:', additionalMinutes);
+    
+    let connection: RoomConnection | undefined;
+    
+    for (const conn of this.connections.values()) {
+      if (conn.agents[0]?.roomId === roomId || conn.config.id === roomId) {
+        connection = conn;
+        break;
+      }
+    }
+    
+    if (!connection) {
+      console.error('[MultiSocket] Cannot find connection for room:', roomId);
+      return;
+    }
+    
+    if (!connection.socket.connected) {
+      console.error('[MultiSocket] Cannot extend time - not connected:', roomId);
+      return;
+    }
+
+    const agentRoomId = connection.agents[0]?.roomId || roomId;
+    console.log('[MultiSocket] Emitting extend-time with roomId:', agentRoomId, 'additionalMinutes:', additionalMinutes);
+    connection.socket.emit('cashier:extend-time', { roomId: agentRoomId, additionalMinutes });
+    console.log('[MultiSocket] Extended time for room:', roomId, '-> agentRoomId:', agentRoomId, 'minutes:', additionalMinutes);
+  }
+
   // Get all room billings
   getRoomBillings(): Map<string, RoomBilling> {
     const billings = new Map<string, RoomBilling>();
@@ -202,20 +231,72 @@ class MultiSocketService {
     });
 
     // Listen for agent registration
-    socket.on('agent:register', (agent: AgentInfo) => {
-      console.log('[MultiSocket] Agent registered:', config.name, agent);
-      connection.agents = [agent];
+    socket.on('agent:register', (newAgent: AgentInfo) => {
+      console.log('[MultiSocket] Agent registered:', config.name, newAgent);
+      // Preserve billing-related data from existing agent if reconnecting
+      const existingAgent = connection.agents[0] as any;
+      if (existingAgent) {
+        if (existingAgent.startTime && !newAgent.startTime) {
+          newAgent.startTime = existingAgent.startTime;
+        }
+        if (existingAgent.expiresAt && !newAgent.expiresAt) {
+          newAgent.expiresAt = existingAgent.expiresAt;
+        }
+        if (existingAgent.isActive && !newAgent.isActive) {
+          newAgent.isActive = existingAgent.isActive;
+        }
+        // Preserve customer info
+        if (existingAgent.customerName && !(newAgent as any).customerName) (newAgent as any).customerName = existingAgent.customerName;
+        if (existingAgent.customerPhone && !(newAgent as any).customerPhone) (newAgent as any).customerPhone = existingAgent.customerPhone;
+        if (existingAgent.customerEmail && !(newAgent as any).customerEmail) (newAgent as any).customerEmail = existingAgent.customerEmail;
+        if (existingAgent.customerNote && !(newAgent as any).customerNote) (newAgent as any).customerNote = existingAgent.customerNote;
+      }
+      connection.agents = [newAgent];
       this.notifyUpdate();
     });
 
     // Listen for agent status updates
     socket.on('agent:status', (data: { agent: AgentInfo }) => {
+      // Preserve billing-related data - use later expiry, earlier startTime
+      const existingAgent = connection.agents[0] as any;
+      if (existingAgent) {
+        // Use later expiresAt (more time remaining)
+        if (existingAgent.expiresAt && (!data.agent.expiresAt || existingAgent.expiresAt > data.agent.expiresAt)) {
+          data.agent.expiresAt = existingAgent.expiresAt;
+        }
+        // Use earlier startTime (first activation)
+        if (existingAgent.startTime && (!data.agent.startTime || existingAgent.startTime < data.agent.startTime)) {
+          data.agent.startTime = existingAgent.startTime;
+        }
+        if (existingAgent.isActive) data.agent.isActive = existingAgent.isActive;
+        if (existingAgent.customerName) (data.agent as any).customerName = existingAgent.customerName;
+        if (existingAgent.customerPhone) (data.agent as any).customerPhone = existingAgent.customerPhone;
+        if (existingAgent.customerEmail) (data.agent as any).customerEmail = existingAgent.customerEmail;
+        if (existingAgent.customerNote) (data.agent as any).customerNote = existingAgent.customerNote;
+      }
       connection.agents = [data.agent];
       this.notifyUpdate();
     });
 
     // Listen for heartbeat updates
     socket.on('agent:heartbeat', (data: { agent: AgentInfo }) => {
+      // Preserve billing-related data - use later expiry, earlier startTime
+      const existingAgent = connection.agents[0] as any;
+      if (existingAgent) {
+        // Use later expiresAt (more time remaining)
+        if (existingAgent.expiresAt && (!data.agent.expiresAt || existingAgent.expiresAt > data.agent.expiresAt)) {
+          data.agent.expiresAt = existingAgent.expiresAt;
+        }
+        // Use earlier startTime (first activation)
+        if (existingAgent.startTime && (!data.agent.startTime || existingAgent.startTime < data.agent.startTime)) {
+          data.agent.startTime = existingAgent.startTime;
+        }
+        if (existingAgent.isActive) data.agent.isActive = existingAgent.isActive;
+        if (existingAgent.customerName) (data.agent as any).customerName = existingAgent.customerName;
+        if (existingAgent.customerPhone) (data.agent as any).customerPhone = existingAgent.customerPhone;
+        if (existingAgent.customerEmail) (data.agent as any).customerEmail = existingAgent.customerEmail;
+        if (existingAgent.customerNote) (data.agent as any).customerNote = existingAgent.customerNote;
+      }
       connection.agents = [data.agent];
       this.notifyUpdate();
     });
@@ -231,11 +312,30 @@ class MultiSocketService {
     // Listen for bulk agent list
     socket.on('agents:update', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents update for room:', config.name, agents);
-      // Preserve startTime from existing agents
+      // Don't overwrite billing-related data from agents:update - rely on room:activation for that
+      // Just update basic agent info - use later expiry, earlier startTime
       for (let i = 0; i < agents.length; i++) {
-        const existingAgent = connection.agents[i];
-        if (existingAgent?.startTime) {
-          agents[i].startTime = existingAgent.startTime;
+        const incomingAgent = agents[i];
+        const existingAgent = connection.agents[i] as any;
+        if (incomingAgent && existingAgent) {
+          const existingExpiresAt = existingAgent.expiresAt;
+          const incomingExpiresAt = incomingAgent.expiresAt;
+          // Use later expiresAt (more time remaining)
+          if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+            incomingAgent.expiresAt = existingExpiresAt;
+          }
+          // Use earlier startTime (first activation)
+          const existingStartTime = existingAgent.startTime;
+          const incomingStartTime = incomingAgent.startTime;
+          if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+            incomingAgent.startTime = existingStartTime;
+          }
+          if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
+          // Preserve customer info
+          if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+          if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+          if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+          if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
         }
       }
       connection.agents = agents;
@@ -244,11 +344,30 @@ class MultiSocketService {
 
     socket.on('agents:list', (agents: AgentInfo[]) => {
       console.log('[MultiSocket] Agents list for room:', config.name, agents);
-      // Preserve startTime from existing agents
+      // Don't overwrite billing-related data from agents:list - rely on room:activation for that
+      // Use later expiry, earlier startTime
       for (let i = 0; i < agents.length; i++) {
-        const existingAgent = connection.agents[i];
-        if (existingAgent?.startTime) {
-          agents[i].startTime = existingAgent.startTime;
+        const incomingAgent = agents[i];
+        const existingAgent = connection.agents[i] as any;
+        if (incomingAgent && existingAgent) {
+          const existingExpiresAt = existingAgent.expiresAt;
+          const incomingExpiresAt = incomingAgent.expiresAt;
+          // Use later expiresAt (more time remaining)
+          if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+            incomingAgent.expiresAt = existingExpiresAt;
+          }
+          // Use earlier startTime (first activation)
+          const existingStartTime = existingAgent.startTime;
+          const incomingStartTime = incomingAgent.startTime;
+          if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+            incomingAgent.startTime = existingStartTime;
+          }
+          if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
+          // Preserve customer info
+          if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+          if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+          if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+          if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
         }
       }
       connection.agents = agents;
@@ -260,11 +379,22 @@ class MultiSocketService {
       console.log('[MultiSocket] Room activation update:', config.name, data);
       if (connection.agents[0]) {
         connection.agents[0].isActive = data.isActive;
-        connection.agents[0].expiresAt = data.expiresAt ?? null;
-        // Store start time on the agent for billing calculation
-        if (data.startTime && data.isActive) {
-          connection.agents[0].startTime = data.startTime;
+        
+        // Use later expiresAt (more time remaining) - authoritative source from server
+        const currentExpiresAt = connection.agents[0].expiresAt;
+        const newExpiresAt = data.expiresAt ?? null;
+        if (!currentExpiresAt || (newExpiresAt && newExpiresAt > currentExpiresAt)) {
+          connection.agents[0].expiresAt = newExpiresAt;
         }
+        
+        // Use earlier startTime (first activation)
+        const currentStartTime = connection.agents[0].startTime;
+        if (data.startTime && data.isActive) {
+          if (!currentStartTime || data.startTime < currentStartTime) {
+            connection.agents[0].startTime = data.startTime;
+          }
+        }
+        
         // Store customer info
         const agent = connection.agents[0] as any;
         if (data.customerName) agent.customerName = data.customerName;

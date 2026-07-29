@@ -44,6 +44,10 @@ export enum SocketEvents {
 
 
 
+    CASHIER_EXTEND_TIME = "cashier:extend-time",
+
+
+
     AGENT_CLEAR_DATA = "agent:clear-data"
 
 }
