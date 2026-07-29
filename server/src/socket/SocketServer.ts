@@ -350,7 +350,15 @@ export class SocketServer {
                 // Cashier room activation/deactivation
                 socket.on(
                     SocketEvents.CASHIER_ACTIVATE_ROOM,
-                    (data: { roomId: string; roomName: string; durationMinutes?: number }) => {
+                    (data: { 
+                        roomId: string; 
+                        roomName: string; 
+                        durationMinutes?: number; 
+                        customerName?: string;
+                        customerPhone?: string;
+                        customerEmail?: string;
+                        customerNote?: string;
+                    }) => {
                         console.log("[SERVER] Cashier activates room:", data);
                         
                         // Store activation state - persists across reconnections
@@ -364,9 +372,20 @@ export class SocketServer {
                             ? Date.now() + (data.durationMinutes * 60 * 1000) 
                             : null;
                         
+                        // Prepare customer info object
+                        const customerInfo = {
+                            customerName: data.customerName,
+                            customerPhone: data.customerPhone,
+                            customerEmail: data.customerEmail,
+                            customerNote: data.customerNote,
+                        };
+                        
                         if (agent) {
                             agent.isActive = true;
                             agent.expiresAt = expiresAt;
+                            // Store customer info
+                            Object.assign(agent, customerInfo);
+                            
                             // Change status from WAITING to ONLINE when activated
                             if (agent.status === "WAITING") {
                                 agent.status = "ONLINE";
@@ -374,7 +393,8 @@ export class SocketServer {
                             // Notify the specific agent with expiry info
                             this.io.to(agent.socketId).emit("agent:activation", { 
                                 isActive: true,
-                                expiresAt: expiresAt
+                                expiresAt: expiresAt,
+                                ...customerInfo
                             });
                             this.broadcastAgents(registry.getAll());
                         } else {
@@ -393,7 +413,8 @@ export class SocketServer {
                             roomName: data.roomName,
                             isActive: true,
                             expiresAt: expiresAt,
-                            startTime: startTime
+                            startTime: startTime,
+                            ...customerInfo
                         });
                     }
                 );

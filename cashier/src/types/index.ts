@@ -35,6 +35,10 @@ export interface RoomBilling {
   isActive: boolean; // apakah ruangan sudah diaktifkan oleh cashier
   expiresAt: number | null; // Timestamp when room expires (null if no duration set)
   isConnected: boolean; // apakah socket terhubung ke server
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerNote?: string;
 }
 
 // Match server's PlayerState

@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
-import { Clock, Wallet, Disc3, Power, PowerOff, Timer } from 'lucide-react';
+import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -18,6 +18,10 @@ function formatPrice(price: number): string {
 
 export function RoomCard({ roomBilling }: RoomCardProps) {
   const [durationInput, setDurationInput] = useState('');
+  const [customerNameInput, setCustomerNameInput] = useState('');
+  const [customerPhoneInput, setCustomerPhoneInput] = useState('');
+  const [customerEmailInput, setCustomerEmailInput] = useState('');
+  const [customerNoteInput, setCustomerNoteInput] = useState('');
   
   // Countdown timer for expiry
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -50,13 +54,22 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     if (roomBilling.isActive) {
       await multiSocketService.deactivateRoom(roomBilling.roomId);
       setDurationInput('');
+      setCustomerNameInput('');
+      setCustomerPhoneInput('');
+      setCustomerEmailInput('');
+      setCustomerNoteInput('');
     } else {
       const hours = durationInput ? parseInt(durationInput, 10) : undefined;
-      const duration = hours ? hours * 60 : undefined; // Convert hours to minutes
+      const duration = hours ? hours * 60 : undefined;
+      const customerName = customerNameInput.trim() || undefined;
+      const customerPhone = customerPhoneInput.trim() || undefined;
+      const customerEmail = customerEmailInput.trim() || undefined;
+      const customerNote = customerNoteInput.trim() || undefined;
+      
       if (hours && hours > 0) {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, duration);
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, duration, customerName, customerPhone, customerEmail, customerNote);
       } else {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote);
       }
       setDurationInput('');
     }
@@ -153,20 +166,91 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         </div>
       )}
       
-      {/* Start Time */}
-      {roomBilling.startTime && !isLocked && roomBilling.isActive && (
-        <div className="px-3 pb-2 mt-auto border-t border-white/5">
-          <p className="text-[9px] text-gray-500">
-            <span className="text-purple-400">Mulai:</span> {new Date(roomBilling.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-          </p>
+      {/* Start Time & Customer Info */}
+      {(roomBilling.startTime || roomBilling.customerName || roomBilling.customerPhone || roomBilling.customerEmail || roomBilling.customerNote) && !isLocked && roomBilling.isActive && (
+        <div className="px-3 pb-2 mt-auto border-t border-white/5 space-y-1">
+          {roomBilling.customerName && (
+            <p className="text-[9px] text-gray-500">
+              <span className="text-purple-400">Pelanggan:</span> {roomBilling.customerName}
+            </p>
+          )}
+          {roomBilling.customerPhone && (
+            <p className="text-[9px] text-gray-500">
+              <span className="text-purple-400">HP:</span> {roomBilling.customerPhone}
+            </p>
+          )}
+          {roomBilling.customerEmail && (
+            <p className="text-[9px] text-gray-500">
+              <span className="text-purple-400">Email:</span> {roomBilling.customerEmail}
+            </p>
+          )}
+          {roomBilling.customerNote && (
+            <p className="text-[9px] text-gray-500">
+              <span className="text-purple-400">Catatan:</span> {roomBilling.customerNote}
+            </p>
+          )}
+          {roomBilling.startTime && (
+            <p className="text-[9px] text-gray-500">
+              <span className="text-purple-400">Mulai:</span> {new Date(roomBilling.startTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
         </div>
       )}
       
       {/* Duration Input (only when not active and connected) */}
       {!roomBilling.isActive && !isLocked && billingConfig.enabled && (
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-2 space-y-2">
+          {/* Customer Name Input */}
           <div className="flex items-center gap-2">
-            <Timer className="w-3.5 h-3.5 text-orange-400" />
+            <User className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Nama"
+              value={customerNameInput}
+              onChange={(e) => setCustomerNameInput(e.target.value)}
+              className="flex-1 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          
+          {/* Customer Phone Input */}
+          <div className="flex items-center gap-2">
+            <Phone className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <input
+              type="tel"
+              placeholder="No. HP"
+              value={customerPhoneInput}
+              onChange={(e) => setCustomerPhoneInput(e.target.value)}
+              className="flex-1 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          
+          {/* Customer Email Input */}
+          <div className="flex items-center gap-2">
+            <Mail className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <input
+              type="email"
+              placeholder="Email"
+              value={customerEmailInput}
+              onChange={(e) => setCustomerEmailInput(e.target.value)}
+              className="flex-1 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          
+          {/* Customer Note Input */}
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Catatan"
+              value={customerNoteInput}
+              onChange={(e) => setCustomerNoteInput(e.target.value)}
+              className="flex-1 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+          
+          {/* Duration Input */}
+          <div className="flex items-center gap-2">
+            <Timer className="w-3.5 h-3.5 text-orange-400 shrink-0" />
             <input
               type="number"
               min="1"

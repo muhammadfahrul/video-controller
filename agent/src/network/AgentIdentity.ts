@@ -19,6 +19,12 @@ export interface AgentIdentity {
     isActive: boolean;
 
 
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    customerNote?: string;
+
+
 }
 
 export class AgentIdentityProvider {
@@ -62,9 +68,12 @@ export class AgentIdentityProvider {
     }
 
 
-    setActive(active: boolean) {
+    setActive(active: boolean, customerName?: string) {
 
         this.identity.isActive = active;
+        if (customerName !== undefined) {
+            this.identity.customerName = customerName;
+        }
 
     }
 

@@ -194,9 +194,34 @@ export class SocketClient {
         
         this.socket?.on(
             "agent:activation",
-            async (data: { isActive: boolean }) => {
+            async (data: { 
+                isActive: boolean; 
+                expiresAt?: number; 
+                customerName?: string;
+                customerPhone?: string;
+                customerEmail?: string;
+                customerNote?: string;
+            }) => {
                 console.log("Room activation updated:", data);
                 this.identity.isActive = data.isActive;
+                
+                // Set customer info if provided
+                if (data.customerName) {
+                    this.identity.customerName = data.customerName;
+                    console.log("[SOCKET] Customer name set:", data.customerName);
+                }
+                if (data.customerPhone) {
+                    this.identity.customerPhone = data.customerPhone;
+                    console.log("[SOCKET] Customer phone set:", data.customerPhone);
+                }
+                if (data.customerEmail) {
+                    this.identity.customerEmail = data.customerEmail;
+                    console.log("[SOCKET] Customer email set:", data.customerEmail);
+                }
+                if (data.customerNote) {
+                    this.identity.customerNote = data.customerNote;
+                    console.log("[SOCKET] Customer note set:", data.customerNote);
+                }
                 
                 // Resolve the activation promise (for waiting agent)
                 if (this.activationResolve) {

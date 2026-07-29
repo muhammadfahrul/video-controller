@@ -70,8 +70,16 @@ class MultiSocketService {
   }
 
   // Activate a specific room - finds connection by roomId (from agent)
-  async activateRoom(roomId: string, roomName: string, durationMinutes?: number): Promise<void> {
-    console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes);
+  async activateRoom(
+    roomId: string, 
+    roomName: string, 
+    durationMinutes?: number, 
+    customerName?: string,
+    customerPhone?: string,
+    customerEmail?: string,
+    customerNote?: string
+  ): Promise<void> {
+    console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
     
     let connection: RoomConnection | undefined;
@@ -99,9 +107,13 @@ class MultiSocketService {
     connection.socket.emit('cashier:activate-room', { 
       roomId: agentRoomId, 
       roomName,
-      durationMinutes: durationMinutes ?? undefined
+      durationMinutes: durationMinutes ?? undefined,
+      customerName: customerName ?? undefined,
+      customerPhone: customerPhone ?? undefined,
+      customerEmail: customerEmail ?? undefined,
+      customerNote: customerNote ?? undefined,
     });
-    console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId, 'duration:', durationMinutes);
+    console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId, 'duration:', durationMinutes, 'customerName:', customerName);
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
@@ -244,7 +256,7 @@ class MultiSocketService {
     });
 
     // Listen for room activation updates (includes expiry info)
-    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number }) => {
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string }) => {
       console.log('[MultiSocket] Room activation update:', config.name, data);
       if (connection.agents[0]) {
         connection.agents[0].isActive = data.isActive;
@@ -253,6 +265,12 @@ class MultiSocketService {
         if (data.startTime && data.isActive) {
           connection.agents[0].startTime = data.startTime;
         }
+        // Store customer info
+        const agent = connection.agents[0] as any;
+        if (data.customerName) agent.customerName = data.customerName;
+        if (data.customerPhone) agent.customerPhone = data.customerPhone;
+        if (data.customerEmail) agent.customerEmail = data.customerEmail;
+        if (data.customerNote) agent.customerNote = data.customerNote;
         this.notifyUpdate();
       }
     });
@@ -294,6 +312,7 @@ class MultiSocketService {
     const pricePerHour = 50000;
     const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
 
+    const agentAny = agent as any;
     return {
       roomId,
       roomName,
@@ -305,6 +324,10 @@ class MultiSocketService {
       isActive: agent.isActive ?? false,
       expiresAt: agent.expiresAt ?? null,
       isConnected: true, // Agent exists = connected
+      customerName: agentAny.customerName,
+      customerPhone: agentAny.customerPhone,
+      customerEmail: agentAny.customerEmail,
+      customerNote: agentAny.customerNote,
     };
   }
 
