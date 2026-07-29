@@ -2,7 +2,7 @@
 
 export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'PLAYING' | 'PAUSED' | 'WAITING';
 
-// Room configuration - stored in localStorage
+// Room configuration - loaded from VITE_ROOMS environment variable
 export interface RoomConfig {
   id: string;
   name: string;

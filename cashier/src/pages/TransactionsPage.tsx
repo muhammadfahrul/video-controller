@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { multiSocketService } from '../services/MultiSocketService';
 import { Receipt, Search, Calendar, Trash2, Clock, User, Phone, Mail, FileText } from 'lucide-react';
 
 function formatPrice(price: number): string {
@@ -65,6 +66,7 @@ export default function TransactionsPage() {
             onClick={() => {
               if (confirm('Hapus semua riwayat transaksi?')) {
                 clearTransactions();
+                multiSocketService.clearTransactions();
               }
             }}
             className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded"
@@ -181,7 +183,10 @@ export default function TransactionsPage() {
               
               {/* Delete button */}
               <button
-                onClick={() => removeTransaction(transaction.id)}
+                onClick={() => {
+                  removeTransaction(transaction.id);
+                  multiSocketService.deleteTransaction(transaction.id);
+                }}
                 className="mt-2 w-full py-1 text-xs text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center gap-1"
               >
                 <Trash2 className="w-3 h-3" />

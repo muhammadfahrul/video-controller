@@ -18,6 +18,11 @@ import {
 } from "../services/AgentManager";
 
 
+import {
+    DatabaseService
+} from "../services/DatabaseService";
+
+
 
 export class SocketServer {
 
@@ -30,6 +35,9 @@ export class SocketServer {
 
 
     private readonly billingEnabled: boolean;
+
+
+    private readonly database: DatabaseService;
 
 
     // Track activated rooms - persists even after agent disconnects
@@ -46,13 +54,17 @@ export class SocketServer {
     constructor(
         server: HttpServer,
         manager: AgentManager,
-        billingEnabled: boolean = true
+        billingEnabled: boolean = true,
+        database?: DatabaseService
     ){
 
         this.manager =
             manager;
 
         this.billingEnabled = billingEnabled;
+
+        // Initialize database if not provided
+        this.database = database || new DatabaseService();
 
         this.io =
             new Server(
@@ -68,6 +80,56 @@ export class SocketServer {
 
         this.setup();
 
+    }
+
+    public async initialize(): Promise<void> {
+        await this.database.initialize();
+        console.log("[SOCKET SERVER] Database initialized");
+    }
+
+    private async savePlayerState(agentId: string, player: any): Promise<void> {
+        try {
+            await this.database.savePlayer(agentId, player);
+        } catch (error) {
+            console.error("[SOCKET SERVER] Error saving player state:", error);
+        }
+    }
+
+    private async savePlaylistState(agentId: string, playlist: any): Promise<void> {
+        try {
+            await this.database.savePlaylist(agentId, playlist);
+        } catch (error) {
+            console.error("[SOCKET SERVER] Error saving playlist state:", error);
+        }
+    }
+
+    private async loadAgentData(agentId: string): Promise<{player?: any, playlist?: any} | null> {
+        try {
+            const data = await this.database.getAgentData(agentId);
+            if (data) {
+                return {
+                    player: data.player,
+                    playlist: data.playlist
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error("[SOCKET SERVER] Error loading agent data:", error);
+            return null;
+        }
+    }
+
+    private async loadAndSendAgentData(socketId: string, agentId: string): Promise<void> {
+        const data = await this.loadAgentData(agentId);
+        if (data) {
+            console.log(`[SOCKET SERVER] Sending saved data to agent ${agentId}`);
+            if (data.player) {
+                this.io.to(socketId).emit(SocketEvents.PLAYER_STATE, { agentId, player: data.player });
+            }
+            if (data.playlist) {
+                this.io.to(socketId).emit(SocketEvents.PLAYLIST_STATE, data.playlist);
+            }
+        }
     }
 
 
@@ -150,6 +212,9 @@ export class SocketServer {
                         if (initialActive && data.roomId) {
                             this.io.to(socket.id).emit("agent:activation", { isActive: true });
                         }
+
+                        // Load saved player/playlist data from database and send to agent
+                        this.loadAndSendAgentData(socket.id, data.id);
 
                         this.broadcastAgents(
                             registry.getAll()
@@ -261,7 +326,7 @@ export class SocketServer {
 
                     SocketEvents.PLAYER_STATE,
 
-                    (payload)=>{
+                    async (payload)=>{
 
 
                         console.log(
@@ -295,7 +360,10 @@ export class SocketServer {
 
                         );
 
-
+                        // Save to database
+                        if (payload.agentId && payload.player) {
+                            await this.savePlayerState(payload.agentId, payload.player);
+                        }
 
                         this.io.emit(
 
@@ -314,7 +382,7 @@ export class SocketServer {
 
                     SocketEvents.PLAYLIST_STATE,
 
-                    (snapshot) => {
+                    async (snapshot) => {
 
                         console.log(
 
@@ -323,6 +391,14 @@ export class SocketServer {
                             snapshot
 
                         );
+
+                        // Get agentId from socket handshake query
+                        const agentId = socket.handshake.query?.agentId as string || snapshot.agentId;
+                        
+                        // Save to database
+                        if (agentId && snapshot) {
+                            await this.savePlaylistState(agentId, snapshot);
+                        }
 
                         this.io.emit(
 
@@ -558,6 +634,60 @@ export class SocketServer {
                         });
                         
                         this.broadcastAgents(registry.getAll());
+                    }
+                );
+
+                // Transaction handlers
+                socket.on(
+                    SocketEvents.TRANSACTION_SAVE,
+                    async (transaction) => {
+                        console.log("[SERVER] Saving transaction:", transaction.id);
+                        try {
+                            await this.database.saveTransaction(transaction);
+                            // Broadcast to all connected cashiers
+                            this.io.emit(SocketEvents.TRANSACTION_GET, await this.database.getTransactions());
+                        } catch (error) {
+                            console.error("[SOCKET SERVER] Error saving transaction:", error);
+                        }
+                    }
+                );
+
+                socket.on(
+                    SocketEvents.TRANSACTION_GET,
+                    async () => {
+                        console.log("[SERVER] Sending transactions");
+                        try {
+                            const transactions = await this.database.getTransactions();
+                            socket.emit(SocketEvents.TRANSACTION_GET, transactions);
+                        } catch (error) {
+                            console.error("[SOCKET SERVER] Error getting transactions:", error);
+                        }
+                    }
+                );
+
+                socket.on(
+                    SocketEvents.TRANSACTION_DELETE,
+                    async (transactionId: string) => {
+                        console.log("[SERVER] Deleting transaction:", transactionId);
+                        try {
+                            await this.database.deleteTransaction(transactionId);
+                            this.io.emit(SocketEvents.TRANSACTION_GET, await this.database.getTransactions());
+                        } catch (error) {
+                            console.error("[SOCKET SERVER] Error deleting transaction:", error);
+                        }
+                    }
+                );
+
+                socket.on(
+                    SocketEvents.TRANSACTION_CLEAR,
+                    async () => {
+                        console.log("[SERVER] Clearing all transactions");
+                        try {
+                            await this.database.clearTransactions();
+                            this.io.emit(SocketEvents.TRANSACTION_GET, []);
+                        } catch (error) {
+                            console.error("[SOCKET SERVER] Error clearing transactions:", error);
+                        }
                     }
                 );
 

@@ -1,89 +1,45 @@
-import path from "path";
-
-import { JsonStorage } from "../persistence/JsonStorage";
-
 import type { PlayerPersistence } from "../types/PlayerPersistence";
+
+// NOTE: Data is now stored in server database, not local file
+// This repository is kept for interface compatibility but no longer persists to disk
 
 export class PlayerRepository {
 
-    private storage =
-
-        new JsonStorage<PlayerPersistence>(
-
-            path.join(
-
-                process.cwd(),
-
-                "data",
-
-                "player.json"
-
-            ),
-
-            {
-
-                player: {
-
-                    playing: false,
-
-                    currentTime: 0,
-
-                    duration: 0,
-
-                    volume: 100,
-
-                    muted: false,
-
-                    fullscreen: false,
-
-                    videoId: ""
-
-                }
-
-            }
-
-        );
+    // In-memory storage only (server handles persistence)
+    private data: PlayerPersistence = {
+        player: {
+            playing: false,
+            currentTime: 0,
+            duration: 0,
+            volume: 100,
+            muted: false,
+            fullscreen: false,
+            videoId: ""
+        }
+    };
 
     load() {
-
-        return this.storage.load();
-
+        return Promise.resolve(this.data);
     }
 
     save(
-
         data: PlayerPersistence
-
     ) {
-
-        return this.storage.save(data);
-
+        this.data = data;
+        return Promise.resolve();
     }
 
     clear() {
-
-        return this.storage.save({
-
+        return this.save({
             player: {
-
                 playing: false,
-
                 currentTime: 0,
-
                 duration: 0,
-
                 volume: 100,
-
                 muted: false,
-
                 fullscreen: false,
-
                 videoId: ""
-
             }
-
         });
-
     }
-
 }

@@ -48,6 +48,22 @@ export enum SocketEvents {
 
 
 
-    AGENT_CLEAR_DATA = "agent:clear-data"
+    AGENT_CLEAR_DATA = "agent:clear-data",
+
+
+
+    TRANSACTION_SAVE = "transaction:save",
+
+
+
+    TRANSACTION_GET = "transaction:get",
+
+
+
+    TRANSACTION_DELETE = "transaction:delete",
+
+
+
+    TRANSACTION_CLEAR = "transaction:clear"
 
 }

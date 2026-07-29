@@ -93,6 +93,9 @@ export class SocketClient {
                 // Register immediately after connection
                 this.register();
 
+                // Set up listener for receiving player state from server (for database restore)
+                this.setupDatabaseRestoreListener();
+
                 // Wait for activation after registering
                 this.waitForActivation().then(isActive => {
                     if (isActive) {
@@ -274,6 +277,46 @@ export class SocketClient {
 
         // Set up clear data listener
         this.setupClearDataListener();
+    }
+
+    // Listen for player/playlist data restored from server database
+    private setupDatabaseRestoreListener() {
+        this.socket?.off(SocketEvents.PLAYER_STATE);
+        
+        this.socket?.on(
+            SocketEvents.PLAYER_STATE,
+            async (payload: { agentId?: string; player?: any }) => {
+                // Only handle if we receive player data (not when we send)
+                // Check if this is a restore response (no video playing)
+                if (payload.player && payload.player.videoId && payload.player.videoId !== "") {
+                    console.log("[SOCKET] Received player state from server (restore):", payload.player);
+                    
+                    // Restore player state using PlayerService
+                    if (this.playerService) {
+                        await this.playerService.restoreState(payload.player);
+                        console.log("[SOCKET] Player state restored from server");
+                    }
+                }
+            }
+        );
+
+        this.socket?.off(SocketEvents.PLAYLIST_STATE);
+        
+        this.socket?.on(
+            SocketEvents.PLAYLIST_STATE,
+            async (payload: any) => {
+                // Only handle if we receive playlist data (not when we send)
+                if (payload && payload.items && payload.items.length > 0) {
+                    console.log("[SOCKET] Received playlist state from server (restore):", payload);
+                    
+                    // Restore playlist state using PlaylistService
+                    if (this.playlistService) {
+                        await this.playlistService.restoreState(payload);
+                        console.log("[SOCKET] Playlist state restored from server");
+                    }
+                }
+            }
+        );
     }
 
     private setupClearDataListener() {

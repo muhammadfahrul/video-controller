@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { RoomConfig } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 
@@ -18,17 +17,6 @@ interface RoomStore {
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 9);
-
-// Helper to ensure connectionStatus is always a Map
-function normalizeConnectionStatus(status: unknown): Map<string, boolean> {
-  if (status instanceof Map) {
-    return status;
-  }
-  if (status && typeof status === 'object') {
-    return new Map(Object.entries(status as Record<string, boolean>));
-  }
-  return new Map();
-}
 
 // Load rooms from .env
 function loadRoomsFromEnv(): RoomConfig[] {
@@ -52,75 +40,66 @@ function loadRoomsFromEnv(): RoomConfig[] {
 }
 
 export const useRoomStore = create<RoomStore>()(
-  persist(
-    (set, get) => ({
-      // Always initialize from .env - never from storage
-      roomConfigs: loadRoomsFromEnv(),
-      connectionStatus: new Map(),
+  (set, get) => ({
+    // Always initialize from .env - never from storage
+    roomConfigs: loadRoomsFromEnv(),
+    connectionStatus: new Map(),
+    
+    addRoom: (config) => {
+      const id = generateId();
+      const newConfig: RoomConfig = { ...config, id };
       
-      addRoom: (config) => {
-        const id = generateId();
-        const newConfig: RoomConfig = { ...config, id };
-        
-        set((state) => ({
-          roomConfigs: [...state.roomConfigs, newConfig],
-        }));
-        
-        // Connect to the room server
-        multiSocketService.addRoom(newConfig);
-      },
+      set((state) => ({
+        roomConfigs: [...state.roomConfigs, newConfig],
+      }));
       
-      removeRoom: (roomId) => {
-        set((state) => ({
-          roomConfigs: state.roomConfigs.filter(r => r.id !== roomId),
-        }));
-        
-        multiSocketService.removeRoom(roomId);
-      },
+      // Connect to the room server
+      multiSocketService.addRoom(newConfig);
+    },
+    
+    removeRoom: (roomId) => {
+      set((state) => ({
+        roomConfigs: state.roomConfigs.filter(r => r.id !== roomId),
+      }));
       
-      setRoomConnected: (roomId, connected) => {
-        set((state) => {
-          const statusMap = normalizeConnectionStatus(state.connectionStatus);
-          statusMap.set(roomId, connected);
-          return { connectionStatus: statusMap };
-        });
-      },
+      multiSocketService.removeRoom(roomId);
+    },
+    
+    setRoomConnected: (roomId, connected) => {
+      set((state) => {
+        const newStatus = new Map(state.connectionStatus);
+        newStatus.set(roomId, connected);
+        return { connectionStatus: newStatus };
+      });
+    },
+    
+    getRoomConfig: (roomId) => {
+      return get().roomConfigs.find(r => r.id === roomId);
+    },
+    
+    reconnectAll: () => {
+      const { roomConfigs } = get();
+      // Disconnect all first
+      multiSocketService.disconnectAll();
+      // Reconnect to all rooms
+      roomConfigs.forEach(config => {
+        multiSocketService.addRoom(config);
+      });
+    },
+    
+    initFromEnv: () => {
+      const envRooms = loadRoomsFromEnv();
+      console.log('[Store] Loading rooms from .env:', envRooms);
       
-      getRoomConfig: (roomId) => {
-        return get().roomConfigs.find(r => r.id === roomId);
-      },
+      // Always use .env config - ignore stored roomConfigs
+      multiSocketService.disconnectAll();
+      set({ roomConfigs: envRooms, connectionStatus: new Map() });
       
-      reconnectAll: () => {
-        const { roomConfigs } = get();
-        // Disconnect all first
-        multiSocketService.disconnectAll();
-        // Reconnect to all rooms
-        roomConfigs.forEach(config => {
-          multiSocketService.addRoom(config);
-        });
-      },
-      
-      initFromEnv: () => {
-        const envRooms = loadRoomsFromEnv();
-        console.log('[Store] Loading rooms from .env:', envRooms);
-        
-        // Always use .env config - ignore stored roomConfigs
-        multiSocketService.disconnectAll();
-        set({ roomConfigs: envRooms, connectionStatus: new Map() });
-        
-        envRooms.forEach(config => {
-          multiSocketService.addRoom(config);
-        });
-      },
-    }),
-    {
-      name: 'cashier-rooms',
-      // Only persist connectionStatus, NOT roomConfigs
-      partialize: (state) => ({
-        connectionStatus: Array.from(state.connectionStatus.entries()),
-      }),
-    }
-  )
+      envRooms.forEach(config => {
+        multiSocketService.addRoom(config);
+      });
+    },
+  })
 );
 
 // Initialize from .env on module load

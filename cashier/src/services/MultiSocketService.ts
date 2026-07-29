@@ -231,6 +231,49 @@ class MultiSocketService {
         totalPrice,
         paidAt: endTime,
       });
+      
+      // Send transaction to server
+      this.saveTransactionToServer(connection.socket, {
+        roomId,
+        roomName: connection.config.name,
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerNote,
+        startTime,
+        endTime,
+        duration: durationSeconds,
+        pricePerHour,
+        totalPrice,
+        paidAt: endTime,
+      });
+    }
+  }
+
+  // Save transaction to server
+  private saveTransactionToServer(socket: Socket, transaction: any): void {
+    const transactionWithId = {
+      ...transaction,
+      id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
+    };
+    socket.emit('transaction:save', transactionWithId);
+  }
+
+  // Delete transaction on server
+  deleteTransaction(transactionId: string): void {
+    for (const conn of this.connections.values()) {
+      if (conn.socket.connected) {
+        conn.socket.emit('transaction:delete', transactionId);
+      }
+    }
+  }
+
+  // Clear all transactions on server
+  clearTransactions(): void {
+    for (const conn of this.connections.values()) {
+      if (conn.socket.connected) {
+        conn.socket.emit('transaction:clear');
+      }
     }
   }
 
@@ -299,6 +342,14 @@ class MultiSocketService {
       this.notifyStatus(config.id, true);
       // Request agent list
       socket.emit('cashier:request-agents');
+      // Request transactions from server
+      socket.emit('transaction:get');
+    });
+
+    // Listen for transactions from server
+    socket.on('transaction:get', (transactions: any[]) => {
+      console.log('[MultiSocket] Received transactions from server:', transactions.length);
+      useTransactionStore.getState().setTransactions(transactions);
     });
 
     socket.on('disconnect', (reason) => {
@@ -514,6 +565,22 @@ class MultiSocketService {
         
         if (startTime > 0 && durationSeconds > 0) {
           useTransactionStore.getState().addTransaction({
+            roomId: data.roomId,
+            roomName: data.roomName || config.name,
+            customerName: agent.customerName,
+            customerPhone: agent.customerPhone,
+            customerEmail: agent.customerEmail,
+            customerNote: agent.customerNote,
+            startTime,
+            endTime,
+            duration: durationSeconds,
+            pricePerHour,
+            totalPrice,
+            paidAt: endTime,
+          });
+          
+          // Send transaction to server
+          this.saveTransactionToServer(socket, {
             roomId: data.roomId,
             roomName: data.roomName || config.name,
             customerName: agent.customerName,

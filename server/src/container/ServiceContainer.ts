@@ -4,6 +4,8 @@ import { SocketServer } from "../socket/SocketServer";
 
 import { CommandService } from "../services/CommandService";
 
+import { DatabaseService } from "../services/DatabaseService";
+
 import { Server as HttpServer } from "http";
 
 export class ServiceContainer {
@@ -16,11 +18,15 @@ export class ServiceContainer {
 
     private readonly billingEnabled: boolean;
 
+    private readonly database: DatabaseService;
+
     constructor(
         httpServer: HttpServer,
         billingEnabled: boolean = true
     ) {
         this.billingEnabled = billingEnabled;
+
+        this.database = new DatabaseService();
 
         this.agentManager =
             new AgentManager();
@@ -29,7 +35,8 @@ export class ServiceContainer {
             new SocketServer(
                 httpServer,
                 this.agentManager,
-                this.billingEnabled
+                this.billingEnabled,
+                this.database
             );
 
         this.commandService =
@@ -37,6 +44,11 @@ export class ServiceContainer {
                 this.socketServer
             );
 
+    }
+
+    public async initialize(): Promise<void> {
+        await this.database.initialize();
+        await this.socketServer.initialize();
     }
 
     public getAgentManager() {

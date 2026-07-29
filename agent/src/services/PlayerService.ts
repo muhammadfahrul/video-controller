@@ -77,6 +77,46 @@ export class PlayerService {
         console.log("[PlayerService] Clearing mode ended");
     }
 
+    // Restore player state from server database
+    public async restoreState(playerState: {
+        playing?: boolean;
+        currentTime?: number;
+        duration?: number;
+        volume?: number;
+        muted?: boolean;
+        fullscreen?: boolean;
+        videoId?: string;
+        title?: string;
+    }): Promise<void> {
+        console.log("[PlayerService] Restoring player state from server:", playerState);
+        
+        if (!playerState || !playerState.videoId) {
+            console.log("[PlayerService] No valid player state to restore");
+            return;
+        }
+
+        try {
+            // Store the restored state
+            this.restoredSnapshot = {
+                videoId: playerState.videoId,
+                title: playerState.title,
+                currentTime: playerState.currentTime || 0,
+                duration: playerState.duration || 0,
+                playing: playerState.playing || false,
+                volume: playerState.volume || 100,
+                muted: playerState.muted || false,
+                fullscreen: playerState.fullscreen || false
+            };
+            
+            // Open the video but don't auto-play yet
+            await this.player.open(playerState.videoId);
+            
+            console.log("[PlayerService] Player state restored successfully");
+        } catch (error) {
+            console.error("[PlayerService] Error restoring player state:", error);
+        }
+    }
+
     private isHealthySnapshot(
         snapshot: PlayerSnapshot
     ): boolean {

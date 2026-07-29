@@ -220,6 +220,53 @@ export class PlaylistService {
 
     }
 
+    // Restore playlist state from server database
+    public async restoreState(playlistState: {
+        items?: PlaylistItem[];
+        currentIndex?: number;
+        repeat?: string;
+        shuffle?: boolean;
+    }): Promise<void> {
+        console.log("[PlaylistService] Restoring playlist state from server:", playlistState);
+        
+        if (!playlistState) {
+            console.log("[PlaylistService] No valid playlist state to restore");
+            return;
+        }
+
+        try {
+            // Restore playlist items
+            if (playlistState.items && playlistState.items.length > 0) {
+                this.items = playlistState.items.map(item => ({
+                    id: item.id || item.videoId,
+                    videoId: item.videoId,
+                    title: item.title,
+                    thumbnail: item.thumbnail,
+                    channel: item.channel,
+                    duration: item.duration,
+                    addedAt: item.addedAt || Date.now()
+                }));
+            }
+            
+            // Restore current index
+            this.currentIndex = playlistState.currentIndex ?? -1;
+            
+            // Restore repeat mode
+            if (playlistState.repeat) {
+                this.repeatMode = playlistState.repeat.toUpperCase() as any;
+            }
+            
+            // Restore shuffle
+            this.shuffleEnabled = playlistState.shuffle ?? false;
+            
+            await this.persist();
+            
+            console.log("[PlaylistService] Playlist state restored successfully");
+        } catch (error) {
+            console.error("[PlaylistService] Error restoring playlist state:", error);
+        }
+    }
+
     public async playById(
         id: string
     ) {

@@ -16,6 +16,13 @@ const httpServer = createServer(app);
 
 const container = new ServiceContainer(httpServer, BILLING_ENABLED);
 
+// Initialize database
+container.initialize().then(() => {
+    console.log("[SERVER] Initialization complete");
+}).catch(err => {
+    console.error("[SERVER] Initialization error:", err);
+});
+
 registerRoutes(app, container);
 
 httpServer.listen(PORT, () => {
