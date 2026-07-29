@@ -34,6 +34,12 @@ export class SocketServer {
 
     // Track activated rooms - persists even after agent disconnects
     private activatedRooms = new Map<string, boolean>();
+    
+    // Track room activation timers for auto-expiry
+    private roomTimers = new Map<string, NodeJS.Timeout>();
+    
+    // Warning thresholds in seconds before expiry (broadcast to clients)
+    private readonly warningThresholds = [300, 120, 60, 30]; // 5min, 2min, 1min, 30sec
 
 
 
@@ -132,7 +138,9 @@ export class SocketServer {
 
                             connectedAt: Date.now(),
 
-                            isActive: initialActive
+                            isActive: initialActive,
+                            
+                            expiresAt: null
 
                         });
 
@@ -342,7 +350,7 @@ export class SocketServer {
                 // Cashier room activation/deactivation
                 socket.on(
                     SocketEvents.CASHIER_ACTIVATE_ROOM,
-                    (data: { roomId: string; roomName: string }) => {
+                    (data: { roomId: string; roomName: string; durationMinutes?: number }) => {
                         console.log("[SERVER] Cashier activates room:", data);
                         
                         // Store activation state - persists across reconnections
@@ -351,18 +359,40 @@ export class SocketServer {
                         const registry = this.manager.getRegistry();
                         const agent = registry.getByRoomId(data.roomId);
                         
+                        // Calculate expiry time if duration is provided
+                        const expiresAt = data.durationMinutes 
+                            ? Date.now() + (data.durationMinutes * 60 * 1000) 
+                            : null;
+                        
                         if (agent) {
                             agent.isActive = true;
+                            agent.expiresAt = expiresAt;
                             // Change status from WAITING to ONLINE when activated
                             if (agent.status === "WAITING") {
                                 agent.status = "ONLINE";
                             }
-                            // Notify the specific agent
-                            this.io.to(agent.socketId).emit("agent:activation", { isActive: true });
+                            // Notify the specific agent with expiry info
+                            this.io.to(agent.socketId).emit("agent:activation", { 
+                                isActive: true,
+                                expiresAt: expiresAt
+                            });
                             this.broadcastAgents(registry.getAll());
                         } else {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
+                        
+                        // Set up auto-expiry timer if duration is provided
+                        if (data.durationMinutes && data.durationMinutes > 0) {
+                            this.setupRoomTimer(data.roomId, data.durationMinutes, agent?.socketId);
+                        }
+                        
+                        // Broadcast activation to all clients
+                        this.io.emit("room:activation", {
+                            roomId: data.roomId,
+                            roomName: data.roomName,
+                            isActive: true,
+                            expiresAt: expiresAt
+                        });
                     }
                 );
 
@@ -370,6 +400,9 @@ export class SocketServer {
                     SocketEvents.CASHIER_DEACTIVATE_ROOM,
                     (data: { roomId: string }) => {
                         console.log("[SERVER] Cashier deactivates room:", data);
+                        
+                        // Clear any existing timer
+                        this.clearRoomTimer(data.roomId);
                         
                         // Remove activation state
                         this.activatedRooms.delete(data.roomId);
@@ -515,5 +548,117 @@ export class SocketServer {
             agents
         );
 
+    }
+    
+    // Set up auto-expiry timer for a room
+    private setupRoomTimer(roomId: string, durationMinutes: number, socketId?: string): void {
+        // Clear any existing timer for this room
+        this.clearRoomTimer(roomId);
+        
+        const durationMs = durationMinutes * 60 * 1000;
+        const expiryTime = Date.now() + durationMs;
+        
+        console.log(`[SERVER] Setting up auto-expiry timer for room ${roomId}: ${durationMinutes} minutes (expires at ${new Date(expiryTime).toISOString()})`);
+        
+        // Set up warning timers
+        for (const threshold of this.warningThresholds) {
+            const warningTime = durationMs - (threshold * 1000);
+            if (warningTime > 0) {
+                setTimeout(() => {
+                    this.sendRoomWarning(roomId, threshold, expiryTime);
+                }, warningTime);
+            }
+        }
+        
+        // Set up expiry timer
+        const timer = setTimeout(() => {
+            this.expireRoom(roomId);
+        }, durationMs);
+        
+        this.roomTimers.set(roomId, timer);
+    }
+    
+    // Clear room timer
+    private clearRoomTimer(roomId: string): void {
+        const existingTimer = this.roomTimers.get(roomId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+            this.roomTimers.delete(roomId);
+            console.log(`[SERVER] Cleared timer for room ${roomId}`);
+        }
+    }
+    
+    // Send warning before expiry
+    private sendRoomWarning(roomId: string, secondsRemaining: number, expiresAt: number): void {
+        console.log(`[SERVER] Room ${roomId} will expire in ${secondsRemaining} seconds`);
+        
+        this.io.emit("room:expiry-warning", {
+            roomId,
+            secondsRemaining,
+            expiresAt
+        });
+    }
+    
+    // Expire a room (auto-deactivate)
+    private expireRoom(roomId: string): void {
+        console.log(`[SERVER] Room ${roomId} expired - auto-deactivating`);
+        
+        // Clear the timer reference
+        this.roomTimers.delete(roomId);
+        
+        // Remove activation state
+        this.activatedRooms.delete(roomId);
+        
+        const registry = this.manager.getRegistry();
+        const agent = registry.getByRoomId(roomId);
+        
+        if (agent) {
+            agent.isActive = false;
+            agent.expiresAt = null;
+            
+            // Notify the specific agent
+            this.io.to(agent.socketId).emit("agent:activation", { 
+                isActive: false,
+                reason: "expired"
+            });
+            
+            // Clear player and playlist data
+            this.io.to(agent.socketId).emit(SocketEvents.AGENT_CLEAR_DATA, {});
+            
+            // Broadcast empty state to all clients
+            const emptyPlayerState = {
+                player: {
+                    playing: false,
+                    currentTime: 0,
+                    duration: 0,
+                    volume: 100,
+                    muted: false,
+                    fullscreen: false,
+                    videoId: undefined,
+                    title: undefined,
+                    channel: undefined,
+                    thumbnail: undefined
+                },
+                playlist: {
+                    items: [],
+                    currentIndex: -1,
+                    repeat: "off",
+                    shuffle: false
+                }
+            };
+            
+            this.io.emit(SocketEvents.PLAYER_STATE, emptyPlayerState);
+            this.io.emit(SocketEvents.PLAYLIST_STATE, { items: [], currentIndex: -1, repeat: "off", shuffle: false });
+            registry.updateSnapshot(agent.id, emptyPlayerState);
+            
+            this.broadcastAgents(registry.getAll());
+        }
+        
+        // Broadcast deactivation to all clients
+        this.io.emit("room:activation", {
+            roomId,
+            isActive: false,
+            reason: "expired"
+        });
     }
 }

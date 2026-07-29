@@ -37,4 +37,6 @@ export interface AgentInfo {
 
     isActive: boolean;
 
+    expiresAt: number | null; // Timestamp when room expires (null if no duration set)
+
 }

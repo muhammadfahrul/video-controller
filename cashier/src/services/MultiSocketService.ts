@@ -3,6 +3,7 @@ import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
 
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
+type ExpiryWarningCallback = (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => void;
 
 interface RoomConnection {
   socket: Socket;
@@ -14,6 +15,7 @@ class MultiSocketService {
   private connections: Map<string, RoomConnection> = new Map();
   private updateCallbacks: RoomUpdateCallback[] = [];
   private statusCallbacks: ConnectionStatusCallback[] = [];
+  private expiryWarningCallbacks: ExpiryWarningCallback[] = [];
   private maxReconnectAttempts = 10;
 
   // Add a new room connection
@@ -68,8 +70,8 @@ class MultiSocketService {
   }
 
   // Activate a specific room - finds connection by roomId (from agent)
-  async activateRoom(roomId: string, roomName: string): Promise<void> {
-    console.log('[MultiSocket] activateRoom called with roomId:', roomId);
+  async activateRoom(roomId: string, roomName: string, durationMinutes?: number): Promise<void> {
+    console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
     
     let connection: RoomConnection | undefined;
@@ -94,8 +96,12 @@ class MultiSocketService {
     }
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
-    connection.socket.emit('cashier:activate-room', { roomId: agentRoomId, roomName });
-    console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId);
+    connection.socket.emit('cashier:activate-room', { 
+      roomId: agentRoomId, 
+      roomName,
+      durationMinutes: durationMinutes ?? undefined
+    });
+    console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId, 'duration:', durationMinutes);
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
@@ -154,6 +160,7 @@ class MultiSocketService {
             status: 'idle' as const,
             pricePerHour: 50000,
             isActive: false,
+            expiresAt: null,
           };
 
       billings.set(roomId, billing);
@@ -220,6 +227,27 @@ class MultiSocketService {
       connection.agents = agents;
       this.notifyUpdate();
     });
+
+    // Listen for room activation updates (includes expiry info)
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string }) => {
+      console.log('[MultiSocket] Room activation update:', config.name, data);
+      if (connection.agents[0]) {
+        connection.agents[0].isActive = data.isActive;
+        connection.agents[0].expiresAt = data.expiresAt ?? null;
+        this.notifyUpdate();
+      }
+    });
+
+    // Listen for expiry warnings
+    socket.on('room:expiry-warning', (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => {
+      console.log('[MultiSocket] Expiry warning:', config.name, data);
+      if (connection.agents[0]) {
+        connection.agents[0].expiresAt = data.expiresAt;
+        this.notifyUpdate();
+      }
+      // Emit warning event for UI
+      this.expiryWarningCallbacks.forEach(cb => cb(data));
+    });
   }
 
   private agentToBilling(agent: AgentInfo, config: RoomConfig): RoomBilling {
@@ -253,6 +281,7 @@ class MultiSocketService {
       status,
       pricePerHour,
       isActive: agent.isActive ?? false,
+      expiresAt: agent.expiresAt ?? null,
     };
   }
 
@@ -275,6 +304,11 @@ class MultiSocketService {
   // Subscribe to connection status changes
   onStatusChange(callback: ConnectionStatusCallback): void {
     this.statusCallbacks.push(callback);
+  }
+
+  // Subscribe to expiry warnings
+  onExpiryWarning(callback: ExpiryWarningCallback): void {
+    this.expiryWarningCallbacks.push(callback);
   }
 
   // Disconnect all

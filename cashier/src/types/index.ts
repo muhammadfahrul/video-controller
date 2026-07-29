@@ -33,6 +33,7 @@ export interface RoomBilling {
   status: RoomStatus;
   pricePerHour?: number;
   isActive: boolean; // apakah ruangan sudah diaktifkan oleh cashier
+  expiresAt: number | null; // Timestamp when room expires (null if no duration set)
 }
 
 // Match server's PlayerState
@@ -59,4 +60,5 @@ export interface AgentInfo {
   player?: PlayerState;
   connected?: boolean;
   isActive?: boolean;
+  expiresAt?: number | null; // Timestamp when room expires
 }

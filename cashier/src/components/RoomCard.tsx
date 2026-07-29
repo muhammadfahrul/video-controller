@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
-import { Clock, Wallet, Disc3, Power, PowerOff } from 'lucide-react';
+import { Clock, Wallet, Disc3, Power, PowerOff, Timer } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -26,14 +26,52 @@ function formatPrice(price: number): string {
 
 export function RoomCard({ roomBilling }: RoomCardProps) {
   const [currentTime, setCurrentTime] = useState(roomBilling.currentDuration);
+  const [durationInput, setDurationInput] = useState('');
+  
+  // Countdown timer for expiry
+  const [countdown, setCountdown] = useState<number | null>(null);
+  
+  useEffect(() => {
+    if (roomBilling.expiresAt) {
+      const updateCountdown = () => {
+        const remaining = Math.max(0, Math.floor((roomBilling.expiresAt! - Date.now()) / 1000));
+        setCountdown(remaining);
+      };
+      
+      updateCountdown();
+      const interval = setInterval(updateCountdown, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setCountdown(null);
+    }
+  }, [roomBilling.expiresAt]);
   
   const handleToggleActive = async () => {
     if (roomBilling.isActive) {
       await multiSocketService.deactivateRoom(roomBilling.roomId);
+      setDurationInput('');
     } else {
-      await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
+      const duration = durationInput ? parseInt(durationInput, 10) : undefined;
+      if (duration && duration > 0) {
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, duration);
+      } else {
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName);
+      }
+      setDurationInput('');
     }
   };
+  
+  // Format countdown to MM:SS or HH:MM:SS
+  const formatCountdown = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  const isExpiringSoon = countdown !== null && countdown <= 60;
+  const isWarning = countdown !== null && countdown <= 300;
   
   useEffect(() => {
     if (roomBilling.status === 'playing') {
@@ -94,15 +132,36 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         </div>
       )}
       
+      {/* Duration Input (only when not active) */}
+      {!roomBilling.isActive && billingConfig.enabled && (
+        <div className="px-3 pb-2">
+          <div className="flex items-center gap-2">
+            <Timer className="w-3.5 h-3.5 text-orange-400" />
+            <input
+              type="number"
+              min="1"
+              max="480"
+              placeholder="Menit"
+              value={durationInput}
+              onChange={(e) => setDurationInput(e.target.value)}
+              className="w-16 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+            />
+            <span className="text-[10px] text-gray-500">(opsional)</span>
+          </div>
+        </div>
+      )}
+      
       {/* Info Rows */}
       {!isLocked && (
         <div className="px-3 pb-3 space-y-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-[10px] text-gray-400">Durasi:</span>
+              <Clock className={`w-3.5 h-3.5 ${countdown !== null ? 'text-orange-400' : 'text-cyan-400'}`} />
+              <span className="text-[10px] text-gray-400">{countdown !== null ? 'Sisa Waktu:' : 'Durasi:'}</span>
             </div>
-            <span className="text-xs font-semibold text-white">{formatDuration(displayDuration)}</span>
+            <span className={`text-xs font-semibold ${countdown !== null ? (isExpiringSoon ? 'text-red-400' : isWarning ? 'text-yellow-400' : 'text-orange-400') : 'text-white'}`}>
+              {countdown !== null ? formatCountdown(countdown) : formatDuration(displayDuration)}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
