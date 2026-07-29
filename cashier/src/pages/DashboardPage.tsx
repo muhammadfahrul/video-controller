@@ -37,14 +37,14 @@ export default function DashboardPage() {
           ? 'connecting' 
           : 'disconnected';
 
-  const activeRooms = roomList.filter(r => r.status === 'playing').length;
-  const connectedAgents = roomList.filter(r => r.isActive).length;
+  const activeRooms = roomList.filter(r => r.isActive).length;
+  const connectedRooms = connectedCount;
   const totalRevenue = roomList.reduce((sum, r) => sum + Math.ceil(r.currentDuration / 3600) * 50000, 0);
 
   const stats = [
-    { label: 'Ruangan', value: roomList.length, icon: Tv, color: 'blue' },
+    { label: 'Ruangan', value: roomConfigs.length, icon: Tv, color: 'blue' },
     { label: 'Aktif', value: activeRooms, icon: Zap, color: 'green' },
-    { label: 'Online', value: connectedAgents, icon: Users, color: 'cyan' },
+    { label: 'Online', value: connectedRooms, icon: Users, color: 'cyan' },
     { label: 'Pendapatan', value: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalRevenue), icon: TrendingUp, color: 'yellow', isFormatted: true }
   ];
 
