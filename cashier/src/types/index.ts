@@ -41,6 +41,25 @@ export interface RoomBilling {
   customerNote?: string;
 }
 
+// Transaction for payment recording
+export interface Transaction {
+  id: string;
+  roomId: string;
+  roomName: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  customerNote?: string;
+  startTime: number;
+  endTime: number;
+  duration: number; // in seconds
+  pricePerHour: number;
+  totalPrice: number;
+  paymentMethod?: 'cash' | 'transfer' | 'other';
+  paidAt: number;
+  notes?: string;
+}
+
 // Match server's PlayerState
 export interface PlayerState {
   state: string;

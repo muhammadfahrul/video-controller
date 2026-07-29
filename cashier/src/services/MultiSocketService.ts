@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
+import { useTransactionStore } from '../store/useTransactionStore';
 
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
@@ -149,9 +150,53 @@ class MultiSocketService {
     }
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
+    
+    // Get billing info before deactivating for transaction record
+    const agent = connection.agents[0];
+    const pricePerHour = 50000;
+    const startTime = agent?.startTime ? new Date(agent.startTime).getTime() : 0;
+    const endTime = Date.now();
+    const durationSeconds = Math.floor((endTime - startTime) / 1000);
+    const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
+    
+    // Get customer info
+    const agentAny = agent as any;
+    const customerName = agentAny?.customerName;
+    const customerPhone = agentAny?.customerPhone;
+    const customerEmail = agentAny?.customerEmail;
+    const customerNote = agentAny?.customerNote;
+    
     console.log('[MultiSocket] Emitting deactivate-room with roomId:', agentRoomId);
     connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId });
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
+    
+    // Record transaction if there was an active session
+    if (startTime > 0 && durationSeconds > 0) {
+      console.log('[MultiSocket] Recording transaction:', {
+        roomId,
+        roomName: connection.config.name,
+        startTime,
+        endTime,
+        duration: durationSeconds,
+        totalPrice,
+        customerName
+      });
+      
+      useTransactionStore.getState().addTransaction({
+        roomId,
+        roomName: connection.config.name,
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerNote,
+        startTime,
+        endTime,
+        duration: durationSeconds,
+        pricePerHour,
+        totalPrice,
+        paidAt: endTime,
+      });
+    }
   }
 
   // Extend room time
@@ -377,7 +422,49 @@ class MultiSocketService {
     // Listen for room activation updates (includes expiry info)
     socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string }) => {
       console.log('[MultiSocket] Room activation update:', config.name, data);
+      
+      // Check if room was previously active and is now inactive (auto-deactivate)
+      const wasActive = connection.agents[0]?.isActive === true;
+      const isNowInactive = data.isActive === false;
+      
       if (connection.agents[0]) {
+        // Record transaction if room goes from active to inactive (auto-deactivate)
+        if (wasActive && isNowInactive) {
+          const agent = connection.agents[0] as any;
+          const pricePerHour = 50000;
+          const startTime = agent.startTime || 0;
+          const endTime = Date.now();
+          const durationSeconds = Math.floor((endTime - startTime) / 1000);
+          const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
+          
+          console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
+            roomId: data.roomId,
+            roomName: data.roomName || config.name,
+            startTime,
+            endTime,
+            duration: durationSeconds,
+            totalPrice,
+            customerName: agent.customerName
+          });
+          
+          if (startTime > 0 && durationSeconds > 0) {
+            useTransactionStore.getState().addTransaction({
+              roomId: data.roomId,
+              roomName: data.roomName || config.name,
+              customerName: agent.customerName,
+              customerPhone: agent.customerPhone,
+              customerEmail: agent.customerEmail,
+              customerNote: agent.customerNote,
+              startTime,
+              endTime,
+              duration: durationSeconds,
+              pricePerHour,
+              totalPrice,
+              paidAt: endTime,
+            });
+          }
+        }
+        
         connection.agents[0].isActive = data.isActive;
         
         // Use later expiresAt (more time remaining) - authoritative source from server

@@ -485,6 +485,13 @@ export class SocketServer {
                             (agent as any).customerEmail = undefined;
                             (agent as any).customerNote = undefined;
                             
+                            // Broadcast deactivation to all clients
+                            this.io.emit("room:activation", {
+                                roomId: data.roomId,
+                                isActive: false,
+                                reason: "deactivated"
+                            });
+                            
                             this.broadcastAgents(registry.getAll());
                         } else {
                             console.log("[SERVER] Agent not found for room:", data.roomId);

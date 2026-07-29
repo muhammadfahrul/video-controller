@@ -1,6 +1,6 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, NavLink } from "react-router-dom";
 import { useState, useEffect } from 'react';
-import { Mic } from 'lucide-react';
+import { Mic, LayoutDashboard, Receipt } from 'lucide-react';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -36,6 +36,36 @@ export default function CashierLayout() {
             <p className="text-[10px] text-gray-500">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
         </header>
+
+        {/* Navigation */}
+        <nav className="flex gap-1 px-4 sm:px-6 py-2 border-b border-white/5">
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
+                isActive
+                  ? 'bg-purple-600/20 text-purple-400'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`
+            }
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Dashboard</span>
+          </NavLink>
+          <NavLink
+            to="/transactions"
+            className={({ isActive }) =>
+              `flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
+                isActive
+                  ? 'bg-purple-600/20 text-purple-400'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`
+            }
+          >
+            <Receipt className="w-4 h-4" />
+            <span>Transaksi</span>
+          </NavLink>
+        </nav>
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto w-full px-4 sm:px-6 py-4">
