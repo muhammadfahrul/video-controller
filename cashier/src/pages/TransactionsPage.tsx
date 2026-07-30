@@ -34,7 +34,6 @@ export default function TransactionsPage() {
   const globalLoading = useTransactionStore((state) => state.isLoading);
   const setTransactionLoading = useTransactionStore((state) => state.setLoading);
   const setRoomLoading = useRoomStore((state) => state.setLoading);
-  const [localLoading, setLocalLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [hasNavigated, setHasNavigated] = useState(false);
@@ -78,31 +77,37 @@ export default function TransactionsPage() {
     };
   }, [hasNavigated, setTransactionLoading, setRoomLoading]);
   
-  // Show local loading only when not in global loading (navigation)
-  const isLoading = localLoading || globalLoading;
+  // Use global loading for full page loading
+  const isLoading = globalLoading;
   
   const handleClearTransactions = async () => {
     if (!confirm('Hapus semua riwayat transaksi?')) return;
-    setLocalLoading(true);
+    setTransactionLoading(true);
+    setRoomLoading(true);
     try {
       clearTransactions();
       multiSocketService.clearTransactions(() => {
-        setLocalLoading(false);
+        setTransactionLoading(false);
+        setRoomLoading(false);
       });
     } catch (error) {
-      setLocalLoading(false);
+      setTransactionLoading(false);
+      setRoomLoading(false);
     }
   };
   
   const handleRemoveTransaction = async (id: string) => {
-    setLocalLoading(true);
+    setTransactionLoading(true);
+    setRoomLoading(true);
     try {
       removeTransaction(id);
       multiSocketService.deleteTransaction(id, () => {
-        setLocalLoading(false);
+        setTransactionLoading(false);
+        setRoomLoading(false);
       });
     } catch (error) {
-      setLocalLoading(false);
+      setTransactionLoading(false);
+      setRoomLoading(false);
     }
   };
   
