@@ -324,7 +324,11 @@ export class RecoveryEngine {
                 return;
 
             }
-            catch{
+            catch(error){
+                console.warn(
+                    `[RECOVERY] Failed to seek to ${targetTime}, attempt ${i}/3`,
+                    error
+                );
 
             }
 

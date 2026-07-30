@@ -40,7 +40,8 @@ export default function SearchPage(){
             setError("");
             const response = await searchService.search(keyword);
             setResults(response);
-        } catch {
+        } catch (error) {
+            console.error("Search error:", error);
             setError("Search failed");
         } finally {
             setLoading(false);
@@ -80,6 +81,7 @@ export default function SearchPage(){
         }
 
         load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

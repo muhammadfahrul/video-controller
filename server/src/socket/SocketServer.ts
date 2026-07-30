@@ -426,6 +426,17 @@ export class SocketServer {
                     }
                 );
 
+                // Web client requests current state
+                socket.on(
+                    "client:request-state",
+                    () => {
+                        console.log("[SERVER] Client requested state");
+                        const registry = this.manager.getRegistry();
+                        const agents = registry.getAll();
+                        socket.emit("agents:update", agents);
+                    }
+                );
+
                 // Cashier room activation/deactivation
                 socket.on(
                     SocketEvents.CASHIER_ACTIVATE_ROOM,
