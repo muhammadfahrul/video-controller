@@ -3,20 +3,45 @@ import { useState, useEffect } from 'react';
 import { Mic, LayoutDashboard, Receipt } from 'lucide-react';
 import { useRoomStore } from '../store/useRoomStore';
 import { useTransactionStore } from '../store/useTransactionStore';
-import { FullPageLoading } from '../components/FullPageLoading';
+import { FullPageLoading, loadingDurations } from '../components/FullPageLoading';
 import { MenuLink } from '../components/MenuLink';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const location = useLocation();
+  
   const roomLoading = useRoomStore((state) => state.isLoading);
+  const roomLoadingType = useRoomStore((state) => state.loadingType);
+  const roomLoadingMessage = useRoomStore((state) => state.loadingMessage);
+  
   const transactionLoading = useTransactionStore((state) => state.isLoading);
+  const transactionLoadingType = useTransactionStore((state) => state.loadingType);
+  const transactionLoadingMessage = useTransactionStore((state) => state.loadingMessage);
+  
   const isLoading = roomLoading || transactionLoading;
+  
+  // Determine which loading type and message to show (prefer the more specific one)
+  const activeLoadingType = transactionLoading ? transactionLoadingType : roomLoadingType;
+  const activeLoadingMessage = transactionLoading ? transactionLoadingMessage : roomLoadingMessage;
+  
+  // Auto-clear loading after duration timeout
+  useEffect(() => {
+    if (!isLoading) return;
+    
+    const duration = loadingDurations[activeLoadingType] || 5000;
+    const timeoutId = setTimeout(() => {
+      console.log('[CashierLayout] Auto-clearing loading after timeout:', duration);
+      useRoomStore.getState().setLoading(false);
+      useTransactionStore.getState().setLoading(false);
+    }, duration);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isLoading, activeLoadingType]);
   
   // Debug log
   useEffect(() => {
-    console.log('[CashierLayout] isLoading:', isLoading, 'roomLoading:', roomLoading, 'transactionLoading:', transactionLoading);
-  }, [isLoading, roomLoading, transactionLoading]);
+    console.log('[CashierLayout] isLoading:', isLoading, 'type:', activeLoadingType, 'message:', activeLoadingMessage);
+  }, [isLoading, activeLoadingType, activeLoadingMessage]);
 
   useEffect(() => {
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -26,7 +51,7 @@ export default function CashierLayout() {
   return (
     <div className="min-h-screen bg-[#0a0a14] w-full">
       {/* Full Page Loading Overlay */}
-      <FullPageLoading isLoading={isLoading} />
+      <FullPageLoading isLoading={isLoading} type={activeLoadingType} message={activeLoadingMessage} />
       
       {/* Main */}
       <div className="flex flex-col min-h-screen bg-[#12121f]">

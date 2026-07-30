@@ -14,7 +14,7 @@ export function AddRoomForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !ip.trim()) return;
-    setLoading(true);
+    setLoading(true, 'connecting');
     try {
       await addRoom({ name: name.trim(), ip: ip.trim(), port: parseInt(port, 10) || 53331 });
       setName('');

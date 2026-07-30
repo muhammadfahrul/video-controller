@@ -15,6 +15,10 @@ export default function DashboardPage() {
     // Mark that we've navigated to this page
     setHasNavigated(true);
     
+    // Set loading state for initial connection
+    setRoomLoading(true, 'connecting');
+    setTransactionLoading(true, 'connecting');
+    
     const unsubscribeUpdate = multiSocketService.onUpdate((billings) => {
       setRoomBillings(billings);
     });
@@ -28,7 +32,7 @@ export default function DashboardPage() {
       unsubscribeUpdate();
       unsubscribeStatus();
     };
-  }, [setRoomConnected]);
+  }, [setRoomConnected, setRoomLoading, setTransactionLoading]);
   
   // Clear global loading when data is received from server (connection established)
   useEffect(() => {

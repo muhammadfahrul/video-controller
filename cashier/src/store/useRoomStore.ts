@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import type { RoomConfig } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
+import type { LoadingMessage } from '../components/FullPageLoading';
 
 interface RoomStore {
   roomConfigs: RoomConfig[];
   connectionStatus: Map<string, boolean>;
   isLoading: boolean;
+  loadingType: LoadingMessage;
+  loadingMessage: string;
   
   // Actions
   addRoom: (config: Omit<RoomConfig, 'id'>) => Promise<void>;
@@ -14,7 +17,7 @@ interface RoomStore {
   getRoomConfig: (roomId: string) => RoomConfig | undefined;
   reconnectAll: () => void;
   initFromEnv: () => void;
-  setLoading: (loading: boolean) => void;
+  setLoading: (loading: boolean, type?: LoadingMessage, message?: string) => void;
 }
 
 // Generate unique ID
@@ -47,6 +50,8 @@ export const useRoomStore = create<RoomStore>()(
     roomConfigs: loadRoomsFromEnv(),
     connectionStatus: new Map(),
     isLoading: false,
+    loadingType: 'loading',
+    loadingMessage: '',
     
     addRoom: async (config) => {
       set({ isLoading: true });
@@ -101,8 +106,8 @@ export const useRoomStore = create<RoomStore>()(
       });
     },
     
-    setLoading: (loading) => {
-      set({ isLoading: loading });
+    setLoading: (loading, type = 'loading', message = '') => {
+      set({ isLoading: loading, loadingType: type, loadingMessage: message });
     },
     
     initFromEnv: () => {

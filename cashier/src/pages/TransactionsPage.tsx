@@ -38,10 +38,12 @@ export default function TransactionsPage() {
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [hasNavigated, setHasNavigated] = useState(false);
   
-  // Mark that we've navigated to this page
+  // Mark that we've navigated to this page and set loading
   useEffect(() => {
     setHasNavigated(true);
-  }, []);
+    setTransactionLoading(true, 'loading');
+    setRoomLoading(true, 'loading');
+  }, [setTransactionLoading, setRoomLoading]);
   
   // Clear global loading when transactions are loaded from server
   useEffect(() => {
@@ -82,8 +84,8 @@ export default function TransactionsPage() {
   
   const handleClearTransactions = async () => {
     if (!confirm('Hapus semua riwayat transaksi?')) return;
-    setTransactionLoading(true);
-    setRoomLoading(true);
+    setTransactionLoading(true, 'clearing' as const);
+    setRoomLoading(true, 'clearing' as const);
     try {
       clearTransactions();
       multiSocketService.clearTransactions(() => {
@@ -97,8 +99,8 @@ export default function TransactionsPage() {
   };
   
   const handleRemoveTransaction = async (id: string) => {
-    setTransactionLoading(true);
-    setRoomLoading(true);
+    setTransactionLoading(true, 'deleting' as const);
+    setRoomLoading(true, 'deleting' as const);
     try {
       removeTransaction(id);
       multiSocketService.deleteTransaction(id, () => {

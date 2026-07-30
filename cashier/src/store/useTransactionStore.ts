@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import type { Transaction } from '../types';
+import type { LoadingMessage } from '../components/FullPageLoading';
 
 interface TransactionStore {
   transactions: Transaction[];
   isLoading: boolean;
+  loadingType: LoadingMessage;
+  loadingMessage: string;
   
   // Actions
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
@@ -14,7 +17,7 @@ interface TransactionStore {
   getTransactionsByDateRange: (startDate: number, endDate: number) => Transaction[];
   getTotalRevenue: () => number;
   getTodayRevenue: () => number;
-  setLoading: (loading: boolean) => void;
+  setLoading: (loading: boolean, type?: LoadingMessage, message?: string) => void;
 }
 
 // Generate unique ID
@@ -24,6 +27,8 @@ export const useTransactionStore = create<TransactionStore>()(
   (set, get) => ({
     transactions: [],
     isLoading: false,
+    loadingType: 'loading',
+    loadingMessage: '',
     
     addTransaction: (transaction) => {
       const newTransaction: Transaction = {
@@ -50,8 +55,8 @@ export const useTransactionStore = create<TransactionStore>()(
       set({ transactions });
     },
     
-    setLoading: (loading) => {
-      set({ isLoading: loading });
+    setLoading: (loading, type = 'loading', message = '') => {
+      set({ isLoading: loading, loadingType: type, loadingMessage: message });
     },
     
     getTransactionsByRoom: (roomId) => {

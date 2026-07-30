@@ -16,10 +16,10 @@ export function MenuLink({ to, children, className = "" }: MenuLinkProps) {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     
-    // Set loading to true
+    // Set loading to true with connecting type
     console.log('[MenuLink] Setting loading to true, navigating to:', to);
-    setRoomLoading(true);
-    setTransactionLoading(true);
+    setRoomLoading(true, 'connecting');
+    setTransactionLoading(true, 'connecting');
 
     // Navigate immediately
     navigate(to);

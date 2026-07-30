@@ -3,6 +3,7 @@ import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
 import { useRoomStore } from '../store/useRoomStore';
+import type { LoadingMessage } from '../components/FullPageLoading';
 import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText } from 'lucide-react';
 
 interface RoomCardProps {
@@ -55,7 +56,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   }, [roomBilling.expiresAt]);
   
   const handleToggleActive = async () => {
-    setGlobalLoading(true);
+    const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
+    setGlobalLoading(true, loadingType);
     try {
       if (roomBilling.isActive) {
         await multiSocketService.deactivateRoom(roomBilling.roomId, () => {
@@ -94,7 +96,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     if (!minutes || minutes <= 0) {
       return;
     }
-    setGlobalLoading(true);
+    setGlobalLoading(true, 'extending');
     try {
       await multiSocketService.extendTime(roomBilling.roomId, minutes, () => {
         setGlobalLoading(false);
