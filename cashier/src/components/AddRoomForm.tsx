@@ -4,19 +4,26 @@ import { Plus, X, Server } from 'lucide-react';
 
 export function AddRoomForm() {
   const addRoom = useRoomStore((state) => state.addRoom);
+  const setLoading = useRoomStore((state) => state.setLoading);
+  const isLoading = useRoomStore((state) => state.isLoading);
   const [name, setName] = useState('');
   const [ip, setIp] = useState('');
   const [port, setPort] = useState('53331');
   const [showForm, setShowForm] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !ip.trim()) return;
-    addRoom({ name: name.trim(), ip: ip.trim(), port: parseInt(port, 10) || 53331 });
-    setName('');
-    setIp('');
-    setPort('53331');
-    setShowForm(false);
+    setLoading(true);
+    try {
+      await addRoom({ name: name.trim(), ip: ip.trim(), port: parseInt(port, 10) || 53331 });
+      setName('');
+      setIp('');
+      setPort('53331');
+      setShowForm(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!showForm) {
@@ -74,10 +81,18 @@ export function AddRoomForm() {
           />
         </div>
         <div className="flex gap-2 pt-2">
-          <button type="submit" className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-800 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
             Simpan
           </button>
-          <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors">
+          <button 
+            type="button" 
+            onClick={() => setShowForm(false)} 
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-medium rounded-lg transition-colors"
+          >
             Batal
           </button>
         </div>

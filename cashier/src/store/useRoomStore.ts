@@ -5,14 +5,16 @@ import { multiSocketService } from '../services/MultiSocketService';
 interface RoomStore {
   roomConfigs: RoomConfig[];
   connectionStatus: Map<string, boolean>;
+  isLoading: boolean;
   
   // Actions
-  addRoom: (config: Omit<RoomConfig, 'id'>) => void;
+  addRoom: (config: Omit<RoomConfig, 'id'>) => Promise<void>;
   removeRoom: (roomId: string) => void;
   setRoomConnected: (roomId: string, connected: boolean) => void;
   getRoomConfig: (roomId: string) => RoomConfig | undefined;
   reconnectAll: () => void;
   initFromEnv: () => void;
+  setLoading: (loading: boolean) => void;
 }
 
 // Generate unique ID
@@ -44,17 +46,29 @@ export const useRoomStore = create<RoomStore>()(
     // Always initialize from .env - never from storage
     roomConfigs: loadRoomsFromEnv(),
     connectionStatus: new Map(),
+    isLoading: false,
     
-    addRoom: (config) => {
-      const id = generateId();
-      const newConfig: RoomConfig = { ...config, id };
-      
-      set((state) => ({
-        roomConfigs: [...state.roomConfigs, newConfig],
-      }));
-      
-      // Connect to the room server
-      multiSocketService.addRoom(newConfig);
+    addRoom: async (config) => {
+      set({ isLoading: true });
+      try {
+        const id = generateId();
+        const newConfig: RoomConfig = { ...config, id };
+        
+        set((state) => ({
+          roomConfigs: [...state.roomConfigs, newConfig],
+        }));
+        
+        // Connect to the room server with callback
+        await new Promise<void>((resolve) => {
+          multiSocketService.addRoom(newConfig, () => {
+            resolve();
+          });
+          // Fallback timeout
+          setTimeout(resolve, 5000);
+        });
+      } finally {
+        set({ isLoading: false });
+      }
     },
     
     removeRoom: (roomId) => {
@@ -85,6 +99,10 @@ export const useRoomStore = create<RoomStore>()(
       roomConfigs.forEach(config => {
         multiSocketService.addRoom(config);
       });
+    },
+    
+    setLoading: (loading) => {
+      set({ isLoading: loading });
     },
     
     initFromEnv: () => {

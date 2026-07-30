@@ -3,6 +3,7 @@ import type { Transaction } from '../types';
 
 interface TransactionStore {
   transactions: Transaction[];
+  isLoading: boolean;
   
   // Actions
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
@@ -13,6 +14,7 @@ interface TransactionStore {
   getTransactionsByDateRange: (startDate: number, endDate: number) => Transaction[];
   getTotalRevenue: () => number;
   getTodayRevenue: () => number;
+  setLoading: (loading: boolean) => void;
 }
 
 // Generate unique ID
@@ -21,6 +23,7 @@ const generateId = () => Math.random().toString(36).substring(2, 9) + Date.now()
 export const useTransactionStore = create<TransactionStore>()(
   (set, get) => ({
     transactions: [],
+    isLoading: false,
     
     addTransaction: (transaction) => {
       const newTransaction: Transaction = {
@@ -45,6 +48,10 @@ export const useTransactionStore = create<TransactionStore>()(
     
     setTransactions: (transactions) => {
       set({ transactions });
+    },
+    
+    setLoading: (loading) => {
+      set({ isLoading: loading });
     },
     
     getTransactionsByRoom: (roomId) => {

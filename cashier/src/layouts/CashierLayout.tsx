@@ -1,9 +1,22 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import { Mic, LayoutDashboard, Receipt } from 'lucide-react';
+import { useRoomStore } from '../store/useRoomStore';
+import { useTransactionStore } from '../store/useTransactionStore';
+import { FullPageLoading } from '../components/FullPageLoading';
+import { MenuLink } from '../components/MenuLink';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const location = useLocation();
+  const roomLoading = useRoomStore((state) => state.isLoading);
+  const transactionLoading = useTransactionStore((state) => state.isLoading);
+  const isLoading = roomLoading || transactionLoading;
+  
+  // Debug log
+  useEffect(() => {
+    console.log('[CashierLayout] isLoading:', isLoading, 'roomLoading:', roomLoading, 'transactionLoading:', transactionLoading);
+  }, [isLoading, roomLoading, transactionLoading]);
 
   useEffect(() => {
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -12,6 +25,9 @@ export default function CashierLayout() {
 
   return (
     <div className="min-h-screen bg-[#0a0a14] w-full">
+      {/* Full Page Loading Overlay */}
+      <FullPageLoading isLoading={isLoading} />
+      
       {/* Main */}
       <div className="flex flex-col min-h-screen bg-[#12121f]">
         {/* Header */}
@@ -39,32 +55,28 @@ export default function CashierLayout() {
 
         {/* Navigation */}
         <nav className="flex gap-1 px-4 sm:px-6 py-2 border-b border-white/5">
-          <NavLink
+          <MenuLink
             to="/"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
-                isActive
-                  ? 'bg-purple-600/20 text-purple-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`
-            }
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
+              location.pathname === '/'
+                ? 'bg-purple-600/20 text-purple-400'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
           >
             <LayoutDashboard className="w-4 h-4" />
             <span>Dashboard</span>
-          </NavLink>
-          <NavLink
+          </MenuLink>
+          <MenuLink
             to="/transactions"
-            className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
-                isActive
-                  ? 'bg-purple-600/20 text-purple-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`
-            }
+            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
+              location.pathname === '/transactions'
+                ? 'bg-purple-600/20 text-purple-400'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+            }`}
           >
             <Receipt className="w-4 h-4" />
             <span>Transaksi</span>
-          </NavLink>
+          </MenuLink>
         </nav>
 
         {/* Content */}

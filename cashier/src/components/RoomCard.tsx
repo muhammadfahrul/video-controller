@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
+import { useRoomStore } from '../store/useRoomStore';
 import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText } from 'lucide-react';
 
 interface RoomCardProps {
@@ -23,6 +24,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const [customerPhoneInput, setCustomerPhoneInput] = useState('');
   const [customerEmailInput, setCustomerEmailInput] = useState('');
   const [customerNoteInput, setCustomerNoteInput] = useState('');
+  const setGlobalLoading = useRoomStore((state) => state.setLoading);
+  const isLoading = useRoomStore((state) => state.isLoading);
   
   // Countdown timer for expiry
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -52,26 +55,37 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   }, [roomBilling.expiresAt]);
   
   const handleToggleActive = async () => {
-    if (roomBilling.isActive) {
-      await multiSocketService.deactivateRoom(roomBilling.roomId);
-      setDurationInput('');
-      setCustomerNameInput('');
-      setCustomerPhoneInput('');
-      setCustomerEmailInput('');
-      setCustomerNoteInput('');
-    } else {
-      const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
-      const customerName = customerNameInput.trim() || undefined;
-      const customerPhone = customerPhoneInput.trim() || undefined;
-      const customerEmail = customerEmailInput.trim() || undefined;
-      const customerNote = customerNoteInput.trim() || undefined;
-      
-      if (minutes && minutes > 0) {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote);
+    setGlobalLoading(true);
+    try {
+      if (roomBilling.isActive) {
+        await multiSocketService.deactivateRoom(roomBilling.roomId, () => {
+          setGlobalLoading(false);
+        });
+        setDurationInput('');
+        setCustomerNameInput('');
+        setCustomerPhoneInput('');
+        setCustomerEmailInput('');
+        setCustomerNoteInput('');
       } else {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote);
+        const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
+        const customerName = customerNameInput.trim() || undefined;
+        const customerPhone = customerPhoneInput.trim() || undefined;
+        const customerEmail = customerEmailInput.trim() || undefined;
+        const customerNote = customerNoteInput.trim() || undefined;
+        
+        if (minutes && minutes > 0) {
+          await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote, () => {
+            setGlobalLoading(false);
+          });
+        } else {
+          await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote, () => {
+            setGlobalLoading(false);
+          });
+        }
+        setDurationInput('');
       }
-      setDurationInput('');
+    } catch (error) {
+      setGlobalLoading(false);
     }
   };
   
@@ -80,8 +94,15 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     if (!minutes || minutes <= 0) {
       return;
     }
-    await multiSocketService.extendTime(roomBilling.roomId, minutes);
-    setExtendTimeInput('');
+    setGlobalLoading(true);
+    try {
+      await multiSocketService.extendTime(roomBilling.roomId, minutes, () => {
+        setGlobalLoading(false);
+      });
+      setExtendTimeInput('');
+    } catch (error) {
+      setGlobalLoading(false);
+    }
   };
   
   // Format countdown to MM:SS or HH:MM:SS
@@ -121,8 +142,16 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         
         {/* Right: Button - same height as icon */}
         {billingConfig.enabled && roomBilling.isConnected && (
-          <button onClick={handleToggleActive} className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
-            {roomBilling.isActive ? <PowerOff className="w-3.5 h-3.5" /> : <Power className="w-3.5 h-3.5" />}
+          <button 
+            onClick={handleToggleActive} 
+            disabled={isLoading}
+            className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {roomBilling.isActive ? (
+              <PowerOff className="w-3.5 h-3.5" />
+            ) : (
+              <Power className="w-3.5 h-3.5" />
+            )}
           </button>
         )}
       </div>
@@ -223,8 +252,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             />
             <button
               onClick={handleExtendTime}
-              disabled={!extendTimeInput || parseInt(extendTimeInput, 10) <= 0}
-              className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-medium rounded hover:bg-green-500/30 disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={!extendTimeInput || parseInt(extendTimeInput, 10) <= 0 || isLoading}
+              className="px-2 py-1 bg-green-500/20 text-green-400 text-[10px] font-medium rounded hover:bg-green-500/30 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
             >
               Tambah
             </button>

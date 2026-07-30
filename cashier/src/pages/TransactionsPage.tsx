@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { useRoomStore } from '../store/useRoomStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { Receipt, Search, Calendar, Trash2, Clock, User, Phone, Mail, FileText } from 'lucide-react';
 
@@ -30,8 +31,80 @@ function formatDuration(seconds: number): string {
 
 export default function TransactionsPage() {
   const { transactions, removeTransaction, clearTransactions, getTotalRevenue, getTodayRevenue } = useTransactionStore();
+  const globalLoading = useTransactionStore((state) => state.isLoading);
+  const setTransactionLoading = useTransactionStore((state) => state.setLoading);
+  const setRoomLoading = useRoomStore((state) => state.setLoading);
+  const [localLoading, setLocalLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
+  const [hasNavigated, setHasNavigated] = useState(false);
+  
+  // Mark that we've navigated to this page
+  useEffect(() => {
+    setHasNavigated(true);
+  }, []);
+  
+  // Clear global loading when transactions are loaded from server
+  useEffect(() => {
+    if (!hasNavigated) return;
+    
+    // Check if transactions are already loaded
+    if (transactions && transactions.length > 0) {
+      console.log('[Transactions] Data already available, clearing loadings');
+      setTransactionLoading(false);
+      setRoomLoading(false);
+      return;
+    }
+    
+    // Listen for transaction updates (when loaded from server)
+    const unsubscribe = useTransactionStore.subscribe((state) => {
+      if (state.transactions.length > 0) {
+        console.log('[Transactions] Data received, clearing loadings');
+        setTransactionLoading(false);
+        setRoomLoading(false);
+      }
+    });
+    
+    // Fallback timeout in case no data is received
+    const timeoutId = setTimeout(() => {
+      console.log('[Transactions] Timeout, clearing loadings');
+      setTransactionLoading(false);
+      setRoomLoading(false);
+    }, 5000);
+    
+    return () => {
+      unsubscribe();
+      clearTimeout(timeoutId);
+    };
+  }, [hasNavigated, setTransactionLoading, setRoomLoading]);
+  
+  // Show local loading only when not in global loading (navigation)
+  const isLoading = localLoading || globalLoading;
+  
+  const handleClearTransactions = async () => {
+    if (!confirm('Hapus semua riwayat transaksi?')) return;
+    setLocalLoading(true);
+    try {
+      clearTransactions();
+      multiSocketService.clearTransactions(() => {
+        setLocalLoading(false);
+      });
+    } catch (error) {
+      setLocalLoading(false);
+    }
+  };
+  
+  const handleRemoveTransaction = async (id: string) => {
+    setLocalLoading(true);
+    try {
+      removeTransaction(id);
+      multiSocketService.deleteTransaction(id, () => {
+        setLocalLoading(false);
+      });
+    } catch (error) {
+      setLocalLoading(false);
+    }
+  };
   
   // Filter transactions
   const filteredTransactions = transactions.filter(t => {
@@ -63,13 +136,9 @@ export default function TransactionsPage() {
         
         {transactions.length > 0 && (
           <button 
-            onClick={() => {
-              if (confirm('Hapus semua riwayat transaksi?')) {
-                clearTransactions();
-                multiSocketService.clearTransactions();
-              }
-            }}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded"
+            onClick={handleClearTransactions}
+            disabled={isLoading}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-red-400 hover:bg-red-500/20 rounded disabled:opacity-50"
           >
             <Trash2 className="w-3 h-3" />
             Hapus Semua
@@ -183,11 +252,9 @@ export default function TransactionsPage() {
               
               {/* Delete button */}
               <button
-                onClick={() => {
-                  removeTransaction(transaction.id);
-                  multiSocketService.deleteTransaction(transaction.id);
-                }}
-                className="mt-2 w-full py-1 text-xs text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center gap-1"
+                onClick={() => handleRemoveTransaction(transaction.id)}
+                disabled={isLoading}
+                className="mt-2 w-full py-1 text-xs text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center gap-1 disabled:opacity-50"
               >
                 <Trash2 className="w-3 h-3" />
                 Hapus

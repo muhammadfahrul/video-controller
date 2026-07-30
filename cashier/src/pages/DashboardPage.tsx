@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
+import { useTransactionStore } from '../store/useTransactionStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { RoomCard } from '../components/RoomCard';
 import { Tv, TrendingUp, Wifi, WifiOff, Server, CircleDot } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { roomConfigs, connectionStatus, setRoomConnected } = useRoomStore();
+  const { roomConfigs, connectionStatus, setRoomConnected, setLoading: setRoomLoading } = useRoomStore();
+  const setTransactionLoading = useTransactionStore((state) => state.setLoading);
   const [roomBillings, setRoomBillings] = useState<Map<string, any>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
+  const [hasNavigated, setHasNavigated] = useState(false);
   
   useEffect(() => {
+    // Mark that we've navigated to this page
+    setHasNavigated(true);
+    
     const unsubscribeUpdate = multiSocketService.onUpdate((billings) => {
       setRoomBillings(billings);
-      setIsLoading(false);
     });
     const unsubscribeStatus = multiSocketService.onStatusChange((roomId, connected) => {
       setRoomConnected(roomId, connected);
@@ -25,6 +29,38 @@ export default function DashboardPage() {
       unsubscribeStatus();
     };
   }, [setRoomConnected]);
+  
+  // Clear global loading when data is received from server (connection established)
+  useEffect(() => {
+    if (!hasNavigated) return;
+    
+    // Check if we already have data (connection already established)
+    if (roomBillings && roomBillings.size > 0) {
+      console.log('[Dashboard] Data already available, clearing loadings');
+      setRoomLoading(false);
+      setTransactionLoading(false);
+      return;
+    }
+    
+    // Listen for first update to clear loading (connection established)
+    const unsubscribe = multiSocketService.onUpdate(() => {
+      console.log('[Dashboard] First data received, clearing loadings');
+      setRoomLoading(false);
+      setTransactionLoading(false);
+    });
+    
+    // Fallback timeout in case no data is received
+    const timeoutId = setTimeout(() => {
+      console.log('[Dashboard] Timeout, clearing loadings');
+      setRoomLoading(false);
+      setTransactionLoading(false);
+    }, 5000);
+    
+    return () => {
+      unsubscribe();
+      clearTimeout(timeoutId);
+    };
+  }, [hasNavigated, setRoomLoading, setTransactionLoading]);
   
   const roomList = Array.from(roomBillings?.values?.() || []);
   const statusMap = connectionStatus instanceof Map ? connectionStatus : new Map();
@@ -110,12 +146,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Room Grid */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-xs mt-3">Memuat...</p>
-        </div>
-      ) : roomList.length === 0 ? (
+      {roomList.length === 0 ? (
         <div className="bg-[#1a1a2e] rounded-lg p-8 text-center border border-dashed border-gray-700">
           <Server className="w-10 h-10 text-gray-600 mx-auto mb-3" />
           <p className="text-gray-400 text-sm">Belum ada ruangan</p>

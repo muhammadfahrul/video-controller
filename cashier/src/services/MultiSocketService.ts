@@ -24,9 +24,10 @@ class MultiSocketService {
   private maxReconnectAttempts = 10;
 
   // Add a new room connection
-  addRoom(config: RoomConfig): void {
+  addRoom(config: RoomConfig, onConnected?: () => void): void {
     if (this.connections.has(config.id)) {
       console.log('[MultiSocket] Room already connected:', config.id);
+      onConnected?.();
       return;
     }
 
@@ -48,6 +49,13 @@ class MultiSocketService {
       agentUpdateQueue: Promise.resolve(),
       lastAgentUpdate: 0,
     };
+
+    // Set up one-time connection callback
+    if (onConnected) {
+      socket.once('connect', () => {
+        onConnected();
+      });
+    }
 
     this.setupSocketEvents(connection);
     this.connections.set(config.id, connection);
@@ -113,7 +121,8 @@ class MultiSocketService {
     customerName?: string,
     customerPhone?: string,
     customerEmail?: string,
-    customerNote?: string
+    customerNote?: string,
+    onComplete?: () => void
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
@@ -140,6 +149,25 @@ class MultiSocketService {
     }
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
+    
+    // Set up timeout fallback in case server doesn't respond
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      console.log('[MultiSocket] Activation timeout, calling callback');
+      onComplete?.();
+    }, timeoutMs);
+    
+    // Listen for the activation response from server
+    const handleActivation = (data: any) => {
+      if (data.roomId === agentRoomId || data.roomId === roomId) {
+        clearTimeout(timeoutId);
+        connection.socket.off('room:activation', handleActivation);
+        console.log('[MultiSocket] Activation confirmed for room:', roomId);
+        onComplete?.();
+      }
+    };
+    connection.socket.on('room:activation', handleActivation);
+    
     connection.socket.emit('cashier:activate-room', { 
       roomId: agentRoomId, 
       roomName,
@@ -153,7 +181,7 @@ class MultiSocketService {
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
-  async deactivateRoom(roomId: string): Promise<void> {
+  async deactivateRoom(roomId: string, onComplete?: () => void): Promise<void> {
     console.log('[MultiSocket] deactivateRoom called with roomId:', roomId);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({
       key: k,
@@ -200,6 +228,24 @@ class MultiSocketService {
     const customerPhone = agentAny?.customerPhone;
     const customerEmail = agentAny?.customerEmail;
     const customerNote = agentAny?.customerNote;
+    
+    // Set up timeout fallback
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      console.log('[MultiSocket] Deactivation timeout, calling callback');
+      onComplete?.();
+    }, timeoutMs);
+    
+    // Listen for the deactivation response from server
+    const handleDeactivation = (data: any) => {
+      if (data.roomId === agentRoomId || data.roomId === roomId) {
+        clearTimeout(timeoutId);
+        connection.socket.off('room:activation', handleDeactivation);
+        console.log('[MultiSocket] Deactivation confirmed for room:', roomId);
+        onComplete?.();
+      }
+    };
+    connection.socket.on('room:activation', handleDeactivation);
     
     console.log('[MultiSocket] Emitting deactivate-room with roomId:', agentRoomId);
     connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId });
@@ -260,25 +306,55 @@ class MultiSocketService {
   }
 
   // Delete transaction on server
-  deleteTransaction(transactionId: string): void {
+  deleteTransaction(transactionId: string, onComplete?: () => void): void {
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      onComplete?.();
+    }, timeoutMs);
+    
+    // Listen for transaction update from server
+    const handleTransactionUpdate = () => {
+      clearTimeout(timeoutId);
+      for (const conn of this.connections.values()) {
+        conn.socket.off('transaction:get', handleTransactionUpdate);
+      }
+      onComplete?.();
+    };
+    
     for (const conn of this.connections.values()) {
       if (conn.socket.connected) {
+        conn.socket.on('transaction:get', handleTransactionUpdate);
         conn.socket.emit('transaction:delete', transactionId);
       }
     }
   }
 
   // Clear all transactions on server
-  clearTransactions(): void {
+  clearTransactions(onComplete?: () => void): void {
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      onComplete?.();
+    }, timeoutMs);
+    
+    // Listen for transaction update from server
+    const handleTransactionUpdate = () => {
+      clearTimeout(timeoutId);
+      for (const conn of this.connections.values()) {
+        conn.socket.off('transaction:get', handleTransactionUpdate);
+      }
+      onComplete?.();
+    };
+    
     for (const conn of this.connections.values()) {
       if (conn.socket.connected) {
+        conn.socket.on('transaction:get', handleTransactionUpdate);
         conn.socket.emit('transaction:clear');
       }
     }
   }
 
   // Extend room time
-  async extendTime(roomId: string, additionalMinutes: number): Promise<void> {
+  async extendTime(roomId: string, additionalMinutes: number, onComplete?: () => void): Promise<void> {
     console.log('[MultiSocket] extendTime called with roomId:', roomId, 'additionalMinutes:', additionalMinutes);
     
     let connection: RoomConnection | undefined;
@@ -300,7 +376,25 @@ class MultiSocketService {
       return;
     }
 
+    const socket = connection.socket;
     const agentRoomId = connection.agents[0]?.roomId || roomId;
+    
+    // Set up timeout fallback
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      console.log('[MultiSocket] Extend time timeout, calling callback');
+      onComplete?.();
+    }, timeoutMs);
+    
+    // Listen for the update response from server
+    const handleUpdate = () => {
+      clearTimeout(timeoutId);
+      socket.off('agents:update', handleUpdate);
+      console.log('[MultiSocket] Extend time confirmed for room:', roomId);
+      onComplete?.();
+    };
+    socket.on('agents:update', handleUpdate);
+    
     console.log('[MultiSocket] Emitting extend-time with roomId:', agentRoomId, 'additionalMinutes:', additionalMinutes);
     connection.socket.emit('cashier:extend-time', { roomId: agentRoomId, additionalMinutes });
     console.log('[MultiSocket] Extended time for room:', roomId, '-> agentRoomId:', agentRoomId, 'minutes:', additionalMinutes);
