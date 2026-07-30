@@ -703,15 +703,31 @@ class MultiSocketService {
   }
 
   // Subscribe to room updates
-  onUpdate(callback: RoomUpdateCallback): void {
+  onUpdate(callback: RoomUpdateCallback): () => void {
     this.updateCallbacks.push(callback);
-    // Send initial data
-    callback(this.getRoomBillings());
+    // Don't send initial data here - it will be empty if agent just connected
+    // Let notifyUpdate() handle sending data after agent registration
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.updateCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.updateCallbacks.splice(index, 1);
+      }
+    };
   }
 
   // Subscribe to connection status changes
-  onStatusChange(callback: ConnectionStatusCallback): void {
+  onStatusChange(callback: ConnectionStatusCallback): () => void {
     this.statusCallbacks.push(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const index = this.statusCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.statusCallbacks.splice(index, 1);
+      }
+    };
   }
 
   // Subscribe to expiry warnings

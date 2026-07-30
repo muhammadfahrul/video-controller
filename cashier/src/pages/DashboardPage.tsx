@@ -10,14 +10,20 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    multiSocketService.onUpdate((billings) => {
+    const unsubscribeUpdate = multiSocketService.onUpdate((billings) => {
       setRoomBillings(billings);
       setIsLoading(false);
     });
-    multiSocketService.onStatusChange((roomId, connected) => {
+    const unsubscribeStatus = multiSocketService.onStatusChange((roomId, connected) => {
       setRoomConnected(roomId, connected);
     });
     useRoomStore.getState().initFromEnv();
+    
+    // Cleanup subscriptions when component unmounts
+    return () => {
+      unsubscribeUpdate();
+      unsubscribeStatus();
+    };
   }, [setRoomConnected]);
   
   const roomList = Array.from(roomBillings?.values?.() || []);

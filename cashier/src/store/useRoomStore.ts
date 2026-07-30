@@ -91,12 +91,16 @@ export const useRoomStore = create<RoomStore>()(
       const envRooms = loadRoomsFromEnv();
       console.log('[Store] Loading rooms from .env:', envRooms);
       
-      // Always use .env config - ignore stored roomConfigs
-      multiSocketService.disconnectAll();
-      set({ roomConfigs: envRooms, connectionStatus: new Map() });
+      set({ roomConfigs: envRooms });
+      
+      // Only add rooms that don't have existing connections
+      const existingConnections = multiSocketService.getRooms();
+      const existingIds = new Set(existingConnections.map(c => c.id));
       
       envRooms.forEach(config => {
-        multiSocketService.addRoom(config);
+        if (!existingIds.has(config.id)) {
+          multiSocketService.addRoom(config);
+        }
       });
     },
   })
