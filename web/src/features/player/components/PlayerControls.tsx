@@ -164,7 +164,7 @@ export default function PlayerControls() {
 
         }
 
-        setTimeout(() => setProcessing("mute", false), 500);
+        setTimeout(() => setProcessing("mute", false), 300);
 
     }
 
@@ -198,7 +198,7 @@ export default function PlayerControls() {
 
         }
 
-        setTimeout(() => setProcessing("fullscreen", false), 500);
+        setTimeout(() => setProcessing("fullscreen", false), 300);
 
     }
 

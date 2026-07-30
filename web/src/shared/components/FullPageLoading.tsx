@@ -1,6 +1,30 @@
 import { Loader2 } from "lucide-react";
 
-export default function FullPageLoading() {
+import { useEffect, useState } from "react";
+
+interface FullPageLoadingProps {
+    message?: string;
+    duration?: number; // Custom duration in ms. If not provided, stays until manually hidden
+}
+
+export default function FullPageLoading({ 
+    message = "Processing...",
+    duration 
+}: FullPageLoadingProps) {
+    const [show, setShow] = useState(true);
+
+    useEffect(() => {
+        // If duration is provided, auto-hide after duration
+        if (duration !== undefined && duration > 0) {
+            const timer = setTimeout(() => {
+                setShow(false);
+            }, duration);
+            return () => clearTimeout(timer);
+        }
+        // If no duration, stay visible until manually hidden
+    }, [duration]);
+
+    if (!show) return null;
 
     return (
 
@@ -47,7 +71,7 @@ export default function FullPageLoading() {
                     "
                 >
 
-                    Processing...
+                    {message}
 
                 </p>
 

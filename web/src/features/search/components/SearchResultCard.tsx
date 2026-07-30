@@ -52,6 +52,8 @@ export default function SearchResultCard({
 
         }
 
+        setProcessing("openVideo", true);
+        
         playerCommandService.openVideo(
 
             agent.id,
@@ -60,8 +62,7 @@ export default function SearchResultCard({
 
         );
 
-        setProcessing("play", true);
-        setTimeout(() => setProcessing("play", false), 500);
+        setTimeout(() => setProcessing("openVideo", false), 1000);
 
     };
 
@@ -74,6 +75,7 @@ export default function SearchResultCard({
         }
 
         setAddingToPlaylist(true);
+        setProcessing("addToPlaylist", true);
 
         playerCommandService.addPlaylist(
 
@@ -105,7 +107,10 @@ export default function SearchResultCard({
 
         );
 
-        setTimeout(() => setAddingToPlaylist(false), 500);
+        setTimeout(() => {
+            setAddingToPlaylist(false);
+            setProcessing("addToPlaylist", false);
+        }, 500);
 
     };
 
@@ -181,7 +186,7 @@ export default function SearchResultCard({
 
                         onClick={play}
 
-                        disabled={!agent.id || !agent.online || processing.play}
+                        disabled={!agent.id || !agent.online || processing.openVideo}
 
                         className={`
                             flex
@@ -195,20 +200,20 @@ export default function SearchResultCard({
                             text-white
                             transition
                             shadow-[0_0_10px_rgba(255,45,149,0.4)]
-                            ${!agent.id || !agent.online || processing.play
+                            ${!agent.id || !agent.online || processing.openVideo
                                 ? "opacity-50 cursor-not-allowed" 
                                 : "hover:bg-[#ff4da6] hover:shadow-[0_0_20px_rgba(255,45,149,0.6)]"}
                         `}
 
                     >
 
-                        {processing.play ? (
+                        {processing.openVideo ? (
                             <Loader2 size={16} className="animate-spin" />
                         ) : (
                             <Play size={16} />
                         )}
 
-                        {processing.play ? "Playing..." : "Play"}
+                        {processing.openVideo ? "Playing..." : "Play"}
 
                     </button>
 

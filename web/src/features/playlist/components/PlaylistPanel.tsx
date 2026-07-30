@@ -70,7 +70,9 @@ export default function PlaylistPanel() {
                                 disabled={!agent.online || processing.removeFromPlaylist}
                                 onPlay={() => {
                                     if (!agent.online) return;
+                                    setProcessing("playPlaylistItem", true);
                                     playerCommandService.playPlaylistItem(agent.id, item.id);
+                                    setTimeout(() => setProcessing("playPlaylistItem", false), 1000);
                                 }}
                                 onRemove={() => {
                                     if (!agent.online) return;

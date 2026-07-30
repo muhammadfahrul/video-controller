@@ -152,6 +152,13 @@ export class PlayerCommandService {
 
     }
 
+    toggleFullscreen(agentId: string) {
+        this.emit({
+            agentId,
+            type: "TOGGLE_FULLSCREEN"
+        });
+    }
+
     volume(
 
         agentId: string,
@@ -170,6 +177,17 @@ export class PlayerCommandService {
 
         });
 
+    }
+
+    setVolume(agentId: string, volume: number): void {
+        this.volume(agentId, volume);
+    }
+
+    toggleMute(agentId: string): void {
+        this.emit({
+            agentId,
+            type: "TOGGLE_MUTE"
+        });
     }
 
     seek(

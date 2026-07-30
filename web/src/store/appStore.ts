@@ -48,13 +48,19 @@ interface ProcessingState {
 
     removeFromPlaylist: boolean;
 
+    seek: boolean;
+
+    repeat: boolean;
+
     skipAd: boolean;
 
     clearPlaylist: boolean;
 
     shufflePlaylist: boolean;
 
-    repeat: boolean;
+    openVideo: boolean;
+
+    playPlaylistItem: boolean;
 
 }
 
@@ -205,7 +211,13 @@ create<AppStore>((set)=>({
 
         repeat: false,
 
-        skipAd: false
+        skipAd: false,
+
+        seek: false,
+
+        openVideo: false,
+
+        playPlaylistItem: false
 
     },
 

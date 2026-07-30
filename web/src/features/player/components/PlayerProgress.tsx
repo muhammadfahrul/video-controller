@@ -12,7 +12,8 @@ export default function PlayerProgress() {
 
         player,
 
-        agent
+        agent,
+        setProcessing
 
     } = useAppStore();
 
@@ -67,16 +68,21 @@ export default function PlayerProgress() {
 
         try {
 
+            setProcessing("seek", true);
+            
             await playerCommandService.seek(
                 agent.id,
                 seconds
             );
+
+            setTimeout(() => setProcessing("seek", false), 300);
 
         }
 
         catch (err) {
 
             console.error(err);
+            setProcessing("seek", false);
 
         }
 

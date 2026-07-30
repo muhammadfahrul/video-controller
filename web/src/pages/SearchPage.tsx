@@ -21,7 +21,7 @@ export default function SearchPage(){
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
     
-    const { loadAgent, setProcessing, agent } = useAppStore();
+    const { loadAgent, setProcessing, setGlobalLoading, agent } = useAppStore();
 
     const search = async () => {
         if (!keyword.trim()) {
@@ -37,6 +37,7 @@ export default function SearchPage(){
         try {
             setLoading(true);
             setProcessing("search", true);
+            setGlobalLoading(true);
             setError("");
             const response = await searchService.search(keyword);
             setResults(response);
@@ -46,6 +47,7 @@ export default function SearchPage(){
         } finally {
             setLoading(false);
             setProcessing("search", false);
+            setGlobalLoading(false);
         }
     };
 

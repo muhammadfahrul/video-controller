@@ -19,7 +19,8 @@ export default function ProgressBar(){
 
     const {
         player,
-        agent
+        agent,
+        setProcessing
     } = useAppStore();
 
 
@@ -58,6 +59,8 @@ export default function ProgressBar(){
 
         if (!agent.online) return;
 
+        setProcessing("seek", true);
+        
         playerCommandService
             .seek(
 
@@ -67,6 +70,7 @@ export default function ProgressBar(){
 
             );
 
+        setTimeout(() => setProcessing("seek", false), 300);
 
     }
 
