@@ -4,6 +4,8 @@ import { ServiceContainer } from "../container/ServiceContainer";
 
 import { createApiRouter } from "../routes/api";
 
+import { createHealthRouter } from "../routes/health";
+
 import searchRoutes from "../routes/SearchRoutes";
 
 export function registerRoutes(
@@ -16,15 +18,9 @@ export function registerRoutes(
         createApiRouter(container)
     );
 
-    app.get(
-        "/health",
-        (_, res) => {
-
-            res.json({
-                status: "ok"
-            });
-
-        }
+    app.use(
+        "/api",
+        createHealthRouter(container)
     );
 
     app.use(
