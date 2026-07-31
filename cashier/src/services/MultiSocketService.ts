@@ -760,13 +760,21 @@ class MultiSocketService {
       if (!startTime) {
         startTime = Date.now();
       }
-      currentDuration = agent.player?.currentTime || 0;
     } else if (agent.status === 'PAUSED' || agent.player?.state === 'paused') {
       status = 'paused';
-      currentDuration = agent.player?.currentTime || 0;
     }
 
-    // Calculate price based on room config
+    // Calculate current duration based on timer (expiresAt) if available
+    // Otherwise use player's currentTime
+    if (agent.expiresAt && startTime) {
+      // Timer-based: duration = expiresAt - startTime (total time purchased)
+      currentDuration = Math.floor((agent.expiresAt - startTime) / 1000);
+    } else if (agent.player?.currentTime) {
+      // Non-timer: use player's current time
+      currentDuration = agent.player.currentTime;
+    }
+
+    // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas)
     const pricePerHour = config.pricePerHour || 50000;
     const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
 
