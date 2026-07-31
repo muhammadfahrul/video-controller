@@ -64,6 +64,10 @@ export enum SocketEvents {
 
 
 
-    TRANSACTION_CLEAR = "transaction:clear"
+    TRANSACTION_CLEAR = "transaction:clear",
+
+
+
+    AGENT_ERROR = "agent:error"
 
 }

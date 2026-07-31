@@ -702,6 +702,30 @@ export class SocketServer {
                     }
                 );
 
+                // Handle agent error reports
+                socket.on(
+                    SocketEvents.AGENT_ERROR,
+                    async (error: {
+                        agentId: string;
+                        roomId: string;
+                        timestamp: number;
+                        type: string;
+                        message: string;
+                        stack?: string;
+                        context?: Record<string, unknown>;
+                    }) => {
+                        console.error("[SERVER] Agent error:", error);
+                        // Store error in database for later analysis
+                        try {
+                            await this.database.saveAgentError(error);
+                            // Broadcast error to all connected clients (cashier, web)
+                            this.io.emit(SocketEvents.AGENT_ERROR, error);
+                        } catch (err) {
+                            console.error("[SOCKET SERVER] Error saving agent error:", err);
+                        }
+                    }
+                );
+
 
             }
         );

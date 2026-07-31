@@ -161,15 +161,19 @@ export class Agent {
 
     async start() {
 
+        // Set up global error handlers to catch unhandled errors
+        this.setupGlobalErrorHandlers();
+
         const config =
             ConfigService
                 .getInstance()
                 .getConfig();
 
-        // Connect socket FIRST so agent can register
-        // Use waitForConnection to ensure socket is connected before proceeding
-        console.log("[AGENT] Connecting to server...");
-        this.socketClient?.connect();
+        try {
+            // Connect socket FIRST so agent can register
+            // Use waitForConnection to ensure socket is connected before proceeding
+            console.log("[AGENT] Connecting to server...");
+            this.socketClient?.connect();
         
         // Wait for socket to be connected first
         await this.socketClient?.waitForConnection();
@@ -317,10 +321,41 @@ export class Agent {
 
         this.startAutoSkipAds();
 
+        } catch (err) {
+            // Catch any startup errors and report to server
+            console.error("[AGENT] Startup error:", err);
+            this.socketClient?.sendError({
+                type: "STARTUP_ERROR",
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined
+            });
+            throw err;
+        }
     }
 
+    // Set up global error handlers to catch unhandled errors
+    private setupGlobalErrorHandlers() {
+        // Handle uncaught exceptions
+        process.on("uncaughtException", (err) => {
+            console.error("[AGENT] Uncaught exception:", err);
+            this.socketClient?.sendError({
+                type: "UNCAUGHT_EXCEPTION",
+                message: err.message,
+                stack: err.stack
+            });
+        });
 
-
+        // Handle unhandled promise rejections
+        process.on("unhandledRejection", (reason, promise) => {
+            console.error("[AGENT] Unhandled rejection:", reason);
+            this.socketClient?.sendError({
+                type: "UNHANDLED_REJECTION",
+                message: reason instanceof Error ? reason.message : String(reason),
+                stack: reason instanceof Error ? reason.stack : undefined,
+                context: { promise: String(promise) }
+            });
+        });
+    }
 
     getPlayer(){
 

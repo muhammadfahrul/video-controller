@@ -54,6 +54,17 @@ export interface TransactionData {
     notes?: string;
 }
 
+export interface AgentError {
+    id?: number;
+    agentId: string;
+    roomId: string;
+    timestamp: number;
+    type: string;
+    message: string;
+    stack?: string;
+    context?: Record<string, unknown>;
+}
+
 const DEFAULT_PLAYER: PlayerData = {
     playing: false,
     currentTime: 0,
@@ -129,6 +140,20 @@ export class DatabaseService {
                 paymentMethod TEXT,
                 paidAt INTEGER NOT NULL,
                 notes TEXT
+            )
+        `);
+
+        // Agent errors table
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS errors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agentId TEXT NOT NULL,
+                roomId TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                stack TEXT,
+                context TEXT
             )
         `);
 
@@ -367,6 +392,53 @@ export class DatabaseService {
         if (!this.db) return;
 
         this.db.run(`DELETE FROM transactions`);
+        this.save();
+    }
+
+    // Error methods
+    async saveAgentError(error: AgentError): Promise<void> {
+        if (!this.db) return;
+
+        this.db.run(
+            `INSERT INTO errors (agentId, roomId, timestamp, type, message, stack, context) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+                error.agentId,
+                error.roomId,
+                error.timestamp,
+                error.type,
+                error.message,
+                error.stack || null,
+                error.context ? JSON.stringify(error.context) : null
+            ]
+        );
+        this.save();
+    }
+
+    async getAgentErrors(limit: number = 100): Promise<AgentError[]> {
+        if (!this.db) return [];
+
+        const result = this.db.exec(
+            `SELECT id, agentId, roomId, timestamp, type, message, stack, context FROM errors ORDER BY timestamp DESC LIMIT ?`,
+            [limit]
+        );
+        if (result.length === 0) return [];
+
+        return result[0].values.map(row => ({
+            id: row[0] as number,
+            agentId: row[1] as string,
+            roomId: row[2] as string,
+            timestamp: row[3] as number,
+            type: row[4] as string,
+            message: row[5] as string,
+            stack: row[6] as string | undefined,
+            context: row[7] ? JSON.parse(row[7] as string) : undefined
+        }));
+    }
+
+    async clearAgentErrors(): Promise<void> {
+        if (!this.db) return;
+
+        this.db.run(`DELETE FROM errors`);
         this.save();
     }
 }

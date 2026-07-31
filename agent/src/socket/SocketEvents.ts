@@ -40,6 +40,10 @@ export enum SocketEvents {
 
 
 
-    AGENT_CLEAR_DATA = "agent:clear-data"
+    AGENT_CLEAR_DATA = "agent:clear-data",
+
+
+
+    AGENT_ERROR = "agent:error"
 
 }

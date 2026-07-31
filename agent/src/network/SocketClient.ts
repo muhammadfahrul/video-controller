@@ -455,6 +455,24 @@ export class SocketClient {
 
     }
 
+    // Send error report to server
+    public sendError(error: {
+        type: string;
+        message: string;
+        stack?: string;
+        context?: Record<string, unknown>;
+    }): void {
+        this.socket?.emit(
+            SocketEvents.AGENT_ERROR,
+            {
+                agentId: this.identity.id,
+                roomId: this.identity.roomId,
+                timestamp: Date.now(),
+                ...error
+            }
+        );
+    }
+
 
     // Check if room is activated
     public isActive(): boolean {
