@@ -123,7 +123,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const roomConfigs = useRoomStore((state) => state.roomConfigs);
   const roomConfig = roomConfigs.find(r => r.name === roomBilling.roomName);
   const pricePerHour = roomConfig?.pricePerHour || roomBilling.pricePerHour || 50000;
-  const currentPrice = Math.round((totalSeconds / 3600) * pricePerHour);
+  // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
+  const currentPrice = Math.ceil(totalSeconds / 3600) * pricePerHour;
   
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;

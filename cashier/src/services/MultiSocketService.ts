@@ -220,7 +220,8 @@ class MultiSocketService {
     const startTime = agent?.startTime ? new Date(agent.startTime).getTime() : 0;
     const endTime = Date.now();
     const durationSeconds = Math.floor((endTime - startTime) / 1000);
-    const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
+    // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
+    const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
     
     // Get customer info
     const agentAny = agent as any;
@@ -645,7 +646,8 @@ class MultiSocketService {
         const startTime = agent.startTime || 0;
         const endTime = Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
-        const totalPrice = Math.max(0, Math.round((durationSeconds / 3600) * pricePerHour));
+        // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
+        const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
         
         console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
           roomId: data.roomId,
