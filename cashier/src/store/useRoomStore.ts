@@ -32,11 +32,12 @@ function loadRoomsFromEnv(): RoomConfig[] {
     const parsed = JSON.parse(envRooms);
     if (!Array.isArray(parsed)) return [];
     
-    return parsed.map((room: { name: string; ip: string; port: number }, index: number) => ({
+    return parsed.map((room: { name: string; ip: string; port: number; pricePerHour?: number }, index: number) => ({
       id: `env-room-${index}`,
       name: room.name || `Room ${index + 1}`,
       ip: room.ip || '127.0.0.1',
       port: room.port || 53331,
+      pricePerHour: room.pricePerHour || 50000, // Default Rp 50,000 jika tidak ada
     }));
   } catch (e) {
     console.error('[Store] Failed to parse VITE_ROOMS:', e);

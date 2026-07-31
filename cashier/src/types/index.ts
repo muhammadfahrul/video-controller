@@ -8,6 +8,7 @@ export interface RoomConfig {
   name: string;
   ip: string;
   port: number;
+  pricePerHour?: number; // Tarif per ruangan, bisa berbeda-beda
 }
 
 // Room from agent connection

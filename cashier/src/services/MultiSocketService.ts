@@ -216,7 +216,7 @@ class MultiSocketService {
     
     // Get billing info before deactivating for transaction record
     const agent = connection.agents[0];
-    const pricePerHour = 50000;
+    const pricePerHour = connection.config.pricePerHour || 50000;
     const startTime = agent?.startTime ? new Date(agent.startTime).getTime() : 0;
     const endTime = Date.now();
     const durationSeconds = Math.floor((endTime - startTime) / 1000);
@@ -641,7 +641,7 @@ class MultiSocketService {
       // Record transaction BEFORE queue (to capture current state)
       if (existingAgent && wasActive && isNowInactive) {
         const agent = existingAgent as any;
-        const pricePerHour = 50000;
+        const pricePerHour = config.pricePerHour || 50000;
         const startTime = agent.startTime || 0;
         const endTime = Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
@@ -764,8 +764,8 @@ class MultiSocketService {
       currentDuration = agent.player?.currentTime || 0;
     }
 
-    // Calculate price (Rp 50,000 per hour)
-    const pricePerHour = 50000;
+    // Calculate price based on room config
+    const pricePerHour = config.pricePerHour || 50000;
     const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
 
     const agentAny = agent as any;

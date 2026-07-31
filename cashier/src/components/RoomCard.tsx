@@ -119,7 +119,10 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const isExpiringSoon = countdown !== null && countdown <= 60;
   const isWarning = countdown !== null && countdown <= 300;
   
-  const pricePerHour = 50000;
+  // Get price from room config store
+  const roomConfigs = useRoomStore((state) => state.roomConfigs);
+  const roomConfig = roomConfigs.find(r => r.name === roomBilling.roomName);
+  const pricePerHour = roomConfig?.pricePerHour || roomBilling.pricePerHour || 50000;
   const currentPrice = Math.round((totalSeconds / 3600) * pricePerHour);
   
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
