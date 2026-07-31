@@ -1,3 +1,4 @@
+import initSqlJs, { Database } from "sql.js";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -53,151 +54,319 @@ export interface TransactionData {
     notes?: string;
 }
 
-interface DatabaseSchema {
-    agents: Record<string, AgentData>;
-    transactions: TransactionData[];
-}
+const DEFAULT_PLAYER: PlayerData = {
+    playing: false,
+    currentTime: 0,
+    duration: 0,
+    volume: 100,
+    muted: false,
+    fullscreen: false,
+    videoId: ""
+};
 
-const DEFAULT_DB: DatabaseSchema = {
-    agents: {},
-    transactions: []
+const DEFAULT_PLAYLIST: PlaylistData = {
+    items: [],
+    currentIndex: -1,
+    repeat: "off",
+    shuffle: false
 };
 
 export class DatabaseService {
     private readonly dbPath: string;
-    private data: DatabaseSchema = DEFAULT_DB;
+    private db: Database | null = null;
+    private saveTimeout: NodeJS.Timeout | null = null;
 
     constructor(dbDir: string = path.join(process.cwd(), "data")) {
-        this.dbPath = path.join(dbDir, "database.json");
+        this.dbPath = path.join(dbDir, "database.sqlite");
     }
 
     async initialize(): Promise<void> {
+        const dir = path.dirname(this.dbPath);
+        await fs.mkdir(dir, { recursive: true });
+
+        const SQL = await initSqlJs();
+
         try {
-            const dir = path.dirname(this.dbPath);
-            await fs.mkdir(dir, { recursive: true });
-            
-            const content = await fs.readFile(this.dbPath, "utf-8");
-            this.data = JSON.parse(content);
-            console.log("[DATABASE] Loaded existing data");
+            const fileBuffer = await fs.readFile(this.dbPath);
+            this.db = new SQL.Database(fileBuffer);
+            console.log("[DATABASE] Loaded existing database");
         } catch {
-            // File doesn't exist, use default
-            await this.save();
+            this.db = new SQL.Database();
             console.log("[DATABASE] Created new database");
+        }
+
+        this.createTables();
+    }
+
+    private createTables(): void {
+        if (!this.db) return;
+
+        // Agents table - stores player and playlist as JSON
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS agents (
+                agentId TEXT PRIMARY KEY,
+                player TEXT NOT NULL,
+                playlist TEXT NOT NULL,
+                updatedAt INTEGER NOT NULL
+            )
+        `);
+
+        // Transactions table
+        this.db.run(`
+            CREATE TABLE IF NOT EXISTS transactions (
+                id TEXT PRIMARY KEY,
+                roomId TEXT NOT NULL,
+                roomName TEXT NOT NULL,
+                customerName TEXT,
+                customerPhone TEXT,
+                customerEmail TEXT,
+                customerNote TEXT,
+                startTime INTEGER NOT NULL,
+                endTime INTEGER NOT NULL,
+                duration INTEGER NOT NULL,
+                pricePerHour REAL NOT NULL,
+                totalPrice REAL NOT NULL,
+                paymentMethod TEXT,
+                paidAt INTEGER NOT NULL,
+                notes TEXT
+            )
+        `);
+
+        this.save();
+    }
+
+    private save(): void {
+        if (!this.db) return;
+
+        // Debounce saves to avoid excessive disk writes
+        if (this.saveTimeout) {
+            clearTimeout(this.saveTimeout);
+        }
+
+        this.saveTimeout = setTimeout(async () => {
+            try {
+                const data = this.db!.export();
+                const buffer = Buffer.from(data);
+                await fs.writeFile(this.dbPath, buffer);
+            } catch (error) {
+                console.error("[DATABASE] Error saving database:", error);
+            }
+        }, 100);
+    }
+
+    private parsePlayer(row: any): PlayerData {
+        try {
+            return JSON.parse(row.player);
+        } catch {
+            return DEFAULT_PLAYER;
         }
     }
 
-    private async save(): Promise<void> {
-        await fs.writeFile(
-            this.dbPath,
-            JSON.stringify(this.data, null, 2),
-            "utf-8"
-        );
+    private parsePlaylist(row: any): PlaylistData {
+        try {
+            return JSON.parse(row.playlist);
+        } catch {
+            return DEFAULT_PLAYLIST;
+        }
     }
 
     // Player methods
     async savePlayer(agentId: string, player: PlayerData): Promise<void> {
-        if (!this.data.agents[agentId]) {
-            this.data.agents[agentId] = {
-                agentId,
-                player,
-                playlist: { items: [], currentIndex: -1, repeat: "off", shuffle: false },
-                updatedAt: Date.now()
-            };
+        if (!this.db) return;
+
+        const existing = this.db.exec(`SELECT agentId FROM agents WHERE agentId = ?`, [agentId]);
+        
+        if (existing.length === 0 || existing[0].values.length === 0) {
+            this.db.run(
+                `INSERT INTO agents (agentId, player, playlist, updatedAt) VALUES (?, ?, ?, ?)`,
+                [agentId, JSON.stringify(player), JSON.stringify(DEFAULT_PLAYLIST), Date.now()]
+            );
         } else {
-            this.data.agents[agentId].player = player;
-            this.data.agents[agentId].updatedAt = Date.now();
+            this.db.run(
+                `UPDATE agents SET player = ?, updatedAt = ? WHERE agentId = ?`,
+                [JSON.stringify(player), Date.now(), agentId]
+            );
         }
-        await this.save();
+        this.save();
     }
 
     async getPlayer(agentId: string): Promise<PlayerData | null> {
-        return this.data.agents[agentId]?.player || null;
+        if (!this.db) return null;
+
+        const result = this.db.exec(`SELECT player FROM agents WHERE agentId = ?`, [agentId]);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+        return this.parsePlayer(result[0].values[0][0]);
     }
 
     // Playlist methods
     async savePlaylist(agentId: string, playlist: PlaylistData): Promise<void> {
-        if (!this.data.agents[agentId]) {
-            this.data.agents[agentId] = {
-                agentId,
-                player: {
-                    playing: false,
-                    currentTime: 0,
-                    duration: 0,
-                    volume: 100,
-                    muted: false,
-                    fullscreen: false,
-                    videoId: ""
-                },
-                playlist,
-                updatedAt: Date.now()
-            };
+        if (!this.db) return;
+
+        const existing = this.db.exec(`SELECT agentId FROM agents WHERE agentId = ?`, [agentId]);
+        
+        if (existing.length === 0 || existing[0].values.length === 0) {
+            this.db.run(
+                `INSERT INTO agents (agentId, player, playlist, updatedAt) VALUES (?, ?, ?, ?)`,
+                [agentId, JSON.stringify(DEFAULT_PLAYER), JSON.stringify(playlist), Date.now()]
+            );
         } else {
-            this.data.agents[agentId].playlist = playlist;
-            this.data.agents[agentId].updatedAt = Date.now();
+            this.db.run(
+                `UPDATE agents SET playlist = ?, updatedAt = ? WHERE agentId = ?`,
+                [JSON.stringify(playlist), Date.now(), agentId]
+            );
         }
-        await this.save();
+        this.save();
     }
 
     async getPlaylist(agentId: string): Promise<PlaylistData | null> {
-        return this.data.agents[agentId]?.playlist || null;
+        if (!this.db) return null;
+
+        const result = this.db.exec(`SELECT playlist FROM agents WHERE agentId = ?`, [agentId]);
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+        return this.parsePlaylist(result[0].values[0][0]);
     }
 
     // Get all data for an agent
     async getAgentData(agentId: string): Promise<AgentData | null> {
-        return this.data.agents[agentId] || null;
+        if (!this.db) return null;
+
+        const result = this.db.exec(
+            `SELECT agentId, player, playlist, updatedAt FROM agents WHERE agentId = ?`,
+            [agentId]
+        );
+        if (result.length === 0 || result[0].values.length === 0) {
+            return null;
+        }
+
+        const row = result[0].values[0];
+        return {
+            agentId: row[0] as string,
+            player: this.parsePlayer({ player: row[1] }),
+            playlist: this.parsePlaylist({ playlist: row[2] }),
+            updatedAt: row[3] as number
+        };
     }
 
     // Clear agent data
     async clearAgentData(agentId: string): Promise<void> {
-        if (this.data.agents[agentId]) {
-            this.data.agents[agentId] = {
-                agentId,
-                player: {
-                    playing: false,
-                    currentTime: 0,
-                    duration: 0,
-                    volume: 100,
-                    muted: false,
-                    fullscreen: false,
-                    videoId: ""
-                },
-                playlist: { items: [], currentIndex: -1, repeat: "off", shuffle: false },
-                updatedAt: Date.now()
-            };
-            await this.save();
-        }
+        if (!this.db) return;
+
+        this.db.run(
+            `UPDATE agents SET player = ?, playlist = ?, updatedAt = ? WHERE agentId = ?`,
+            [JSON.stringify(DEFAULT_PLAYER), JSON.stringify(DEFAULT_PLAYLIST), Date.now(), agentId]
+        );
+        this.save();
     }
 
     // Transaction methods
     async saveTransaction(transaction: TransactionData): Promise<void> {
-        const existingIndex = this.data.transactions.findIndex(t => t.id === transaction.id);
-        if (existingIndex >= 0) {
-            this.data.transactions[existingIndex] = transaction;
+        if (!this.db) return;
+
+        const existing = this.db.exec(`SELECT id FROM transactions WHERE id = ?`, [transaction.id]);
+        
+        if (existing.length > 0 && existing[0].values.length > 0) {
+            this.db.run(`
+                UPDATE transactions SET 
+                    roomId = ?, roomName = ?, customerName = ?, customerPhone = ?,
+                    customerEmail = ?, customerNote = ?, startTime = ?, endTime = ?,
+                    duration = ?, pricePerHour = ?, totalPrice = ?, paymentMethod = ?,
+                    paidAt = ?, notes = ?
+                WHERE id = ?
+            `, [
+                transaction.roomId, transaction.roomName, transaction.customerName || null,
+                transaction.customerPhone || null, transaction.customerEmail || null,
+                transaction.customerNote || null, transaction.startTime, transaction.endTime,
+                transaction.duration, transaction.pricePerHour, transaction.totalPrice,
+                transaction.paymentMethod || null, transaction.paidAt, transaction.notes || null,
+                transaction.id
+            ]);
         } else {
-            this.data.transactions.unshift(transaction); // Add to beginning
+            this.db.run(`
+                INSERT INTO transactions (
+                    id, roomId, roomName, customerName, customerPhone, customerEmail,
+                    customerNote, startTime, endTime, duration, pricePerHour, totalPrice,
+                    paymentMethod, paidAt, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [
+                transaction.id, transaction.roomId, transaction.roomName, transaction.customerName || null,
+                transaction.customerPhone || null, transaction.customerEmail || null,
+                transaction.customerNote || null, transaction.startTime, transaction.endTime,
+                transaction.duration, transaction.pricePerHour, transaction.totalPrice,
+                transaction.paymentMethod || null, transaction.paidAt, transaction.notes || null
+            ]);
         }
-        await this.save();
+        this.save();
     }
 
     async getTransactions(): Promise<TransactionData[]> {
-        return this.data.transactions;
+        if (!this.db) return [];
+
+        const result = this.db.exec(`SELECT * FROM transactions ORDER BY paidAt DESC`);
+        if (result.length === 0) return [];
+
+        const columns = result[0].columns;
+        return result[0].values.map(row => {
+            const obj: any = {};
+            columns.forEach((col, idx) => {
+                obj[col] = row[idx];
+            });
+            return obj as TransactionData;
+        });
     }
 
     async getTransactionsByRoom(roomId: string): Promise<TransactionData[]> {
-        return this.data.transactions.filter(t => t.roomId === roomId);
+        if (!this.db) return [];
+
+        const result = this.db.exec(
+            `SELECT * FROM transactions WHERE roomId = ? ORDER BY paidAt DESC`,
+            [roomId]
+        );
+        if (result.length === 0) return [];
+
+        const columns = result[0].columns;
+        return result[0].values.map(row => {
+            const obj: any = {};
+            columns.forEach((col, idx) => {
+                obj[col] = row[idx];
+            });
+            return obj as TransactionData;
+        });
     }
 
     async getTransactionsByDateRange(startDate: number, endDate: number): Promise<TransactionData[]> {
-        return this.data.transactions.filter(t => t.paidAt >= startDate && t.paidAt <= endDate);
+        if (!this.db) return [];
+
+        const result = this.db.exec(
+            `SELECT * FROM transactions WHERE paidAt >= ? AND paidAt <= ? ORDER BY paidAt DESC`,
+            [startDate, endDate]
+        );
+        if (result.length === 0) return [];
+
+        const columns = result[0].columns;
+        return result[0].values.map(row => {
+            const obj: any = {};
+            columns.forEach((col, idx) => {
+                obj[col] = row[idx];
+            });
+            return obj as TransactionData;
+        });
     }
 
     async deleteTransaction(id: string): Promise<void> {
-        this.data.transactions = this.data.transactions.filter(t => t.id !== id);
-        await this.save();
+        if (!this.db) return;
+
+        this.db.run(`DELETE FROM transactions WHERE id = ?`, [id]);
+        this.save();
     }
 
     async clearTransactions(): Promise<void> {
-        this.data.transactions = [];
-        await this.save();
+        if (!this.db) return;
+
+        this.db.run(`DELETE FROM transactions`);
+        this.save();
     }
 }
