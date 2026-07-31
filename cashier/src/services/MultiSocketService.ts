@@ -218,7 +218,8 @@ class MultiSocketService {
     const agent = connection.agents[0];
     const pricePerHour = connection.config.pricePerHour || 50000;
     const startTime = agent?.startTime ? new Date(agent.startTime).getTime() : 0;
-    const endTime = Date.now();
+    // Use expiresAt if available (time purchased), otherwise actual end time
+    const endTime = agent?.expiresAt || Date.now();
     const durationSeconds = Math.floor((endTime - startTime) / 1000);
     // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
     const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
@@ -644,7 +645,8 @@ class MultiSocketService {
         const agent = existingAgent as any;
         const pricePerHour = config.pricePerHour || 50000;
         const startTime = agent.startTime || 0;
-        const endTime = Date.now();
+        // Use expiresAt if available (time purchased), otherwise actual end time
+        const endTime = agent.expiresAt || Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
         // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
         const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
