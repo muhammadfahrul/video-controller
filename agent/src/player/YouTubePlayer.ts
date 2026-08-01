@@ -684,4 +684,89 @@ export class YouTubePlayer {
         await this.dom.waitUntilReady();
 
     }
+
+    public async triggerAtmosphere(): Promise<void> {
+        await this.page.evaluate(() => {
+            // 1. Create floating clapping hands particle animation overlay
+            const containerId = "atmosphere-overlay-container";
+            let container = document.getElementById(containerId);
+            if (!container) {
+                container = document.createElement("div");
+                container.id = containerId;
+                container.style.position = "fixed";
+                container.style.inset = "0";
+                container.style.pointerEvents = "none";
+                container.style.zIndex = "999999";
+                container.style.overflow = "hidden";
+                document.body.appendChild(container);
+            }
+
+            const particleCount = 20;
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement("div");
+                particle.textContent = "👏";
+                particle.style.position = "absolute";
+                particle.style.left = `${Math.random() * 80 + 10}%`;
+                particle.style.bottom = "-50px";
+                particle.style.fontSize = `${Math.random() * 28 + 36}px`;
+                particle.style.opacity = "1";
+                particle.style.filter = "drop-shadow(0 0 12px rgba(255, 215, 0, 0.85))";
+                particle.style.transition = `all ${1.8 + Math.random() * 1.2}s cubic-bezier(0.1, 0.8, 0.3, 1)`;
+
+                container.appendChild(particle);
+
+                requestAnimationFrame(() => {
+                    const drift = (Math.random() - 0.5) * 180;
+                    const scale = 1 + Math.random() * 0.4;
+                    const rotate = (Math.random() - 0.5) * 60;
+                    particle.style.transform = `translate(${drift}px, -${window.innerHeight * 0.8}px) scale(${scale}) rotate(${rotate}deg)`;
+                    particle.style.opacity = "0";
+                });
+
+                setTimeout(() => {
+                    particle.remove();
+                }, 3000);
+            }
+
+            // 2. Synthesize applause sound effect via Web Audio API
+            try {
+                const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+
+                const bufferSize = ctx.sampleRate * 2.0;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = (Math.random() * 2 - 1);
+                }
+
+                const noise = ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = ctx.createBiquadFilter();
+                filter.type = "bandpass";
+                filter.frequency.value = 1200;
+                filter.Q.value = 1.5;
+
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.01, ctx.currentTime);
+                for (let t = 0; t < 2.0; t += 0.07 + Math.random() * 0.05) {
+                    const peakVol = 0.15 + Math.random() * 0.25;
+                    gain.gain.setValueAtTime(peakVol, ctx.currentTime + t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + t + 0.05);
+                }
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+
+                noise.start();
+                noise.stop(ctx.currentTime + 2.0);
+            } catch (e) {
+                console.warn("[Atmosphere] Sound synthesis error:", e);
+            }
+        });
+    }
 }

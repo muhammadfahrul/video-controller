@@ -556,4 +556,8 @@ export class PlayerService {
         return this.lastHealthySnapshot;
 
     }
+
+    public async triggerAtmosphere(): Promise<void> {
+        await this.player.triggerAtmosphere();
+    }
 }

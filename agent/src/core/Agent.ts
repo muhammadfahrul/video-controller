@@ -48,6 +48,7 @@ import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandle
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { SkipAdHandler } from "../commands/handlers/SkipAdHandler";
+import { AtmosphereHandler } from "../commands/handlers/AtmosphereHandler";
 import { RepeatMode } from "../playlist/RepeatMode";
 import { PlaylistRepository } from "../repositories/PlaylistRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
@@ -291,8 +292,7 @@ export class Agent {
 
         this.registerCommands();
 
-        this.socketClient!.connect();
-
+        // NOTE: connect() already called at the top of start() — do NOT call again
         this.heartbeat =
             new HeartbeatService(
                 this.socketClient!
@@ -301,10 +301,6 @@ export class Agent {
         this.heartbeat.start();
 
         this.startPlayerStateSync();
-
-        this.sendCurrentPlaylist();
-
-        this.startPlaylistSync();
 
         this.startAutoSkipAds();
 
@@ -341,166 +337,35 @@ export class Agent {
     private registerCommands() {
 
         if (!this.player) {
-
-            throw new Error(
-                "Player not initialized."
-            );
-
+            throw new Error("Player not initialized.");
         }
 
-        this.commandDispatcher.register(
-            CommandType.PLAY,
-            new PlayHandler(this.player)
-        );
+        // Use local variable after null-check to avoid repeated non-null assertions
+        const player = this.player;
 
-        this.commandDispatcher.register(
-            CommandType.PAUSE,
-            new PauseHandler(this.player)
-        );
-
-        this.commandDispatcher.register(
-            CommandType.VOLUME,
-            new VolumeHandler(this.player)
-        );
-
-        this.commandDispatcher.register(
-            CommandType.SEEK,
-            new SeekHandler(
-                this.player
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.MUTE,
-            new MuteHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.UNMUTE,
-            new UnmuteHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.STOP,
-            new StopHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.OPEN_VIDEO,
-            new OpenVideoHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.NEXT,
-            new NextHandler(
-                this.player!,
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.PREVIOUS,
-            new PreviousHandler(
-                this.player!,
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.FULLSCREEN,
-            new FullscreenHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.EXIT_FULLSCREEN,
-            new ExitFullscreenHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.TOGGLE_FULLSCREEN,
-            new ToggleFullscreenHandler(
-                this.player!
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.ADD_PLAYLIST,
-            new AddPlaylistHandler(
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.REMOVE_PLAYLIST,
-            new RemovePlaylistHandler(
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.CLEAR_PLAYLIST,
-            new ClearPlaylistHandler(
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.PLAY_PLAYLIST_ITEM,
-            new PlayPlaylistItemHandler(
-                this.player!,
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.SHUFFLE_PLAYLIST,
-            new ShufflePlaylistHandler(
-                this.playlist
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.REPEAT_OFF,
-            new RepeatModeHandler(
-                this.playlist,
-                RepeatMode.OFF
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.REPEAT_ONE,
-            new RepeatModeHandler(
-                this.playlist,
-                RepeatMode.ONE
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.REPEAT_ALL,
-            new RepeatModeHandler(
-                this.playlist,
-                RepeatMode.ALL
-            )
-        );
-
-        this.commandDispatcher.register(
-            CommandType.SKIP_AD,
-            new SkipAdHandler(
-                this.player!
-            )
-        );
+        this.commandDispatcher.register(CommandType.PLAY, new PlayHandler(player));
+        this.commandDispatcher.register(CommandType.PAUSE, new PauseHandler(player));
+        this.commandDispatcher.register(CommandType.VOLUME, new VolumeHandler(player));
+        this.commandDispatcher.register(CommandType.SEEK, new SeekHandler(player));
+        this.commandDispatcher.register(CommandType.MUTE, new MuteHandler(player));
+        this.commandDispatcher.register(CommandType.UNMUTE, new UnmuteHandler(player));
+        this.commandDispatcher.register(CommandType.STOP, new StopHandler(player));
+        this.commandDispatcher.register(CommandType.OPEN_VIDEO, new OpenVideoHandler(player));
+        this.commandDispatcher.register(CommandType.NEXT, new NextHandler(player, this.playlist));
+        this.commandDispatcher.register(CommandType.PREVIOUS, new PreviousHandler(player, this.playlist));
+        this.commandDispatcher.register(CommandType.FULLSCREEN, new FullscreenHandler(player));
+        this.commandDispatcher.register(CommandType.EXIT_FULLSCREEN, new ExitFullscreenHandler(player));
+        this.commandDispatcher.register(CommandType.TOGGLE_FULLSCREEN, new ToggleFullscreenHandler(player));
+        this.commandDispatcher.register(CommandType.ADD_PLAYLIST, new AddPlaylistHandler(this.playlist));
+        this.commandDispatcher.register(CommandType.REMOVE_PLAYLIST, new RemovePlaylistHandler(this.playlist));
+        this.commandDispatcher.register(CommandType.CLEAR_PLAYLIST, new ClearPlaylistHandler(this.playlist));
+        this.commandDispatcher.register(CommandType.PLAY_PLAYLIST_ITEM, new PlayPlaylistItemHandler(player, this.playlist));
+        this.commandDispatcher.register(CommandType.SHUFFLE_PLAYLIST, new ShufflePlaylistHandler(this.playlist));
+        this.commandDispatcher.register(CommandType.REPEAT_OFF, new RepeatModeHandler(this.playlist, RepeatMode.OFF));
+        this.commandDispatcher.register(CommandType.REPEAT_ONE, new RepeatModeHandler(this.playlist, RepeatMode.ONE));
+        this.commandDispatcher.register(CommandType.REPEAT_ALL, new RepeatModeHandler(this.playlist, RepeatMode.ALL));
+        this.commandDispatcher.register(CommandType.SKIP_AD, new SkipAdHandler(player));
+        this.commandDispatcher.register(CommandType.ATMOSPHERE, new AtmosphereHandler(player));
     }
 
     public getSocketClient() {
@@ -685,47 +550,7 @@ export class Agent {
     }
 
 
-    private startPlaylistSync() {
-
-        this.playlistStateTimer =
-
-            setInterval(
-
-                () => {
-
-                    const snapshot =
-
-                        this.playlist.getSnapshot();
-
-                    this.socketClient
-
-                        ?.sendPlaylistState(
-
-                            snapshot
-
-                        );
-
-                },
-
-                1000
-
-            );
-
-    }
-
-    private sendCurrentPlaylist() {
-
-        if (!this.socketClient) {
-
-            return;
-
-        }
-
-        this.socketClient.sendPlaylistState(
-
-            this.playlist.getSnapshot()
-
-        );
-
-    }
+    // startPlaylistSync() and sendCurrentPlaylist() removed:
+    // Playlist snapshot is already sent every second inside startPlayerStateSync()
+    // via sendPlayerState({ player, playlist }). Sending it again here is redundant.
 }

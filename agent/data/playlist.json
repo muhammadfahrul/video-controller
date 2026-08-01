@@ -1,6 +1,70 @@
 {
-  "items": [],
-  "currentIndex": -1,
-  "repeat": "OFF",
+  "items": [
+    {
+      "id": "08a54bd4-99b4-44c2-a9fe-5e684b5cc317",
+      "videoId": "qQDaxjLReck",
+      "title": "Perunggu - Ini Abadi (Video Lirik)",
+      "channel": "Perunggu Official",
+      "thumbnail": "https://i.ytimg.com/vi/qQDaxjLReck/hqdefault.jpg",
+      "duration": "3:52",
+      "addedAt": 1785572240376
+    },
+    {
+      "id": "2ae31951-1b3e-4b08-b26c-86ac92c856c7",
+      "videoId": "yyKdTxqHKMc",
+      "title": "Perunggu - Gemilang (Official Lyric Video)",
+      "channel": "Perunggu Official",
+      "thumbnail": "https://i.ytimg.com/vi/yyKdTxqHKMc/hqdefault.jpg",
+      "duration": "5:01",
+      "addedAt": 1785572243268
+    },
+    {
+      "id": "509fb1af-ed40-4a86-8e9a-f7c914596280",
+      "videoId": "6hzrDeceEKc",
+      "title": "Oasis - Wonderwall (Official Video)",
+      "channel": "Oasis",
+      "thumbnail": "https://i.ytimg.com/vi/6hzrDeceEKc/hqdefault.jpg",
+      "duration": "4:40",
+      "addedAt": 1785573377455
+    },
+    {
+      "id": "c1e5c68d-1b35-4748-9a72-bab5e8f4451e",
+      "videoId": "cmpRLQZkTb8",
+      "title": "Oasis - Don’t Look Back In Anger",
+      "channel": "OasisVEVO",
+      "thumbnail": "https://i.ytimg.com/vi/cmpRLQZkTb8/hqdefault.jpg",
+      "duration": "4:48",
+      "addedAt": 1785573380182
+    },
+    {
+      "id": "0d602743-7e75-4ce2-9629-63c814a9e0ea",
+      "videoId": "FQT69jQp1ho",
+      "title": "for Revenge - Sadrah (Official Lyric Video)",
+      "channel": "FORREVENGEVEVO",
+      "thumbnail": "https://i.ytimg.com/vi/FQT69jQp1ho/hqdefault.jpg",
+      "duration": "4:08",
+      "addedAt": 1785573405438
+    },
+    {
+      "id": "f39dfded-7acc-4069-9f5f-48c107251fcc",
+      "videoId": "SVNA0nGBiZY",
+      "title": "for Revenge - Penyangkalan feat. YB &amp; Tepe (Live at Festivaaal)",
+      "channel": "FORREVENGEVEVO",
+      "thumbnail": "https://i.ytimg.com/vi/SVNA0nGBiZY/hqdefault.jpg",
+      "duration": "5:10",
+      "addedAt": 1785573408007
+    },
+    {
+      "id": "8f8732f4-1fa7-48a7-b2ea-84b862759cc7",
+      "videoId": "zen59kngWLU",
+      "title": "for Revenge - Bandung Hari Ini (Official Album Visualizer)",
+      "channel": "FORREVENGEVEVO",
+      "thumbnail": "https://i.ytimg.com/vi/zen59kngWLU/hqdefault.jpg",
+      "duration": "3:40",
+      "addedAt": 1785573419839
+    }
+  ],
+  "currentIndex": 2,
+  "repeat": "ALL",
   "shuffle": false
 }

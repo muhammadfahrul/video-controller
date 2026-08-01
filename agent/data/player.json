@@ -1,14 +1,14 @@
 {
   "player": {
-    "playing": false,
-    "currentTime": 2.363693,
-    "duration": 373.821,
-    "volume": 45,
+    "playing": true,
+    "currentTime": 281.029601,
+    "duration": 287.721,
+    "volume": 75,
     "muted": false,
     "fullscreen": true,
-    "videoId": "0FiJfOviW4U",
-    "title": "Hindia ft. Rara Sekar - Membasuh (Official Lyric & Commentary Video)",
-    "channel": "Hindia",
-    "thumbnail": "https://img.youtube.com/vi/0FiJfOviW4U/mqdefault.jpg"
+    "videoId": "cmpRLQZkTb8",
+    "title": "Oasis - Don’t Look Back In Anger",
+    "channel": "OasisVEVO",
+    "thumbnail": "https://img.youtube.com/vi/cmpRLQZkTb8/mqdefault.jpg"
   }
 }
