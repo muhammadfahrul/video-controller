@@ -2,6 +2,8 @@ import { MonitorSmartphone, Network, Router, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAppStore } from "../store/appStore";
 import AgentStatusCard from "../features/agent/components/AgentStatusCard";
+import AtmosphereEffect from "../features/player/components/AtmosphereEffect";
+import { playerCommandService } from "../services";
 
 type BrowserConnection = {
     effectiveType?: string;
@@ -41,6 +43,7 @@ function getBrowserDeviceName(): string {
 export default function SettingsPage() {
     const { agent } = useAppStore();
     const [network, setNetwork] = useState(getNetworkState);
+    const [atmosphereCount, setAtmosphereCount] = useState(0);
 
     useEffect(() => {
         const connection = (navigator as Navigator & { connection?: BrowserConnection }).connection;
@@ -60,8 +63,15 @@ export default function SettingsPage() {
     const deviceName = agent.name || getBrowserDeviceName();
     const connectionHost = window.location.hostname || "Tidak tersedia";
 
+    const handleTriggerAtmosphere = () => {
+        if (!agent.id || !agent.online) return;
+        setAtmosphereCount((prev) => prev + 1);
+        playerCommandService.atmosphere(agent.id);
+    };
+
     return (
         <div className="space-y-5 tablet-landscape-text">
+            <AtmosphereEffect triggerCount={atmosphereCount} />
             <p className="text-sm text-slate-400 tablet-landscape-text">Informasi perangkat karaoke dan jaringan yang sedang digunakan.</p>
 
             <section className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
@@ -74,6 +84,7 @@ export default function SettingsPage() {
                         lastHeartbeat: agent.lastHeartbeat,
                         isActive: agent.online
                     }}
+                    onTriggerAtmosphere={handleTriggerAtmosphere}
                 />
             </section>
 

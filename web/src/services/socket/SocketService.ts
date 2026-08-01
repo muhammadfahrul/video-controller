@@ -2,7 +2,7 @@ import { io, Socket } from "socket.io-client";
 import { env } from "../../config/env";
 import { useAppStore } from "../../store/appStore";
 
-type EventCallback = (payload: any) => void;
+type EventCallback = (payload: unknown) => void;
 
 export class SocketService {
     private socket?: Socket;
@@ -53,11 +53,16 @@ export class SocketService {
             eventCallbacks = new Set();
             this.handlers.set(event, eventCallbacks);
         }
-        eventCallbacks.add(callback as EventCallback);
+        
+        const cb = callback as EventCallback;
+        if (eventCallbacks.has(cb)) {
+            return;
+        }
+        eventCallbacks.add(cb);
 
         // If socket instance already exists, register handler directly on it
         if (this.socket) {
-            this.socket.on(event, callback as EventCallback);
+            this.socket.on(event, cb);
         }
     }
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../../store/appStore";
 import { playerCommandService } from "../../../services/player";
 
@@ -12,7 +12,9 @@ export default function ProgressBar() {
 
     // Ref to hold latest localValue for use in async callbacks
     const localValueRef = useRef(localValue);
-    localValueRef.current = localValue;
+    useEffect(() => {
+        localValueRef.current = localValue;
+    }, [localValue]);
 
     const handleChangeEnd = () => {
         const value = localValueRef.current;

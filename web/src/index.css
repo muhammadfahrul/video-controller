@@ -138,6 +138,25 @@ main > div > section {
   }
 }
 
+@keyframes float-up {
+  0% {
+    transform: translateY(0) scale(0.6) rotate(-10deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-50vh) scale(1.3) rotate(10deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(-90vh) scale(1) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: float-up 1.8s ease-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -148,3 +167,4 @@ main > div > section {
     transition-duration: 0.01ms !important;
   }
 }
+

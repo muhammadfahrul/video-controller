@@ -45,8 +45,8 @@ export default function SearchPage(){
             setError("");
             const response = await searchService.search(keyword, controller.signal);
             setResults(response);
-        } catch (err: any) {
-            if (err.name === "AbortError") {
+        } catch (err: unknown) {
+            if (err instanceof Error && err.name === "AbortError") {
                 return; // Ignore aborted requests
             }
             setError("Search failed");

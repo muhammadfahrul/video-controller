@@ -48,6 +48,8 @@ export interface PlayerCommand {
 
         | "SKIP_AD"
 
+        | "ATMOSPHERE"
+
         | string;
 
     volume?: number;
