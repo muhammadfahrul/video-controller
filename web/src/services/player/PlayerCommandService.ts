@@ -84,6 +84,7 @@ export class PlayerCommandService {
     }
 
     atmosphere(agentId: string): void {
+        console.log("[PlayerCommandService] emit ATMOSPHERE", agentId);
         this.emit({ agentId, type: "ATMOSPHERE" });
     }
 }

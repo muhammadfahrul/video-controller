@@ -19,6 +19,11 @@ export class AtmosphereHandler implements CommandHandler {
             command
         );
 
+        if (command.type !== "ATMOSPHERE") {
+            console.warn("[ATMOSPHERE HANDLER] Received wrong command type", command.type);
+            return;
+        }
+
         try {
             await this.player.triggerAtmosphere();
             console.log("[ATMOSPHERE HANDLER]: Atmosphere effect triggered");

@@ -218,11 +218,19 @@ export class SocketServer {
 
                         console.log(
 
-                            "[SERVER] Player Command",
+                            "[SERVER] Player Command Received",
 
                             command
 
                         );
+
+                        if (!command?.agentId) {
+                            console.warn(
+                                "[SERVER] Ignoring player command without agentId",
+                                command
+                            );
+                            return;
+                        }
 
                         try {
 
@@ -238,7 +246,7 @@ export class SocketServer {
 
                         catch (err) {
 
-                            console.error(err);
+                            console.error("[SERVER] sendCommand error", err);
 
                         }
 
@@ -427,9 +435,17 @@ export class SocketServer {
         if(!agent){
 
             throw new Error(
-                "Agent offline"
+                `Agent offline or not registered: ${agentId}`
             );
 
+        }
+
+        console.log(`[SERVER] Sending command to agent ${agentId}, active=${agent.isActive}`);
+
+        if (!agent.isActive) {
+            throw new Error(
+                `Agent ${agentId} is not active, command ignored.`
+            );
         }
 
         // Check if agent is active before sending command
@@ -444,6 +460,24 @@ export class SocketServer {
         )
         .emit(
             SocketEvents.COMMAND,
+            command
+        );
+
+        // Emit fallback literal event to support any client naming mismatch
+        this.io.to(
+            agent.socketId
+        )
+        .emit(
+            "command",
+            command
+        );
+
+        // Also emit player:command directly in case the agent listens on that event
+        this.io.to(
+            agent.socketId
+        )
+        .emit(
+            SocketEvents.PLAYER_COMMAND,
             command
         );
 

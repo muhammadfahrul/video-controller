@@ -88,23 +88,39 @@ export class SocketClient {
             }
         );
 
+        const handleCommand = async (command: any) => {
+
+            console.log("[SOCKET] Received command", command);
+
+            // Check if room is activated before processing any command
+            if (!this.identity.isActive) {
+                console.log("[SOCKET] Room not active yet, ignoring command.");
+                return;
+            }
+
+            try {
+                await this.commandRouter?.handle(command);
+            } catch (err) {
+                console.error("[SOCKET] Command error", err);
+            }
+
+        };
+
+        this.socket.on(
+            SocketEvents.COMMAND,
+            handleCommand
+        );
+
+        // Fallback for any literal event name mismatch
         this.socket.on(
             "command",
-            async (command) => {
+            handleCommand
+        );
 
-                // Check if room is activated before processing any command
-                if (!this.identity.isActive) {
-                    console.log("[SOCKET] Room not active yet, ignoring command.");
-                    return;
-                }
-
-                try {
-                    await this.commandRouter?.handle(command);
-                } catch (err) {
-                    console.error("[SOCKET] Command error", err);
-                }
-
-            }
+        // Additional fallback if server ever forwards the player command event directly
+        this.socket.on(
+            SocketEvents.PLAYER_COMMAND,
+            handleCommand
         );
 
     }
