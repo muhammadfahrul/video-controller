@@ -1,5 +1,5 @@
 import { Volume2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface Props {
 
@@ -23,19 +23,10 @@ export default function VolumeSlider({
 
 }:Props){
 
-    const [
+    const [dragValue, setDragValue] = useState(value);
+    const [isDragging, setIsDragging] = useState(false);
 
-        localValue,
-
-        setLocalValue
-
-    ] = useState(value);
-
-    useEffect(() => {
-
-        setLocalValue(value);
-
-    }, [value]);
+    const displayValue = isDragging ? dragValue : value;
 
     return(
 
@@ -86,38 +77,37 @@ export default function VolumeSlider({
 
                 max={100}
 
-                value={localValue}
+                value={displayValue}
 
                 disabled={disabled}
 
-                onChange={e=>
-
-                    setLocalValue(
-
+                onChange={e=>{
+ 
+                    setDragValue(
+ 
                         Number(
                             e.target.value
                         )
+ 
+                    );
+                    setIsDragging(true);
+ 
+                }}
 
-                    )
-
-                }
-
-                onMouseUp={()=>{
+                onMouseUp={() => {
 
                     if (!disabled) {
-
-                        onChange(localValue);
-
+                        setIsDragging(false);
+                        onChange(displayValue);
                     }
 
                 }}
 
-                onTouchEnd={()=>{
+                onTouchEnd={() => {
 
                     if (!disabled) {
-
-                        onChange(localValue);
-
+                        setIsDragging(false);
+                        onChange(displayValue);
                     }
 
                 }}

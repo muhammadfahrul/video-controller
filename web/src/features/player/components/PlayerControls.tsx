@@ -36,17 +36,9 @@ import {
 
 } from "../../../store/appStore";
 
-import {
-
-    usePlayerControls
-
-} from "../../../hooks/usePlayerControls";
-
 export default function PlayerControls() {
 
-    const { } = usePlayerControls();
-
-    const {
+   const {
 
         player,
 
@@ -82,19 +74,7 @@ export default function PlayerControls() {
 
     }
 
-    let volumeText = "";
-
-    if (player.muted) {
-
-        volumeText = "Muted";
-
-    }
-
-    else {
-
-        volumeText = `Volume ${player.volume}%`;
-
-    }
+    const volumeText = player.muted ? "Muted" : `Volume ${player.volume}%`;
 
     const disabled = !agent.online;
 

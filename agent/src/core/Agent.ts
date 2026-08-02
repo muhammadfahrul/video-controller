@@ -304,8 +304,6 @@ export class Agent {
 
         this.registerCommands();
 
-        this.socketClient!.connect();
-
         this.heartbeat =
             new HeartbeatService(
                 this.socketClient!

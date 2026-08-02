@@ -1,16 +1,23 @@
 import { useEffect } from "react";
 
 import {
-
+ 
     socketService
-
+ 
 } from "../services";
 
 import {
-
+ 
     useAppStore
-
+ 
 } from "../store/appStore";
+import type { PlayerState } from "../types/app/PlayerState";
+import type { PlaylistState } from "../types/app/PlaylistState";
+
+type PlayerSocketPayload = {
+   player?: PlayerState;
+   playlist?: PlaylistState;
+};
 
 export function usePlayer() {
 
@@ -28,7 +35,7 @@ export function usePlayer() {
 
             "player:update",
 
-            (payload: any) => {
+            (payload: PlayerSocketPayload) => {
 
                 console.log(
 
@@ -86,6 +93,6 @@ export function usePlayer() {
 
         };
 
-    }, []);
+    }, [setPlayer, setPlaylist]);
 
 }

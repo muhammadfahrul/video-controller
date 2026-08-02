@@ -82,9 +82,10 @@ export class BrowserManager {
             });
         }
 
-        const browser =
-            this.context.browser();
+        this.browser = this.context.browser();
 
+        const browser = this.browser;
+        
         if (browser) {
 
             this.browserInfo = {
@@ -211,7 +212,7 @@ export class BrowserManager {
 
     public async stop(): Promise<void> {
 
-        if (!this.browser) {
+        if (!this.browser && !this.context) {
 
             return;
 
@@ -221,19 +222,15 @@ export class BrowserManager {
 
         LoggerService.info("Closing browser...");
 
-        // await this.browser.close();
-
-        await this.context?.close();
-
-        this.browser = null;
-
-        this.context = null;
-
-        this.page = null;
-
-        this.state = BrowserState.STOPPED;
-
-        this.browserInfo = undefined;
+        try {
+            await this.context?.close();
+        } finally {
+            this.browser = null;
+            this.context = null;
+            this.page = null;
+            this.state = BrowserState.STOPPED;
+            this.browserInfo = undefined;
+        }
 
         LoggerService.info("Browser stopped.");
 

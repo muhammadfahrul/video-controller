@@ -1,6 +1,5 @@
 import {
-    useState,
-    useEffect
+    useState
 } from "react";
 
 
@@ -24,19 +23,12 @@ export default function ProgressBar(){
     } = useAppStore();
 
 
-    const [localValue, setLocalValue] =
+    const [dragValue, setDragValue] =
         useState(player.currentTime);
+    const [isDragging, setIsDragging] =
+        useState(false);
 
-
-    useEffect(() => {
-
-        setLocalValue(player.currentTime);
-
-    }, [player.currentTime]);
-
-
-    const value = localValue;
-
+    const value = isDragging ? dragValue : player.currentTime;
 
     function handleSeek(
         e:React.ChangeEvent<HTMLInputElement>
@@ -49,13 +41,16 @@ export default function ProgressBar(){
             );
 
 
-        setLocalValue(time);
+        setDragValue(time);
+        setIsDragging(true);
 
 
     }
 
 
     function handleChangeEnd(){
+        const time = isDragging ? dragValue : player.currentTime;
+
 
         if (!agent.online) return;
 
@@ -66,11 +61,12 @@ export default function ProgressBar(){
 
                 agent.id,
 
-                localValue
+                time
 
             );
 
         setTimeout(() => setProcessing("seek", false), 300);
+        setIsDragging(false);
 
     }
 

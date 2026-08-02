@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "../../../store/appStore";
 import {
-
+ 
     playerCommandService
-
+ 
 } from "../../../services";
 
 export default function PlayerProgress() {
@@ -59,42 +59,41 @@ export default function PlayerProgress() {
         }
 
         const seconds =
-
+ 
             player.duration *
-
-            value /
-
+ 
+            displayValue /
+ 
             100;
-
+ 
         try {
-
+ 
             setProcessing("seek", true);
-            
+             
             await playerCommandService.seek(
                 agent.id,
                 seconds
             );
-
+ 
             setTimeout(() => setProcessing("seek", false), 300);
-
+            setIsDragging(false);
+ 
         }
 
         catch (err) {
 
             console.error(err);
             setProcessing("seek", false);
+            setIsDragging(false);
 
         }
 
     };
 
-    const [value, setValue] = useState(progress);
+    const [dragValue, setDragValue] = useState(progress);
+    const [isDragging, setIsDragging] = useState(false);
 
-    useEffect(() => {
-
-        setValue(progress);
-
-    }, [progress]);
+    const displayValue = isDragging ? dragValue : progress;
 
     return (
 
@@ -117,20 +116,14 @@ export default function PlayerProgress() {
 
                 max={100}
 
-                value={value}
-
-                onChange={(e) =>
-
-                    setValue(
-
-                        Number(e.target.value)
-
-                    )
-
-                }
+                value={displayValue}
+                onChange={(e) => {
+                    const nextValue = Number(e.target.value);
+                    setDragValue(nextValue);
+                    setIsDragging(true);
+                }}
 
                 onMouseUp={handleSeek}
-
                 onTouchEnd={handleSeek}
 
             />

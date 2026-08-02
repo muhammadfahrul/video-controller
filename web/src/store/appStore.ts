@@ -24,7 +24,7 @@ import type {
 
 } from "../types/app/SearchState";
 
-interface ProcessingState {
+export interface ProcessingState {
 
     play: boolean;
 
@@ -64,6 +64,8 @@ interface ProcessingState {
 
 }
 
+export type ProcessingAction = keyof ProcessingState;
+
 interface AppStore {
 
     agent: AgentState;
@@ -93,7 +95,7 @@ interface AppStore {
     ): void;
 
     setProcessing(
-        key: keyof ProcessingState,
+        key: ProcessingAction,
         value: boolean
     ): void;
 

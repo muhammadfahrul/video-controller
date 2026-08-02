@@ -5,10 +5,11 @@ import {
 } from "react";
 
 import {
-
+ 
     useAppStore
-
+ 
 } from "../store/appStore";
+import type { ProcessingAction } from "../store/appStore";
 
 import {
 
@@ -44,9 +45,9 @@ export function usePlayerControls() {
 
     }, [agent]);
 
-    const clearProcessing = useCallback((action: string) => {
+    const clearProcessing = useCallback((action: ProcessingAction) => {
 
-        setTimeout(() => setProcessing(action as any, false), 2000);
+        setTimeout(() => setProcessing(action, false), 2000);
 
     }, [setProcessing]);
 

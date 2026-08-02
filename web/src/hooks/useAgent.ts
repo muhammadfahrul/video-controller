@@ -4,6 +4,14 @@ import { agentService } from "../services";
 import { socketService } from "../services";
 import { useAppStore } from "../store/appStore";
 
+type AgentSummary = {
+    id: string;
+    name: string;
+    status: string;
+    isActive: boolean;
+    lastHeartbeat: number;
+};
+
 export function useAgent() {
 
     const {
@@ -59,11 +67,11 @@ export function useAgent() {
 
         socketService.connect();
 
-        socketService.on<any[]>(
+        socketService.on<AgentSummary[]>(
 
             "agents:update",
 
-            (agents) => {
+            (agents: AgentSummary[]) => {
 
                 if (agents.length === 0) {
                     
@@ -114,6 +122,6 @@ export function useAgent() {
 
         };
 
-    }, []);
+    }, [loadAgent]);
 
 }

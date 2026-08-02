@@ -18,7 +18,8 @@
     "express": "^5.2.1",
     "googleapis": "^173.0.0",
     "pino": "^10.3.1",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "sql.js": "^1.14.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

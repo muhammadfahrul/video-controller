@@ -62,6 +62,6 @@ export function usePlaylist() {
 
         };
 
-    }, []);
+    }, [setPlaylist]);
 
 }
