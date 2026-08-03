@@ -72,7 +72,7 @@ export const config: AppConfig = {
         enabled: process.env.BILLING_ENABLED !== 'false'
     },
     browser: {
-        headless: process.env.BROWSER_HEADLESS !== 'false',
+        headless: process.env.BROWSER_HEADLESS === 'true',
         channel: process.env.BROWSER_CHANNEL || 'chrome',
         args: parseBrowserArgs(),
         viewport: process.env.BROWSER_VIEWPORT === 'true' ? {

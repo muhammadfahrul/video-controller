@@ -30,12 +30,17 @@ show_menu() {
     echo "  [2] Kasir          - Aplikasi Kasir (Cashier)"
     echo "  [3] Semua          - Room App + Kasir"
     echo ""
-    echo "  [A] Auto-start     - Setup auto-start (systemd)"
-    echo "  [R] Remove Auto-start - Hapus auto-start"
+    echo "  [A] Auto-start Room App"
+    echo "  [B] Auto-start Kasir"
+    echo "  [C] Auto-start Semua"
+    echo ""
+    echo "  [D] Remove Auto-start Room App"
+    echo "  [E] Remove Auto-start Kasir"
+    echo "  [F] Remove Auto-start Semua"
     echo ""
     echo "  [0] Keluar"
     echo ""
-    echo -n "Masukkan pilihan [0-A]: "
+    echo -n "Masukkan pilihan [0-F]: "
 }
 
 # ============================================
@@ -55,11 +60,23 @@ if [[ $# -gt 0 ]]; then
         3|all)
             INSTALL_MODE="all"
             ;;
-        a|autostart)
-            INSTALL_MODE="autostart"
+        a|autostart|ar|autostart-room)
+            INSTALL_MODE="autostart-room"
             ;;
-        r|remove)
-            INSTALL_MODE="remove-autostart"
+        b|autostart-kasir|bk|autostart-cashier)
+            INSTALL_MODE="autostart-kasir"
+            ;;
+        c|autostart-all|all)
+            INSTALL_MODE="autostart-all"
+            ;;
+        d|remove-autostart-room|remove-room)
+            INSTALL_MODE="remove-autostart-room"
+            ;;
+        e|remove-autostart-kasir|remove-kasir)
+            INSTALL_MODE="remove-autostart-kasir"
+            ;;
+        f|remove-autostart-all|remove-all)
+            INSTALL_MODE="remove-autostart-all"
             ;;
         0|exit)
             echo "Keluar..."
@@ -87,7 +104,22 @@ else
             INSTALL_MODE="all"
             ;;
         a|A)
-            INSTALL_MODE="autostart"
+            INSTALL_MODE="autostart-room"
+            ;;
+        b|B)
+            INSTALL_MODE="autostart-kasir"
+            ;;
+        c|C)
+            INSTALL_MODE="autostart-all"
+            ;;
+        d|D)
+            INSTALL_MODE="remove-autostart-room"
+            ;;
+        e|E)
+            INSTALL_MODE="remove-autostart-kasir"
+            ;;
+        f|F)
+            INSTALL_MODE="remove-autostart-all"
             ;;
         r|R)
             INSTALL_MODE="remove-autostart"
@@ -118,11 +150,23 @@ case $INSTALL_MODE in
     kasir)
         echo "📦 Mode: Kasir saja (cashier)"
         ;;
-    autostart)
-        echo "📦 Mode: Setup Auto-start (systemd)"
+    autostart-room)
+        echo "📦 Mode: Setup Auto-start Room App"
         ;;
-    remove-autostart)
-        echo "📦 Mode: Hapus Auto-start"
+    autostart-kasir)
+        echo "📦 Mode: Setup Auto-start Kasir"
+        ;;
+    autostart-all)
+        echo "📦 Mode: Setup Auto-start Semua"
+        ;;
+    remove-autostart-room)
+        echo "📦 Mode: Hapus Auto-start Room App"
+        ;;
+    remove-autostart-kasir)
+        echo "📦 Mode: Hapus Auto-start Kasir"
+        ;;
+    remove-autostart-all)
+        echo "📦 Mode: Hapus Auto-start Semua"
         ;;
 esac
 echo ""
@@ -377,6 +421,13 @@ if [ -z "$DISPLAY" ] && ! command -v xvfb-run &> /dev/null; then
 fi
 
 # ============================================
+# Skip if auto-start mode (services will be started by systemd)
+# ============================================
+if [[ "$INSTALL_MODE" == autostart-* ]] || [[ "$INSTALL_MODE" == remove-autostart-* ]]; then
+    # Skip starting services here, will be started by systemd
+    echo "⏭️ Skipping manual start (auto-start mode)"
+else
+# ============================================
 # Start services based on mode
 # ============================================
 echo "▶️ Starting services..."
@@ -440,10 +491,15 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+# End of manual start section
+fi
+
 # ============================================
 # Auto-start setup (systemd)
 # ============================================
 setup_autostart() {
+    local mode="$1"  # room, kasir, or all
+    
     echo "📝 Membuat systemd service files..."
     
     # Source NVM to get correct Node.js and npm paths
@@ -453,20 +509,14 @@ setup_autostart() {
     # Get current user
     CURRENT_USER=$(whoami)
     
-    # Find Node.js and npm full path (from NVM)
-    NODE_PATH=$(which node)
-    NPM_PATH=$(which npm)
-    XVFB_PATH=$(which xvfb-run 2>/dev/null || echo "")
-    
     # Create systemd service directory
     SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
     mkdir -p "$SYSTEMD_USER_DIR"
     
-    # Get system PATH for systemd
-    SYSTEMD_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-    
-    # Server service
-    cat > "$SYSTEMD_USER_DIR/video-controller-server.service" << EOF
+    # Setup based on mode
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        # Server service
+        cat > "$SYSTEMD_USER_DIR/video-controller-server.service" << EOF
 [Unit]
 Description=Video Controller Server
 After=network.target
@@ -482,12 +532,10 @@ Environment=NODE_ENV=production
 [Install]
 WantedBy=default.target
 EOF
-    echo "   ✅ video-controller-server.service"
-    
-    # Agent service (with xvfb for headless)
-    AGENT_EXEC="'source \$NVM_DIR/nvm.sh && npm run start'"
-    
-    cat > "$SYSTEMD_USER_DIR/video-controller-agent.service" << EOF
+        echo "   ✅ video-controller-server.service"
+        
+        # Agent service (visible browser with DISPLAY access)
+        cat > "$SYSTEMD_USER_DIR/video-controller-agent.service" << EOF
 [Unit]
 Description=Video Controller Agent
 After=network.target video-controller-server.service
@@ -496,17 +544,20 @@ Wants=video-controller-server.service
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_ROOT/agent
-ExecStart=/bin/bash -l -c 'source /home/parkee/.nvm/nvm.sh && xvfb-run -a npm run start'
+Environment=BROWSER_HEADLESS=false
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+ExecStart=/bin/bash -l -c 'source /home/parkee/.nvm/nvm.sh && npm run start'
 Restart=on-failure
 RestartSec=10
 
 [Install]
 WantedBy=default.target
 EOF
-    echo "   ✅ video-controller-agent.service"
-    
-    # Web service
-    cat > "$SYSTEMD_USER_DIR/video-controller-web.service" << EOF
+        echo "   ✅ video-controller-agent.service"
+        
+        # Web service
+        cat > "$SYSTEMD_USER_DIR/video-controller-web.service" << EOF
 [Unit]
 Description=Video Controller Web
 After=network.target
@@ -521,10 +572,12 @@ RestartSec=10
 [Install]
 WantedBy=default.target
 EOF
-    echo "   ✅ video-controller-web.service"
+        echo "   ✅ video-controller-web.service"
+    fi
     
-    # Cashier service
-    cat > "$SYSTEMD_USER_DIR/video-controller-cashier.service" << EOF
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        # Cashier service
+        cat > "$SYSTEMD_USER_DIR/video-controller-cashier.service" << EOF
 [Unit]
 Description=Video Controller Cashier
 After=network.target
@@ -539,26 +592,42 @@ RestartSec=10
 [Install]
 WantedBy=default.target
 EOF
-    echo "   ✅ video-controller-cashier.service"
+        echo "   ✅ video-controller-cashier.service"
+    fi
     
     # Reload systemd
     systemctl --user daemon-reload
     
+    # Enable linger to allow user services to start on boot
+    echo "🔐 Enabling user service linger..."
+    loginctl enable-linger "$CURRENT_USER" 2>/dev/null || true
+    
     echo ""
-    echo "✅ Systemd services dibuat!"
+    echo "✅ Systemd services dibuat untuk mode: $mode"
     echo ""
-    echo "Untuk mengaktifkan auto-start:"
-    echo "  systemctl --user enable video-controller-server.service"
-    echo "  systemctl --user enable video-controller-agent.service"
-    echo "  systemctl --user enable video-controller-web.service"
-    echo "  systemctl --user enable video-controller-cashier.service"
-    echo ""
-    echo "Untuk memulai sekarang:"
-    echo "  systemctl --user start video-controller-server.service"
-    echo "  systemctl --user start video-controller-agent.service"
-    echo "  systemctl --user start video-controller-web.service"
-    echo "  systemctl --user start video-controller-cashier.service"
-    echo ""
+    
+    # Show enable commands based on mode
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        echo "Untuk mengaktifkan Room App auto-start:"
+        echo "  systemctl --user enable video-controller-server.service"
+        echo "  systemctl --user enable video-controller-agent.service"
+        echo "  systemctl --user enable video-controller-web.service"
+        echo ""
+        echo "Untuk memulai sekarang:"
+        echo "  systemctl --user start video-controller-server.service"
+        echo "  systemctl --user start video-controller-agent.service"
+        echo "  systemctl --user start video-controller-web.service"
+        echo ""
+    fi
+    
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        echo "Untuk mengaktifkan Kasir auto-start:"
+        echo "  systemctl --user enable video-controller-cashier.service"
+        echo ""
+        echo "Untuk memulai sekarang:"
+        echo "  systemctl --user start video-controller-cashier.service"
+        echo ""
+    fi
     
     # Ask to enable now
     echo -n "Aktifkan auto-start sekarang? [y/N]: "
@@ -567,79 +636,146 @@ EOF
     if [[ "$enable_now" =~ ^[Yy]$ ]]; then
         echo ""
         echo "🔄 Mengaktifkan services..."
-        systemctl --user enable video-controller-server.service
-        systemctl --user enable video-controller-agent.service
-        systemctl --user enable video-controller-web.service
-        systemctl --user enable video-controller-cashier.service
         
-        echo ""
-        echo "▶️ Memulai services..."
-        systemctl --user start video-controller-server.service
-        sleep 2
-        systemctl --user start video-controller-agent.service
-        sleep 1
-        systemctl --user start video-controller-web.service
-        systemctl --user start video-controller-cashier.service
+        if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+            systemctl --user enable video-controller-server.service
+            systemctl --user enable video-controller-agent.service
+            systemctl --user enable video-controller-web.service
+            
+            echo ""
+            echo "▶️ Memulai Room App services..."
+            systemctl --user start video-controller-server.service
+            sleep 2
+            systemctl --user start video-controller-agent.service
+            sleep 1
+            systemctl --user start video-controller-web.service
+        fi
+        
+        if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+            systemctl --user enable video-controller-cashier.service
+            
+            echo ""
+            echo "▶️ Memulai Kasir service..."
+            systemctl --user start video-controller-cashier.service
+        fi
         
         echo ""
         echo "✅ Auto-start diaktifkan!"
-        echo ""
-        echo "Cek status: systemctl --user status video-controller-server.service"
     fi
 }
 
 # Remove auto-start
 remove_autostart() {
-    echo "🗑️ Menghapus auto-start..."
+    local mode="$1"  # room, kasir, or all
+    
+    echo "🗑️ Menghapus auto-start untuk mode: $mode..."
     
     SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
     
-    # Stop services
-    systemctl --user stop video-controller-server.service 2>/dev/null || true
-    systemctl --user stop video-controller-agent.service 2>/dev/null || true
-    systemctl --user stop video-controller-web.service 2>/dev/null || true
-    systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        # Stop Room App services
+        systemctl --user stop video-controller-server.service 2>/dev/null || true
+        systemctl --user stop video-controller-agent.service 2>/dev/null || true
+        systemctl --user stop video-controller-web.service 2>/dev/null || true
+        
+        # Disable Room App services
+        systemctl --user disable video-controller-server.service 2>/dev/null || true
+        systemctl --user disable video-controller-agent.service 2>/dev/null || true
+        systemctl --user disable video-controller-web.service 2>/dev/null || true
+        
+        # Remove Room App service files
+        rm -f "$SYSTEMD_USER_DIR/video-controller-server.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-agent.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-web.service"
+        
+        echo "   ✅ Room App services removed"
+    fi
     
-    # Disable services
-    systemctl --user disable video-controller-server.service 2>/dev/null || true
-    systemctl --user disable video-controller-agent.service 2>/dev/null || true
-    systemctl --user disable video-controller-web.service 2>/dev/null || true
-    systemctl --user disable video-controller-cashier.service 2>/dev/null || true
-    
-    # Remove service files
-    rm -f "$SYSTEMD_USER_DIR/video-controller-server.service"
-    rm -f "$SYSTEMD_USER_DIR/video-controller-agent.service"
-    rm -f "$SYSTEMD_USER_DIR/video-controller-web.service"
-    rm -f "$SYSTEMD_USER_DIR/video-controller-cashier.service"
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        # Stop Kasir service
+        systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+        
+        # Disable Kasir service
+        systemctl --user disable video-controller-cashier.service 2>/dev/null || true
+        
+        # Remove Kasir service file
+        rm -f "$SYSTEMD_USER_DIR/video-controller-cashier.service"
+        
+        echo "   ✅ Kasir service removed"
+    fi
     
     # Reload systemd
     systemctl --user daemon-reload
     
-    echo "✅ Auto-start dihapus!"
+    echo "✅ Auto-start ($mode) dihapus!"
 }
 
 # Handle auto-start modes
-if [ "$INSTALL_MODE" = "autostart" ]; then
-    # Install dependencies for all services first
-    echo "📦 Installing dependencies for auto-start..."
+if [ "$INSTALL_MODE" = "autostart-room" ]; then
+    echo "📦 Installing dependencies for Room App auto-start..."
+    cd "$PROJECT_ROOT/agent" && npm install
+    cd "$PROJECT_ROOT/server" && npm install
+    cd "$PROJECT_ROOT/web" && npm install
+    
+    echo "🔨 Building Room App..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+    
+    setup_autostart "room"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "autostart-kasir" ]; then
+    echo "📦 Installing dependencies for Kasir auto-start..."
+    cd "$PROJECT_ROOT/cashier" && npm install
+    
+    echo "🔨 Building Kasir..."
+    cd "$PROJECT_ROOT/cashier" && npm run build
+    
+    setup_autostart "kasir"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "autostart-all" ]; then
+    echo "📦 Installing dependencies for all services..."
     cd "$PROJECT_ROOT/agent" && npm install
     cd "$PROJECT_ROOT/server" && npm install
     cd "$PROJECT_ROOT/web" && npm install
     cd "$PROJECT_ROOT/cashier" && npm install
     
-    # Build services
-    echo "🔨 Building services..."
+    echo "🔨 Building all services..."
     cd "$PROJECT_ROOT/server" && npm run build
     cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+    cd "$PROJECT_ROOT/cashier" && npm run build
     
-    setup_autostart
+    setup_autostart "all"
     exit 0
 fi
 
+if [ "$INSTALL_MODE" = "remove-autostart-room" ]; then
+    remove_autostart "room"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart-kasir" ]; then
+    remove_autostart "kasir"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart-all" ]; then
+    remove_autostart "all"
+    exit 0
+fi
+
+# Legacy support for old remove-autostart mode
 if [ "$INSTALL_MODE" = "remove-autostart" ]; then
-    remove_autostart
+    remove_autostart "all"
     exit 0
 fi
 
-# Wait for any process to exit
-wait $PIDS
+# Wait for any process to exit (only for manual start mode)
+if [ -n "$PIDS" ]; then
+    wait $PIDS
+fi
