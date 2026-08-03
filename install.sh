@@ -17,6 +17,118 @@ export PATH="$NVM_DIR/versions/node/$(nvm version default 2>/dev/null || echo 'v
 set -e
 
 # ============================================
+# Prompt for .env configuration
+# ============================================
+prompt_env_config() {
+    local mode="$1"
+    
+    echo ""
+    echo "=========================================="
+    echo "  Konfigurasi .env (optional)"
+    echo "=========================================="
+    echo "Tekan Enter untuk skip/tidak ubah field"
+    echo ""
+    
+    local server_ip=""
+    local room_id=""
+    local room_name=""
+    local rooms_json=""
+    
+    # Room App mode - needs Server IP, Room ID, Room Name
+    if [[ "$mode" == "room" || "$mode" == "all" ]]; then
+        read -p "Server IP (kosongkan untuk skip): " server_ip
+        
+        read -p "Room ID (kosongkan untuk skip): " room_id
+        
+        read -p "Room Name (kosongkan untuk skip): " room_name
+    fi
+    
+    # Kasir mode - only needs Rooms JSON
+    if [[ "$mode" == "kasir" ]]; then
+        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+    fi
+    
+    # All mode - needs everything
+    if [[ "$mode" == "all" ]]; then
+        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+    fi
+    
+    # Apply configuration - only non-empty values will be applied
+    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$mode"
+}
+
+apply_env_config() {
+    local server_ip="$1"
+    local room_id="$2"
+    local room_name="$3"
+    local rooms_json="$4"
+    local mode="$5"
+    
+    # Skip if all values are empty
+    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" ]]; then
+        echo "[INFO] Tidak ada konfigurasi yang diubah"
+        return
+    fi
+    
+    echo ""
+    echo "Mengupdate file .env..."
+    
+    # Agent .env - ROOM_ID, ROOM_NAME, SERVER_IP
+    if [[ "$mode" == "room" || "$mode" == "all" ]]; then
+        local agent_env="$PROJECT_ROOT/agent/.env"
+        if [[ -f "$agent_env" ]]; then
+            if [[ -n "$server_ip" ]]; then
+                sed -i "s|SERVER_IP=.*|SERVER_IP=$server_ip|" "$agent_env"
+            fi
+            if [[ -n "$room_id" ]]; then
+                sed -i "s|ROOM_ID=.*|ROOM_ID=$room_id|" "$agent_env"
+            fi
+            if [[ -n "$room_name" ]]; then
+                sed -i "s|ROOM_NAME=.*|ROOM_NAME=$room_name|" "$agent_env"
+            fi
+            echo "[OK] Updated agent/.env"
+        else
+            echo "[WARN] File agent/.env tidak ditemukan"
+        fi
+    fi
+
+    # Server .env - SERVER_IP
+    local server_env="$PROJECT_ROOT/server/.env"
+    if [[ -f "$server_env" ]]; then
+        if [[ -n "$server_ip" ]]; then
+            sed -i "s|SERVER_IP=.*|SERVER_IP=$server_ip|" "$server_env"
+        fi
+        echo "[OK] Updated server/.env"
+    else
+        echo "[WARN] File server/.env tidak ditemukan"
+    fi
+
+    # Web .env - SERVER_IP
+    local web_env="$PROJECT_ROOT/web/.env"
+    if [[ -f "$web_env" ]]; then
+        if [[ -n "$server_ip" ]]; then
+            sed -i "s|VITE_SERVER_IP=.*|VITE_SERVER_IP=$server_ip|" "$web_env"
+        fi
+        echo "[OK] Updated web/.env"
+    else
+        echo "[WARN] File web/.env tidak ditemukan"
+    fi
+
+    # Cashier .env - VITE_ROOMS
+    if [[ "$mode" == "kasir" || "$mode" == "all" ]]; then
+        local cashier_env="$PROJECT_ROOT/cashier/.env"
+        if [[ -f "$cashier_env" ]]; then
+            if [[ -n "$rooms_json" ]]; then
+                sed -i "s|VITE_ROOMS=.*|VITE_ROOMS=$rooms_json|" "$cashier_env"
+            fi
+            echo "[OK] Updated cashier/.env"
+        else
+            echo "[WARN] File cashier/.env tidak ditemukan"
+        fi
+    fi
+}
+
+# ============================================
 # Interactive menu
 # ============================================
 show_menu() {
@@ -48,8 +160,39 @@ show_menu() {
 # ============================================
 INSTALL_MODE=""
 
-if [[ $# -gt 0 ]]; then
-    # Command line argument provided
+# Use CLI mode if provided via arguments
+if [[ -n "$CLI_MODE" ]]; then
+    case $CLI_MODE in
+        1)
+            INSTALL_MODE="room"
+            ;;
+        2)
+            INSTALL_MODE="kasir"
+            ;;
+        3)
+            INSTALL_MODE="all"
+            ;;
+        a|A)
+            INSTALL_MODE="autostart-room"
+            ;;
+        b|B)
+            INSTALL_MODE="autostart-kasir"
+            ;;
+        c|C)
+            INSTALL_MODE="autostart-all"
+            ;;
+        d|D)
+            INSTALL_MODE="remove-autostart-room"
+            ;;
+        e|E)
+            INSTALL_MODE="remove-autostart-kasir"
+            ;;
+        f|F)
+            INSTALL_MODE="remove-autostart-all"
+            ;;
+    esac
+elif [[ $# -gt 0 ]]; then
+    # Command line argument provided (legacy format)
     case $1 in
         1|room)
             INSTALL_MODE="room"
@@ -209,22 +352,31 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
 
     echo "⬇️ Downloading repository archive..."
 
-    PARENT_DIR="$(dirname "$PROJECT_ROOT")"
+    # Create video-controller subfolder in current directory
+    DEST_DIR="$PROJECT_ROOT/video-controller"
+    
     REPO_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
     ARCHIVE_NAME="video-controller-main.zip"
-    EXTRACT_DIR="$PARENT_DIR/video-controller-main"
-    DEST_DIR="$PARENT_DIR/video-controller"
+    EXTRACT_DIR="$DEST_DIR/video-controller-main"
 
     cd /tmp
     rm -f "$ARCHIVE_NAME"
     curl -fsSL "$REPO_URL" -o "$ARCHIVE_NAME"
 
+    # Remove existing destination folder if exists
     if [ -d "$DEST_DIR" ]; then
         rm -rf "$DEST_DIR"
     fi
 
-    unzip -q "$ARCHIVE_NAME" -d "$PARENT_DIR"
-    mv "$EXTRACT_DIR" "$DEST_DIR"
+    mkdir -p "$DEST_DIR"
+    unzip -q "$ARCHIVE_NAME" -d "$DEST_DIR"
+    
+    # Move contents from video-controller-main to DEST_DIR
+    if [ -d "$EXTRACT_DIR" ]; then
+        mv "$EXTRACT_DIR/"* "$DEST_DIR/"
+        rm -rf "$EXTRACT_DIR"
+    fi
+    rm -f "$ARCHIVE_NAME"
 
     PROJECT_ROOT="$DEST_DIR"
     cd "$PROJECT_ROOT"
@@ -235,6 +387,9 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
     echo "❌ Cannot get project files!"
     exit 1
 fi
+
+# Prompt for .env configuration AFTER PROJECT_ROOT is set correctly
+prompt_env_config "$INSTALL_MODE"
 
 # ============================================
 # Auto-install Node.js if not present

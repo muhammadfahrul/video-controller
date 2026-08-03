@@ -6,6 +6,13 @@ param(
     [string]$Mode
 )
 
+# Bypass execution policy untuk menjalankan script ini
+$currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
+if ($currentPolicy -eq "Restricted" -or $currentPolicy -eq "AllSigned") {
+    Write-Host "[INFO] Mengaktifkan execution policy..." -ForegroundColor Yellow
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
+}
+
 $ErrorActionPreference = "Stop"
 
 function Show-Menu {
@@ -19,10 +26,18 @@ function Show-Menu {
     Write-Host "  [2] Kasir          - Aplikasi Kasir (Cashier)" -ForegroundColor White
     Write-Host "  [3] Semua          - Room App + Kasir" -ForegroundColor White
     Write-Host ""
+    Write-Host "  [A] Auto-start Room App" -ForegroundColor Green
+    Write-Host "  [B] Auto-start Kasir" -ForegroundColor Green
+    Write-Host "  [C] Auto-start Semua" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  [D] Remove Auto-start Room App" -ForegroundColor Red
+    Write-Host "  [E] Remove Auto-start Kasir" -ForegroundColor Red
+    Write-Host "  [F] Remove Auto-start Semua" -ForegroundColor Red
+    Write-Host ""
     Write-Host "  [0] Keluar" -ForegroundColor White
     Write-Host ""
 
-    $choice = Read-Host "Masukkan pilihan [1-3]"
+    $choice = Read-Host "Masukkan pilihan [0-F]"
     return $choice
 }
 
@@ -30,13 +45,30 @@ function Get-InstallMode {
     param([string]$RequestedMode)
 
     if ($RequestedMode) {
-        switch ($RequestedMode.ToLower()) {
+        $mode = $RequestedMode.ToLower()
+        switch ($mode) {
             '1' { return 'room' }
             'room' { return 'room' }
             '2' { return 'kasir' }
             'kasir' { return 'kasir' }
             '3' { return 'all' }
             'all' { return 'all' }
+            'a' { return 'autostart-room' }
+            'autostart-room' { return 'autostart-room' }
+            'b' { return 'autostart-kasir' }
+            'autostart-kasir' { return 'autostart-kasir' }
+            'c' { return 'autostart-all' }
+            'autostart-all' { return 'autostart-all' }
+            'd' { return 'remove-autostart-room' }
+            'remove-autostart-room' { return 'remove-autostart-room' }
+            'remove-room' { return 'remove-autostart-room' }
+            'e' { return 'remove-autostart-kasir' }
+            'remove-autostart-kasir' { return 'remove-autostart-kasir' }
+            'remove-kasir' { return 'remove-autostart-kasir' }
+            'f' { return 'remove-autostart-all' }
+            'remove-autostart-all' { return 'remove-autostart-all' }
+            'remove-all' { return 'remove-autostart-all' }
+            'remove-autostart' { return 'remove-autostart-all' }
             '0' { exit 0 }
             default {
                 Write-Host "Pilihan tidak valid: $RequestedMode" -ForegroundColor Red
@@ -51,6 +83,18 @@ function Get-InstallMode {
         '1' { return 'room' }
         '2' { return 'kasir' }
         '3' { return 'all' }
+        'a' { return 'autostart-room' }
+        'A' { return 'autostart-room' }
+        'b' { return 'autostart-kasir' }
+        'B' { return 'autostart-kasir' }
+        'c' { return 'autostart-all' }
+        'C' { return 'autostart-all' }
+        'd' { return 'remove-autostart-room' }
+        'D' { return 'remove-autostart-room' }
+        'e' { return 'remove-autostart-kasir' }
+        'E' { return 'remove-autostart-kasir' }
+        'f' { return 'remove-autostart-all' }
+        'F' { return 'remove-autostart-all' }
         '0' { exit 0 }
         default {
             Write-Host "Pilihan tidak valid!" -ForegroundColor Red
@@ -76,30 +120,143 @@ function Install-7Zip {
     Write-Host "[OK] 7-Zip installed" -ForegroundColor Green
 }
 
+# ============================================
+# Configure .env files
+# ============================================
+function Set-EnvConfig {
+    param(
+        [string]$ProjectRoot,
+        [string]$ServerIP,
+        [string]$RoomID,
+        [string]$RoomName,
+        [string]$Rooms
+    )
+
+    # Skip if all values are empty
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms) {
+        Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Mengupdate file .env..." -ForegroundColor Yellow
+
+    # Agent .env - ROOM_ID, ROOM_NAME, SERVER_IP
+    if ($RoomID -or $RoomName -or $ServerIP) {
+        $agentEnvPath = Join-Path $ProjectRoot "agent\.env"
+        if (Test-Path $agentEnvPath) {
+            $envContent = Get-Content $agentEnvPath -Raw
+            
+            if ($ServerIP) {
+                $envContent = $envContent -replace 'SERVER_IP=.*', "SERVER_IP=$ServerIP"
+            }
+            if ($RoomID) {
+                $envContent = $envContent -replace 'ROOM_ID=.*', "ROOM_ID=$RoomID"
+            }
+            if ($RoomName) {
+                $envContent = $envContent -replace 'ROOM_NAME=.*', "ROOM_NAME=$RoomName"
+            }
+            
+            Set-Content -Path $agentEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated agent/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File agent/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Server .env - SERVER_IP
+    if ($ServerIP) {
+        $serverEnvPath = Join-Path $ProjectRoot "server\.env"
+        if (Test-Path $serverEnvPath) {
+            $envContent = Get-Content $serverEnvPath -Raw
+            $envContent = $envContent -replace 'SERVER_IP=.*', "SERVER_IP=$ServerIP"
+            Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated server/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File server/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Web .env - SERVER_IP
+    if ($ServerIP) {
+        $webEnvPath = Join-Path $ProjectRoot "web\.env"
+        if (Test-Path $webEnvPath) {
+            $envContent = Get-Content $webEnvPath -Raw
+            $envContent = $envContent -replace 'VITE_SERVER_IP=.*', "VITE_SERVER_IP=$ServerIP"
+            Set-Content -Path $webEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated web/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File web/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Cashier .env - VITE_ROOMS
+    if ($Rooms) {
+        $cashierEnvPath = Join-Path $ProjectRoot "cashier\.env"
+        if (Test-Path $cashierEnvPath) {
+            $envContent = Get-Content $cashierEnvPath -Raw
+            
+            # Use rooms JSON directly if provided (user already included IPs)
+            if ($Rooms -and $Rooms -ne "default") {
+                $envContent = $envContent -replace 'VITE_ROOMS=.*', "VITE_ROOMS=$Rooms"
+            }
+            
+            Set-Content -Path $cashierEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated cashier/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File cashier/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+}
+
 function Install-NodeJS {
-    Write-Host "[INFO] Installing Node.js..." -ForegroundColor Yellow
+    Write-Host "[INFO] Installing Node.js v22 (ZIP format)..." -ForegroundColor Yellow
 
-    $nodeUrl = 'https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi'
-    $nodeInstaller = "$env:TEMP\node-installer.msi"
+    # Use Node.js v22 - required by Vite 8.x and ESLint 10.x
+    $nodeVersion = "22.13.1"
+    $nodeUrl = "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip"
+    $nodeZip = "$env:TEMP\node-v$nodeVersion-win-x64.zip"
+    $nodeExtractDir = "C:\nodejs"
 
-    Write-Host "[INFO] Downloading Node.js..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeInstaller -UseBasicParsing
+    Write-Host "[INFO] Downloading Node.js v$nodeVersion..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeZip -UseBasicParsing
 
-    Write-Host "[INFO] Installing Node.js..." -ForegroundColor Yellow
-    Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', "`"$nodeInstaller`"", '/quiet', '/norestart') -Wait
+    Write-Host "[INFO] Extracting Node.js to $nodeExtractDir..." -ForegroundColor Yellow
+    
+    # Remove old installation if exists
+    if (Test-Path $nodeExtractDir) {
+        Remove-Item -Path $nodeExtractDir -Recurse -Force
+    }
+    
+    # Create directory
+    New-Item -ItemType Directory -Path $nodeExtractDir -Force | Out-Null
 
-    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    # Extract using Expand-Archive (PowerShell 5.1+)
+    Expand-Archive -Path $nodeZip -DestinationPath $nodeExtractDir -Force
 
-    Write-Host "[OK] Node.js installed" -ForegroundColor Green
+    Write-Host "[OK] Node.js v$nodeVersion installed to $nodeExtractDir" -ForegroundColor Green
 }
 
 function Install-Dependencies {
     param(
         [string]$Path,
-        [string]$Name
+        [string]$Name,
+        [switch]$ForceReinstall
     )
 
-    if (-not (Test-Path (Join-Path $Path 'node_modules'))) {
+    # Remove node_modules if ForceReinstall or doesn't exist properly
+    if ($ForceReinstall -or -not (Test-Path (Join-Path $Path 'node_modules'))) {
+        if (Test-Path (Join-Path $Path 'node_modules')) {
+            Write-Host "[INFO] Removing $Name node_modules (fresh install)..." -ForegroundColor Yellow
+            Remove-NodeModules -Path $Path
+        }
+        
+        $lockFile = Join-Path $Path 'package-lock.json'
+        if (Test-Path $lockFile) {
+            Write-Host "[INFO] Removing $Name package-lock.json..." -ForegroundColor Yellow
+            Remove-FileIfExists -Path $lockFile
+        }
+        
         Write-Host "[INFO] Installing $Name dependencies..." -ForegroundColor Yellow
         Push-Location $Path
         & npm install
@@ -133,11 +290,141 @@ function Ensure-PlaywrightBrowsers {
     }
 }
 
+# ============================================
+# Auto-start setup (Windows Task Scheduler)
+# ============================================
+function Setup-Autostart {
+    param([string]$mode)
+
+    Write-Host "[INFO] Setting up auto-start for mode: $mode" -ForegroundColor Yellow
+
+    $taskFolder = "VideoController"
+
+    # Get Node.js path
+    $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if (-not $nodePath) {
+        $nodePath = "node"
+    }
+
+    if ($mode -eq "room" -or $mode -eq "all") {
+        # Server auto-start
+        $serverTaskName = "VideoController_Server"
+        $serverAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\server`" && npm run start" -WorkingDirectory (Join-Path $PROJECT_ROOT "server")
+        $serverTrigger = New-ScheduledTaskTrigger -AtLogOn
+        $serverPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName $serverTaskName -TaskPath "\$taskFolder\" -Action $serverAction -Trigger $serverTrigger -Principal $serverPrincipal -Description "Video Controller Server" -Force
+        Write-Host "[OK] Server auto-start configured" -ForegroundColor Green
+
+        # Agent auto-start (with BROWSER_HEADLESS=false for visible browser)
+        $agentTaskName = "VideoController_Agent"
+        $agentEnv = "set BROWSER_HEADLESS=false&& "
+        $agentAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c $agentEnv cd /d `"$PROJECT_ROOT\agent`" && npm run start" -WorkingDirectory (Join-Path $PROJECT_ROOT "agent")
+        $agentTrigger = New-ScheduledTaskTrigger -AtLogOn
+        $agentPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName $agentTaskName -TaskPath "\$taskFolder\" -Action $agentAction -Trigger $agentTrigger -Principal $agentPrincipal -Description "Video Controller Agent" -Force
+        Write-Host "[OK] Agent auto-start configured" -ForegroundColor Green
+
+        # Web auto-start
+        $webTaskName = "VideoController_Web"
+        $webAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\web`" && npm run preview:host" -WorkingDirectory (Join-Path $PROJECT_ROOT "web")
+        $webTrigger = New-ScheduledTaskTrigger -AtLogOn
+        $webPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName $webTaskName -TaskPath "\$taskFolder\" -Action $webAction -Trigger $webTrigger -Principal $webPrincipal -Description "Video Controller Web" -Force
+        Write-Host "[OK] Web auto-start configured" -ForegroundColor Green
+    }
+
+    if ($mode -eq "kasir" -or $mode -eq "all") {
+        # Cashier auto-start
+        $cashierTaskName = "VideoController_Cashier"
+        $cashierAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\cashier`" && npm run preview:host" -WorkingDirectory (Join-Path $PROJECT_ROOT "cashier")
+        $cashierTrigger = New-ScheduledTaskTrigger -AtLogOn
+        $cashierPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+        Register-ScheduledTask -TaskName $cashierTaskName -TaskPath "\$taskFolder\" -Action $cashierAction -Trigger $cashierTrigger -Principal $cashierPrincipal -Description "Video Controller Cashier" -Force
+        Write-Host "[OK] Cashier auto-start configured" -ForegroundColor Green
+    }
+
+    Write-Host "[OK] Auto-start ($mode) configured successfully!" -ForegroundColor Green
+}
+
+# ============================================
+# Remove auto-start
+# ============================================
+function Remove-Autostart {
+    param([string]$mode)
+
+    Write-Host "[INFO] Removing auto-start for mode: $mode" -ForegroundColor Yellow
+
+    $taskFolder = "VideoController"
+
+    if ($mode -eq "room" -or $mode -eq "all") {
+        # Remove Room App tasks
+        $tasksToRemove = @("VideoController_Server", "VideoController_Agent", "VideoController_Web")
+        foreach ($taskName in $tasksToRemove) {
+            if (Get-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $taskName -ErrorAction SilentlyContinue) {
+                Unregister-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $taskName -Confirm:$false
+                Write-Host "[OK] Removed $taskName" -ForegroundColor Green
+            }
+        }
+    }
+
+    if ($mode -eq "kasir" -or $mode -eq "all") {
+        # Remove Cashier task
+        $cashierTaskName = "VideoController_Cashier"
+        if (Get-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $cashierTaskName -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $cashierTaskName -Confirm:$false
+            Write-Host "[OK] Removed $cashierTaskName" -ForegroundColor Green
+        }
+    }
+
+    Write-Host "[OK] Auto-start ($mode) removed successfully!" -ForegroundColor Green
+}
+
 Write-Host "[INFO] Starting Video Controller..." -ForegroundColor Cyan
 
 $PROJECT_ROOT = $PSScriptRoot
 $INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
 
+# ============================================
+# Prompt for .env configuration
+# ============================================
+Write-Host ""
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "  Konfigurasi .env (optional)" -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "Tekan Enter untuk skip/tidak ubah field"
+Write-Host ""
+
+# Initialize variables
+$ServerIP = ""
+$RoomID = ""
+$RoomName = ""
+$Rooms = ""
+
+# Room App mode - needs Server IP, Room ID, Room Name
+if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
+    $input = Read-Host "Server IP (kosongkan untuk skip)"
+    if ($input -ne "") { $ServerIP = $input }
+    
+    $input = Read-Host "Room ID (kosongkan untuk skip)"
+    if ($input -ne "") { $RoomID = $input }
+    
+    $input = Read-Host "Room Name (kosongkan untuk skip)"
+    if ($input -ne "") { $RoomName = $input }
+}
+
+# Kasir mode - only needs Rooms JSON
+if ($INSTALL_MODE -eq "kasir") {
+    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+    if ($input -ne "") { $Rooms = $input }
+}
+
+# All mode - also needs Rooms JSON
+if ($INSTALL_MODE -eq "all") {
+    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+    if ($input -ne "") { $Rooms = $input }
+}
+
+# Show selected mode
 switch ($INSTALL_MODE) {
     'all' {
         Write-Host "[INFO] Mode: Semua layanan (Room App + Kasir)" -ForegroundColor Yellow
@@ -148,81 +435,296 @@ switch ($INSTALL_MODE) {
     'kasir' {
         Write-Host "[INFO] Mode: Kasir saja (cashier)" -ForegroundColor Yellow
     }
+    'autostart-room' {
+        Write-Host "[INFO] Mode: Auto-start Room App" -ForegroundColor Green
+    }
+    'autostart-kasir' {
+        Write-Host "[INFO] Mode: Auto-start Kasir" -ForegroundColor Green
+    }
+    'autostart-all' {
+        Write-Host "[INFO] Mode: Auto-start Semua" -ForegroundColor Green
+    }
+    'remove-autostart-room' {
+        Write-Host "[INFO] Mode: Remove Auto-start Room App" -ForegroundColor Red
+    }
+    'remove-autostart-kasir' {
+        Write-Host "[INFO] Mode: Remove Auto-start Kasir" -ForegroundColor Red
+    }
+    'remove-autostart-all' {
+        Write-Host "[INFO] Mode: Remove Auto-start Semua" -ForegroundColor Red
+    }
 }
 
 Write-Host ""
 
-$nodeCommand = Get-Command node -ErrorAction SilentlyContinue
-if (-not $nodeCommand) {
-    Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
-    Install-NodeJS
-    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
-    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
+# Handle auto-start modes - skip service start
+if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart-") {
+    Write-Host "[INFO] Auto-start mode detected, checking Node.js..." -ForegroundColor Yellow
+
+    # Check Node.js
+    $nodeExePath = Find-NodeJS
+    if (-not $nodeExePath) {
+        Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
+        exit 1
+    }
+
+    $nodeVersion = & $nodeExePath --version 2>$null
+    $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
+
+    if (-not $nodeVersion -or $nodeMajorVersion -lt 16) {
+        Write-Host "[ERROR] Node.js $nodeVersion is too old or not installed!" -ForegroundColor Red
+        exit 1
+    }
+
+    $nodeDir = Split-Path $nodeExePath -Parent
+    $env:Path = $nodeDir + ";" + $env:Path
+
+    $npmVersion = & npm --version 2>$null
+    Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundColor Green
+
+    # Check if project files exist
+    if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
+        Write-Host "[ERROR] Project files not found in $PROJECT_ROOT" -ForegroundColor Red
+        exit 1
+    }
+
+    # Install dependencies if needed
+    Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+
+    if ($INSTALL_MODE -eq "autostart-room" -or $INSTALL_MODE -eq "autostart-all") {
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent'
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server'
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
+        Ensure-PlaywrightBrowsers
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir" -or $INSTALL_MODE -eq "autostart-all") {
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier'
+    }
+
+    # Build if needed
+    if ($INSTALL_MODE -eq "autostart-room" -or $INSTALL_MODE -eq "autostart-all") {
+        Write-Host "[INFO] Building Room App..." -ForegroundColor Yellow
+        Push-Location (Join-Path $PROJECT_ROOT 'server')
+        & npm run build
+        Pop-Location
+
+        Push-Location (Join-Path $PROJECT_ROOT 'agent')
+        & npm run build
+        Pop-Location
+
+        Push-Location (Join-Path $PROJECT_ROOT 'web')
+        & npm run build
+        Pop-Location
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir" -or $INSTALL_MODE -eq "autostart-all") {
+        Write-Host "[INFO] Building Kasir..." -ForegroundColor Yellow
+        Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+        & npm run build
+        Pop-Location
+    }
+
+    # Setup or remove auto-start
+    if ($INSTALL_MODE -eq "autostart-room") {
+        Setup-Autostart "room"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir") {
+        Setup-Autostart "kasir"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "autostart-all") {
+        Setup-Autostart "all"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-room") {
+        Remove-Autostart "room"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-kasir") {
+        Remove-Autostart "kasir"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-all") {
+        Remove-Autostart "all"
+        exit 0
+    }
 }
 
-if (-not $nodeCommand) {
+# Normal mode - continue with service start
+
+function Find-NodeJS {
+    # Try to find node.exe in common installation directories
+    # Priority: C:\nodejs (ZIP) > Program Files (MSI)
+    $nodePaths = @(
+        # ZIP installations (newer)
+        "C:\nodejs\node-v22.13.1-win-x64\node.exe",
+        "C:\nodejs\node-v20.18.1-win-x64\node.exe",
+        # MSI installations
+        "C:\Program Files\nodejs\node.exe",
+        "C:\Program Files (x86)\nodejs\node.exe",
+        "$env:APPDATA\nodejs\node.exe",
+        "$env:LOCALAPPDATA\nodejs\node.exe"
+    )
+    
+    $foundNode = $null
+    $foundVersion = $null
+    
+    foreach ($path in $nodePaths) {
+        if (Test-Path $path) {
+            # Get version to compare
+            try {
+                $version = & $path --version 2>$null
+                if ($version -match 'v(\d+)\.(\d+)') {
+                    $major = [int]$matches[1]
+                    $minor = [int]$matches[2]
+                    
+                    # Always prefer v22 if found
+                    if ($major -ge 22 -and $foundVersion -notmatch 'v2[2-9]') {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                    # Store first found (v20) if no v22 found yet
+                    elseif (-not $foundNode) {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                }
+            } catch {
+                # If version check fails, still return the path
+                if (-not $foundNode) {
+                    $foundNode = $path
+                }
+            }
+        }
+    }
+    return $foundNode
+}
+
+$nodeExePath = Find-NodeJS
+
+if (-not $nodeExePath) {
+    Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
+    Install-NodeJS
+    $nodeExePath = Find-NodeJS
+}
+
+if (-not $nodeExePath) {
     Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+    Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
     exit 1
 }
 
-$nodeVersion = & $nodeCommand.Source --version 2>$null
+# Get Node.js version using the found path
+$nodeVersion = & $nodeExePath --version 2>$null
 $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
 
-if (-not $nodeVersion -or $nodeMajorVersion -lt 16) {
-    Write-Host "[ERROR] Node.js $nodeVersion is too old or not installed!" -ForegroundColor Red
+# Check if Node.js is too old or below v22 (required by Vite 8.x)
+if (-not $nodeVersion -or $nodeMajorVersion -lt 22) {
+    Write-Host "[ERROR] Node.js $nodeVersion requires v22+ for this project (Vite 8.x)" -ForegroundColor Red
+    Write-Host "[INFO] Installing Node.js v22..." -ForegroundColor Yellow
     Install-NodeJS
-    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
-    $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
-    if (-not $nodeCommand) {
+    $nodeExePath = Find-NodeJS
+    
+    if (-not $nodeExePath) {
         Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+        Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
         exit 1
     }
-    $nodeVersion = & $nodeCommand.Source --version 2>$null
+    $nodeVersion = & $nodeExePath --version 2>$null
     $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
 }
 
-$npmCommand = Get-Command npm -ErrorAction SilentlyContinue
-if (-not $npmCommand) {
+# Add node directory to PATH for this session
+$nodeDir = Split-Path $nodeExePath -Parent
+$env:Path = $nodeDir + ";" + $env:Path
+
+# Find npm
+$npmExePath = $null
+$npmPaths = @(
+    (Join-Path $nodeDir "npm.cmd"),
+    (Join-Path $nodeDir "npm"),
+    "C:\nodejs\node-v22.13.1-win-x64\npm.cmd",
+    "C:\nodejs\node-v20.18.1-win-x64\npm.cmd",
+    "C:\Program Files\nodejs\npm.cmd",
+    "C:\Program Files (x86)\nodejs\npm.cmd"
+)
+foreach ($path in $npmPaths) {
+    if (Test-Path $path) {
+        $npmExePath = $path
+        break
+    }
+}
+
+if (-not $npmExePath) {
+    Write-Host "[ERROR] npm is not available." -ForegroundColor Red
+    exit 1
+}
+if (-not $npmExePath) {
     Write-Host "[ERROR] npm is not available." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "[OK] Node.js $(node --version) and npm $(npm --version) detected" -ForegroundColor Green
+$npmVersion = & $npmExePath --version 2>$null
+Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundColor Green
 
 if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     Write-Host "[INFO] Project files not found. Downloading ZIP archive..." -ForegroundColor Yellow
 
-    $parentDir = Split-Path $PROJECT_ROOT -Parent
+    # Create video-controller subfolder in current directory
+    $destDir = Join-Path $PROJECT_ROOT 'video-controller'
     $archiveUrl = 'https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip'
     $archivePath = Join-Path $env:TEMP 'video-controller-main.zip'
-    $extractDir = Join-Path $parentDir 'video-controller-main'
-    $destDir = Join-Path $parentDir 'video-controller'
+    $extractDir = Join-Path $destDir 'video-controller-main'
 
     if (-not (Get-Command Expand-Archive -ErrorAction SilentlyContinue)) {
         Write-Host "[ERROR] PowerShell archive support is unavailable." -ForegroundColor Red
         Install-7Zip
     }
 
+    # Remove existing destination folder if exists
     if (Test-Path $destDir) {
         Remove-Item -Path $destDir -Recurse -Force
     }
 
-    if (Test-Path $extractDir) {
-        Remove-Item -Path $extractDir -Recurse -Force
-    }
+    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
 
     Write-Host "[INFO] Downloading repository archive..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath -UseBasicParsing
 
     Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
-    Expand-Archive -Path $archivePath -DestinationPath $parentDir -Force
+    Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
 
+    # Move contents from video-controller-main to destDir
     if (Test-Path $extractDir) {
-        Rename-Item -Path $extractDir -NewName 'video-controller'
+        $items = Get-ChildItem -Path $extractDir
+        foreach ($item in $items) {
+            $itemDestPath = Join-Path $destDir $item.Name
+            if (Test-Path $itemDestPath) {
+                if ($item.PSIsContainer) {
+                    Remove-Item -Path $itemDestPath -Recurse -Force
+                } else {
+                    Remove-Item -Path $itemDestPath -Force
+                }
+            }
+            Move-Item -Path $item.FullName -Destination $itemDestPath -Force
+        }
+        Remove-Item -Path $extractDir -Recurse -Force
     }
+
+    Remove-Item -Path $archivePath -Force -ErrorAction SilentlyContinue
 
     $PROJECT_ROOT = $destDir
     Write-Host "[OK] Project ready at $PROJECT_ROOT" -ForegroundColor Green
+
+    # Apply .env configuration AFTER PROJECT_ROOT is set correctly
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
@@ -251,11 +753,11 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent'
     Ensure-PlaywrightBrowsers
     Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server'
-    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web'
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
 }
 
 if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
-    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier'
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier' -ForceReinstall
 }
 
 Write-Host "[INFO] Building services..." -ForegroundColor Yellow
@@ -293,7 +795,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     $processes += $serverProcess
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
 
-    $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
+    $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
     $processes += $agentProcess
     Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
 
