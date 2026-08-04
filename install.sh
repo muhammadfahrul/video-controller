@@ -33,6 +33,7 @@ prompt_env_config() {
     local room_id=""
     local room_name=""
     local rooms_json=""
+    local billing_enabled=""
     
     # Room App mode - needs Server IP, Room ID, Room Name
     if [[ "$mode" == "room" || "$mode" == "all" ]]; then
@@ -41,20 +42,26 @@ prompt_env_config() {
         read -p "Room ID (kosongkan untuk skip): " room_id
         
         read -p "Room Name (kosongkan untuk skip): " room_name
+        
+        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # Kasir mode - only needs Rooms JSON
     if [[ "$mode" == "kasir" ]]; then
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+        
+        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # All mode - needs everything
     if [[ "$mode" == "all" ]]; then
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+        
+        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # Apply configuration - only non-empty values will be applied
-    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$mode"
+    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode"
 }
 
 apply_env_config() {
@@ -62,10 +69,11 @@ apply_env_config() {
     local room_id="$2"
     local room_name="$3"
     local rooms_json="$4"
-    local mode="$5"
+    local billing_enabled="$5"
+    local mode="$6"
     
     # Skip if all values are empty
-    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" ]]; then
+    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" ]]; then
         echo "[INFO] Tidak ada konfigurasi yang diubah"
         return
     fi
@@ -121,9 +129,36 @@ apply_env_config() {
             if [[ -n "$rooms_json" ]]; then
                 sed -i "s|VITE_ROOMS=.*|VITE_ROOMS=$rooms_json|" "$cashier_env"
             fi
+            if [[ -n "$billing_enabled" ]]; then
+                sed -i "s|VITE_BILLING_ENABLED=.*|VITE_BILLING_ENABLED=$billing_enabled|" "$cashier_env"
+            fi
             echo "[OK] Updated cashier/.env"
         else
             echo "[WARN] File cashier/.env tidak ditemukan"
+        fi
+    fi
+    
+    # Server .env - BILLING_ENABLED
+    local server_env="$PROJECT_ROOT/server/.env"
+    if [[ -f "$server_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|BILLING_ENABLED=.*|BILLING_ENABLED=$billing_enabled|" "$server_env"
+        fi
+    fi
+    
+    # Agent .env - BILLING_ENABLED
+    local agent_env="$PROJECT_ROOT/agent/.env"
+    if [[ -f "$agent_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|BILLING_ENABLED=.*|BILLING_ENABLED=$billing_enabled|" "$agent_env"
+        fi
+    fi
+    
+    # Web .env - VITE_BILLING_ENABLED
+    local web_env="$PROJECT_ROOT/web/.env"
+    if [[ -f "$web_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|VITE_BILLING_ENABLED=.*|VITE_BILLING_ENABLED=$billing_enabled|" "$web_env"
         fi
     fi
 }

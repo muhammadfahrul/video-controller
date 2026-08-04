@@ -129,11 +129,12 @@ function Set-EnvConfig {
         [string]$ServerIP,
         [string]$RoomID,
         [string]$RoomName,
-        [string]$Rooms
+        [string]$Rooms,
+        [string]$BillingEnabled
     )
 
     # Skip if all values are empty
-    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms) {
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled) {
         Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
         return
     }
@@ -191,7 +192,7 @@ function Set-EnvConfig {
     }
 
     # Cashier .env - VITE_ROOMS
-    if ($Rooms) {
+    if ($Rooms -or $BillingEnabled) {
         $cashierEnvPath = Join-Path $ProjectRoot "cashier\.env"
         if (Test-Path $cashierEnvPath) {
             $envContent = Get-Content $cashierEnvPath -Raw
@@ -201,10 +202,47 @@ function Set-EnvConfig {
                 $envContent = $envContent -replace 'VITE_ROOMS=.*', "VITE_ROOMS=$Rooms"
             }
             
+            if ($BillingEnabled) {
+                $envContent = $envContent -replace 'VITE_BILLING_ENABLED=.*', "VITE_BILLING_ENABLED=$BillingEnabled"
+            }
+            
             Set-Content -Path $cashierEnvPath -Value $envContent -NoNewline
             Write-Host "[OK] Updated cashier/.env" -ForegroundColor Green
         } else {
             Write-Host "[WARN] File cashier/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+    
+    # Server .env - BILLING_ENABLED
+    if ($BillingEnabled) {
+        $serverEnvPath = Join-Path $ProjectRoot "server\.env"
+        if (Test-Path $serverEnvPath) {
+            $envContent = Get-Content $serverEnvPath -Raw
+            $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated server/.env" -ForegroundColor Green
+        }
+    }
+    
+    # Agent .env - BILLING_ENABLED
+    if ($BillingEnabled) {
+        $agentEnvPath = Join-Path $ProjectRoot "agent\.env"
+        if (Test-Path $agentEnvPath) {
+            $envContent = Get-Content $agentEnvPath -Raw
+            $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            Set-Content -Path $agentEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated agent/.env" -ForegroundColor Green
+        }
+    }
+    
+    # Web .env - VITE_BILLING_ENABLED
+    if ($BillingEnabled) {
+        $webEnvPath = Join-Path $ProjectRoot "web\.env"
+        if (Test-Path $webEnvPath) {
+            $envContent = Get-Content $webEnvPath -Raw
+            $envContent = $envContent -replace 'VITE_BILLING_ENABLED=.*', "VITE_BILLING_ENABLED=$BillingEnabled"
+            Set-Content -Path $webEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated web/.env" -ForegroundColor Green
         }
     }
 }
@@ -399,6 +437,7 @@ $ServerIP = ""
 $RoomID = ""
 $RoomName = ""
 $Rooms = ""
+$BillingEnabled = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
 if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
@@ -410,18 +449,27 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
     
     $input = Read-Host "Room Name (kosongkan untuk skip)"
     if ($input -ne "") { $RoomName = $input }
+    
+    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    if ($input -ne "") { $BillingEnabled = $input }
 }
 
 # Kasir mode - only needs Rooms JSON
 if ($INSTALL_MODE -eq "kasir") {
     $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
+    
+    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    if ($input -ne "") { $BillingEnabled = $input }
 }
 
 # All mode - also needs Rooms JSON
 if ($INSTALL_MODE -eq "all") {
     $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
+    
+    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    if ($input -ne "") { $BillingEnabled = $input }
 }
 
 # Show selected mode
@@ -724,7 +772,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     Write-Host "[OK] Project ready at $PROJECT_ROOT" -ForegroundColor Green
 
     # Apply .env configuration AFTER PROJECT_ROOT is set correctly
-    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
