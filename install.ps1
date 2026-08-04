@@ -456,7 +456,8 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
 
 # Kasir mode - only needs Rooms JSON
 if ($INSTALL_MODE -eq "kasir") {
-    $input = Read-Host "Rooms JSON (contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}], kosongkan untuk skip)"
+    Write-Host "Rooms JSON contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}]" -ForegroundColor Cyan
+    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
     
     $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
@@ -465,7 +466,8 @@ if ($INSTALL_MODE -eq "kasir") {
 
 # All mode - also needs Rooms JSON
 if ($INSTALL_MODE -eq "all") {
-    $input = Read-Host "Rooms JSON (contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}], kosongkan untuk skip)"
+    Write-Host "Rooms JSON contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}]" -ForegroundColor Cyan
+    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
     
     $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
