@@ -633,22 +633,22 @@ export class PlayerService {
 
     /**
      * Show start image when room is activated.
-     * Uses the image from agent/data/start_image.jpeg
+     * Uses the HTML file from agent/data/start_image.html (fullscreen)
      */
     public async showStartImage(): Promise<void> {
         const dataPath = path.join(process.cwd(), "data");
-        const startImagePath = path.join(dataPath, "start_image.jpeg");
+        const startImagePath = path.join(dataPath, "start_image.html");
         
         await this.showImage(startImagePath);
     }
 
     /**
      * Show expired image when room time is expired/deactivated.
-     * Uses the image from agent/data/expired_image.jpeg
+     * Uses the HTML file from agent/data/expired_image.html (fullscreen)
      */
     public async showExpiredImage(): Promise<void> {
         const dataPath = path.join(process.cwd(), "data");
-        const expiredImagePath = path.join(dataPath, "expired_image.jpeg");
+        const expiredImagePath = path.join(dataPath, "expired_image.html");
         
         await this.showImage(expiredImagePath);
     }
