@@ -57,9 +57,8 @@ export interface Transaction {
   pricePerHour: number;
   totalPrice: number;
   paymentMethod?: 'cash' | 'transfer' | 'other';
-  paidAt: number;
+  paidAt: number; // 0 = unpaid, > 0 = paid (timestamp when payment was confirmed)
   notes?: string;
-  isPaid: boolean; // whether payment has been confirmed
 }
 
 // Match server's PlayerState

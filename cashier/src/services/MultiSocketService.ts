@@ -2,6 +2,14 @@ import { io, Socket } from 'socket.io-client';
 import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
 import { useTransactionStore } from '../store/useTransactionStore';
 
+// Helper to format duration in seconds to human readable
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}j ${minutes}m`;
+  return `${minutes}m`;
+}
+
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
 type ExpiryWarningCallback = (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => void;
@@ -181,7 +189,7 @@ class MultiSocketService {
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
-  async deactivateRoom(roomId: string, paymentMethod?: 'cash' | 'transfer' | 'other', notes?: string, onComplete?: () => void): Promise<void> {
+  async deactivateRoom(roomId: string, _paymentMethod?: 'cash' | 'transfer' | 'other', _notes?: string, onComplete?: () => void): Promise<void> {
     console.log('[MultiSocket] deactivateRoom called with roomId:', roomId);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({
       key: k,
@@ -214,22 +222,7 @@ class MultiSocketService {
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
     
-    // Get billing info before deactivating for transaction record
-    const agent = connection.agents[0];
-    const pricePerHour = connection.config.pricePerHour || 50000;
-    const startTime = agent?.startTime ? new Date(agent.startTime).getTime() : 0;
-    // Use expiresAt if available (time purchased), otherwise actual end time
-    const endTime = agent?.expiresAt || Date.now();
-    const durationSeconds = Math.floor((endTime - startTime) / 1000);
-    // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
-    const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
-    
-    // Get customer info
-    const agentAny = agent as any;
-    const customerName = agentAny?.customerName;
-    const customerPhone = agentAny?.customerPhone;
-    const customerEmail = agentAny?.customerEmail;
-    const customerNote = agentAny?.customerNote;
+    // Transaction will be recorded by room:activation event listener (single source)
     
     // Set up timeout fallback
     const timeoutMs = 3000;
@@ -253,55 +246,7 @@ class MultiSocketService {
     connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId });
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
     
-    // Record transaction if there was an active session
-    if (startTime > 0 && durationSeconds > 0) {
-      console.log('[MultiSocket] Recording transaction:', {
-        roomId,
-        roomName: connection.config.name,
-        startTime,
-        endTime,
-        duration: durationSeconds,
-        totalPrice,
-        customerName
-      });
-      
-      useTransactionStore.getState().addTransaction({
-        roomId,
-        roomName: connection.config.name,
-        customerName,
-        customerPhone,
-        customerEmail,
-        customerNote,
-        startTime,
-        endTime,
-        duration: durationSeconds,
-        pricePerHour,
-        totalPrice,
-        paymentMethod,
-        paidAt: endTime,
-        notes,
-        isPaid: false, // unpaid by default - needs payment confirmation
-      });
-      
-      // Send transaction to server
-      this.saveTransactionToServer(connection.socket, {
-        roomId,
-        roomName: connection.config.name,
-        customerName,
-        customerPhone,
-        customerEmail,
-        customerNote,
-        startTime,
-        endTime,
-        duration: durationSeconds,
-        pricePerHour,
-        totalPrice,
-        paymentMethod,
-        paidAt: endTime,
-        notes,
-        isPaid: false,
-      });
-    }
+    // Transaction will be recorded by room:activation event listener (single source)
   }
 
   // Save transaction to server
@@ -319,6 +264,16 @@ class MultiSocketService {
     if (connection && connection.socket.connected) {
       console.log('[MultiSocket] Requesting transactions for room:', roomId);
       connection.socket.emit('transaction:get');
+    }
+  }
+
+  // Update transaction on server (e.g., mark as paid)
+  updateTransaction(transaction: any): void {
+    // Send update to server - saveTransaction handles both insert and update
+    for (const conn of this.connections.values()) {
+      if (conn.socket.connected) {
+        conn.socket.emit('transaction:save', transaction);
+      }
     }
   }
   
@@ -660,8 +615,8 @@ class MultiSocketService {
         const agent = existingAgent as any;
         const pricePerHour = config.pricePerHour || 50000;
         const startTime = agent.startTime || 0;
-        // Use expiresAt if available (time purchased), otherwise actual end time
-        const endTime = agent.expiresAt || Date.now();
+        // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
+        const endTime = data.expiresAt || agent.expiresAt || Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
         // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
         const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
@@ -670,10 +625,15 @@ class MultiSocketService {
           roomId: data.roomId,
           roomName: data.roomName || config.name,
           startTime,
+          startTimeFormatted: new Date(startTime).toISOString(),
           endTime,
+          endTimeFormatted: new Date(endTime).toISOString(),
           duration: durationSeconds,
+          durationFormatted: formatDuration(durationSeconds),
           totalPrice,
-          customerName: agent.customerName
+          customerName: agent.customerName,
+          agentStartTime: agent.startTime,
+          agentExpiresAt: agent.expiresAt,
         });
         
         if (startTime > 0 && durationSeconds > 0) {
@@ -689,8 +649,7 @@ class MultiSocketService {
             duration: durationSeconds,
             pricePerHour,
             totalPrice,
-            paidAt: endTime,
-            isPaid: false,
+            paidAt: 0, // unpaid
           });
           
           // Send transaction to server
@@ -706,7 +665,7 @@ class MultiSocketService {
             duration: durationSeconds,
             pricePerHour,
             totalPrice,
-            paidAt: endTime,
+            paidAt: 0, // unpaid
           });
         }
       }

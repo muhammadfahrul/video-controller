@@ -138,7 +138,7 @@ export class DatabaseService {
                 pricePerHour REAL NOT NULL,
                 totalPrice REAL NOT NULL,
                 paymentMethod TEXT,
-                paidAt INTEGER NOT NULL,
+                paidAt INTEGER DEFAULT 0,
                 notes TEXT
             )
         `);

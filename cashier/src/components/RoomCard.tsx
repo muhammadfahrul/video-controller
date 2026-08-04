@@ -76,9 +76,20 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const handleToggleActive = async () => {
     const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
     
-    // Check if there's unpaid transaction for this room - prevent activation if exists
-    const roomTransactions = useTransactionStore.getState().transactions;
-    const unpaidTx = roomTransactions.find(t => (t.roomId === roomBilling.roomId || t.roomName === roomBilling.roomName) && !t.isPaid);
+    // Check if there's unpaid transaction for this room (paidAt === 0 means unpaid) - prevent activation if exists
+    const allTransactions = useTransactionStore.getState().transactions;
+    // Debug: log transactions for this room
+    console.log('[RoomCard] All transactions:', allTransactions);
+    console.log('[RoomCard] Checking room:', roomBilling.roomId, roomBilling.roomName);
+    // Match by roomId OR roomName (case-insensitive)
+    const roomKey = roomBilling.roomId.toLowerCase();
+    const roomNameKey = roomBilling.roomName.toLowerCase();
+    const roomTransactions = allTransactions.filter(t => 
+      t.roomId.toLowerCase() === roomKey || t.roomName.toLowerCase() === roomNameKey
+    );
+    console.log('[RoomCard] Room transactions:', roomTransactions);
+    const unpaidTx = roomTransactions.find(t => t.paidAt === 0);
+    console.log('[RoomCard] Unpaid transaction:', unpaidTx);
     if (!roomBilling.isActive && unpaidTx) {
       alert(`Tidak dapat mengaktifkan ruangan. Ada transaksi belum lunas: ${formatPrice(unpaidTx.totalPrice)}\nSilakan lunasi terlebih dahulu di Riwayat Transaksi.`);
       setShowTransactionModal(true);

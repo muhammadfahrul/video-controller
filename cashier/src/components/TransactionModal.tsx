@@ -53,8 +53,12 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     multiSocketService.loadTransactions(roomId);
   }, [roomId]);
   
-  // Filter transactions by roomId (client-side filtering from global store)
-  const transactions = allTransactions.filter(t => t.roomId === roomId);
+  // Filter transactions by roomId OR roomName (case-insensitive) - client-side filtering from global store
+  const roomKey = roomId.toLowerCase();
+  const roomNameKey = roomName.toLowerCase();
+  const transactions = allTransactions.filter(t => 
+    t.roomId.toLowerCase() === roomKey || t.roomName.toLowerCase() === roomNameKey
+  );
   
   // Filter transactions
   const filteredTransactions = transactions.filter(t => {
@@ -66,10 +70,18 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayStart = today.getTime();
-      return matchesSearch && t.paidAt >= todayStart;
+      // Show unpaid (paidAt=0) or paid today
+      return matchesSearch && (t.paidAt === 0 || t.paidAt >= todayStart);
     }
     
     return matchesSearch;
+  });
+
+  // Sort: unpaid first (paidAt=0), then by paidAt descending (newest first)
+  filteredTransactions.sort((a, b) => {
+    if (a.paidAt === 0 && b.paidAt !== 0) return -1;
+    if (a.paidAt !== 0 && b.paidAt === 0) return 1;
+    return b.paidAt - a.paidAt;
   });
   
   // Calculate revenue locally
@@ -88,8 +100,8 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   
   const totalRevenue = dateFilter === 'today' ? calculateTodayRevenue() : calculateTotalRevenue();
 
-  // Get unpaid transactions for this room (from filtered transactions)
-  const unpaidTransaction = filteredTransactions.find(t => !t.isPaid);
+  // Get unpaid transactions for this room (paidAt === 0 means unpaid)
+  const unpaidTransaction = filteredTransactions.find(t => t.paidAt === 0);
 
   // Handle payment - show confirmation modal for unpaid transaction
   const handlePayment = (transactionId?: string) => {
@@ -103,14 +115,18 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     setShowPaymentConfirm(false);
     try {
       // Mark transaction as paid - find from filtered transactions
-      const currentUnpaid = filteredTransactions.find(t => !t.isPaid);
+      const currentUnpaid = filteredTransactions.find(t => t.paidAt === 0);
       if (currentUnpaid) {
-        useTransactionStore.getState().updateTransaction(currentUnpaid.id, {
+        const updatedData = {
+          ...currentUnpaid,
           paymentMethod,
           notes,
-          isPaid: true,
           paidAt: Date.now()
-        });
+        };
+        // Update local store
+        useTransactionStore.getState().updateTransaction(currentUnpaid.id, updatedData);
+        // Send to server to persist
+        multiSocketService.updateTransaction(updatedData);
       }
       onClose();
     } catch (error) {
@@ -224,7 +240,9 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       <span>{formatDuration(transaction.duration)}</span>
                       <span>•</span>
-                      <span>{formatDate(transaction.paidAt)}</span>
+                      <span className={transaction.paidAt === 0 ? 'text-red-400' : ''}>
+                        {transaction.paidAt === 0 ? 'Belum Lunas' : formatDate(transaction.paidAt)}
+                      </span>
                     </div>
                     {transaction.customerNote && (
                       <p className="text-[10px] text-gray-500 mt-1">
@@ -236,7 +254,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                     <p className="text-sm font-bold text-yellow-400">
                       {formatPrice(transaction.totalPrice)}
                     </p>
-                    {transaction.isPaid ? (
+                    {transaction.paidAt > 0 ? (
                       <button
                         onClick={() => handleDeleteTransaction(transaction.id)}
                         className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
