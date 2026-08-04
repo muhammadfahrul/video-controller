@@ -436,14 +436,19 @@ class MultiSocketService {
         const existing = existingAgent as any;
         
         if (existing) {
-          if (existing.startTime && !merged.startTime) merged.startTime = existing.startTime;
-          if (existing.expiresAt && !merged.expiresAt) merged.expiresAt = existing.expiresAt;
-          if (existing.isActive && !merged.isActive) merged.isActive = existing.isActive;
-          // Preserve customer info
-          if (existing.customerName && !merged.customerName) merged.customerName = existing.customerName;
-          if (existing.customerPhone && !merged.customerPhone) merged.customerPhone = existing.customerPhone;
-          if (existing.customerEmail && !merged.customerEmail) merged.customerEmail = existing.customerEmail;
-          if (existing.customerNote && !merged.customerNote) merged.customerNote = existing.customerNote;
+          // Only preserve data if room is still active (not reactivation scenario)
+          if (existing.isActive && merged.isActive) {
+            // Room was and still is active - preserve billing data
+            if (existing.startTime && !merged.startTime) merged.startTime = existing.startTime;
+            if (existing.expiresAt && !merged.expiresAt) merged.expiresAt = existing.expiresAt;
+            if (existing.isActive && !merged.isActive) merged.isActive = existing.isActive;
+            // Preserve customer info only if room is still active
+            if (existing.customerName && !merged.customerName) merged.customerName = existing.customerName;
+            if (existing.customerPhone && !merged.customerPhone) merged.customerPhone = existing.customerPhone;
+            if (existing.customerEmail && !merged.customerEmail) merged.customerEmail = existing.customerEmail;
+            if (existing.customerNote && !merged.customerNote) merged.customerNote = existing.customerNote;
+          }
+          // If room was inactive and now active (reactivation), don't preserve old data
         }
         return merged;
       });
@@ -474,10 +479,15 @@ class MultiSocketService {
             // Don't preserve old startTime - let server's startTime be used
           }
           if (existing.isActive) merged.isActive = existing.isActive;
-          if (existing.customerName) merged.customerName = existing.customerName;
-          if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
-          if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
-          if (existing.customerNote) merged.customerNote = existing.customerNote;
+          // Preserve customer info ONLY if room is still active (reactivation should clear old customer info)
+          if (existing.isActive) {
+            // Room was active before - preserve customer info for extending time scenario
+            if (existing.customerName) merged.customerName = existing.customerName;
+            if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
+            if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
+            if (existing.customerNote) merged.customerNote = existing.customerNote;
+          }
+          // If room was inactive and now active (reactivation), don't preserve old customer info
         }
         return merged;
       });
@@ -508,10 +518,15 @@ class MultiSocketService {
             // Don't preserve old startTime - let server's startTime be used
           }
           if (existing.isActive) merged.isActive = existing.isActive;
-          if (existing.customerName) merged.customerName = existing.customerName;
-          if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
-          if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
-          if (existing.customerNote) merged.customerNote = existing.customerNote;
+          // Preserve customer info ONLY if room is still active (reactivation should clear old customer info)
+          if (existing.isActive) {
+            // Room was active before - preserve customer info for extending time scenario
+            if (existing.customerName) merged.customerName = existing.customerName;
+            if (existing.customerPhone) merged.customerPhone = existing.customerPhone;
+            if (existing.customerEmail) merged.customerEmail = existing.customerEmail;
+            if (existing.customerNote) merged.customerNote = existing.customerNote;
+          }
+          // If room was inactive and now active (reactivation), don't preserve old customer info
         }
         return merged;
       });
@@ -568,11 +583,17 @@ class MultiSocketService {
               // Don't preserve old startTime - let server's startTime be used
             }
             if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
-            // Preserve customer info
-            if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
-            if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
-            if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
-            if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+            // Preserve customer info ONLY if room is still active (reactivation should clear old customer info)
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              // Room was active before and still active - preserve customer info
+              if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+              if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+              if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+              if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+            } else if (!incomingAgent.isActive && existingAgent.isActive) {
+              // Room was active and now inactive - this is deactivation, clear customer info
+            }
+            // If room was inactive and now active (reactivation), don't preserve old customer info
           }
         }
         
@@ -621,11 +642,15 @@ class MultiSocketService {
               // Don't preserve old startTime - let server's startTime be used
             }
             if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
-            // Preserve customer info
-            if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
-            if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
-            if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
-            if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+            // Preserve customer info ONLY if room is still active (reactivation should clear old customer info)
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              // Room was active before and still active - preserve customer info
+              if (existingAgent.customerName) (incomingAgent as any).customerName = existingAgent.customerName;
+              if (existingAgent.customerPhone) (incomingAgent as any).customerPhone = existingAgent.customerPhone;
+              if (existingAgent.customerEmail) (incomingAgent as any).customerEmail = existingAgent.customerEmail;
+              if (existingAgent.customerNote) (incomingAgent as any).customerNote = existingAgent.customerNote;
+            }
+            // If room was inactive and now active (reactivation), don't preserve old customer info
           }
         }
         
@@ -752,13 +777,15 @@ class MultiSocketService {
           }
         }
         
-        // Preserve existing customer info if not provided in update
-        if (existingData) {
+        // Preserve existing customer info ONLY if room is still active (reactivation should clear old customer info)
+        if (existingData && existingData.isActive) {
+          // Room was active before - preserve customer info for extending time scenario
           if (!data.customerName && existingData.customerName) merged.customerName = existingData.customerName;
           if (!data.customerPhone && existingData.customerPhone) merged.customerPhone = existingData.customerPhone;
           if (!data.customerEmail && existingData.customerEmail) merged.customerEmail = existingData.customerEmail;
           if (!data.customerNote && existingData.customerNote) merged.customerNote = existingData.customerNote;
         }
+        // If room was inactive and now active (reactivation), don't preserve old customer info
         
         // Override with new customer info if provided
         if (data.customerName) (merged as any).customerName = data.customerName;

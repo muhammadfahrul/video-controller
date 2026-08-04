@@ -72,6 +72,16 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       setCountdown(null);
     }
   }, [roomBilling.expiresAt, roomBilling.isActive]);
+
+  // Clear customer input fields when room is deactivated
+  useEffect(() => {
+    if (!roomBilling.isActive && (customerNameInput || customerPhoneInput || customerEmailInput || customerNoteInput)) {
+      setCustomerNameInput('');
+      setCustomerPhoneInput('');
+      setCustomerEmailInput('');
+      setCustomerNoteInput('');
+    }
+  }, [roomBilling.isActive]);
   
   const handleToggleActive = async () => {
     const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
@@ -446,7 +456,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
 
       {/* Expired Time Confirmation Modal */}
       {showExpiredConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-9999">
           <div className="bg-[#1a1a2e] rounded-xl p-6 w-full max-w-md shadow-2xl border border-red-500/30">
             <div className="text-center">
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
