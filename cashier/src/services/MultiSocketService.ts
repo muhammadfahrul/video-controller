@@ -455,13 +455,23 @@ class MultiSocketService {
         const merged = { ...agent, ...data.agent };
         const existing = existingAgent as any;
         
-        // Preserve billing data - use later expiry, earlier startTime
+        // Preserve billing data - use later expiry
         if (existing) {
           if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
             merged.expiresAt = existing.expiresAt;
           }
-          if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
-            merged.startTime = existing.startTime;
+          // Use the LATEST startTime when reactivating (new activation = new startTime)
+          // Only preserve old startTime if the room is still active (extending time scenario)
+          const wasActive = existing.isActive === true;
+          const isNowActive = merged.isActive === true;
+          if (wasActive && isNowActive) {
+            // Room was active before and still active - use earlier startTime (extending time)
+            if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
+              merged.startTime = existing.startTime;
+            }
+          } else if (!wasActive && isNowActive) {
+            // Room was inactive and now active - use NEW startTime from server (reactivation)
+            // Don't preserve old startTime - let server's startTime be used
           }
           if (existing.isActive) merged.isActive = existing.isActive;
           if (existing.customerName) merged.customerName = existing.customerName;
@@ -479,13 +489,23 @@ class MultiSocketService {
         const merged = { ...agent, ...data.agent };
         const existing = existingAgent as any;
         
-        // Preserve billing data - use later expiry, earlier startTime
+        // Preserve billing data - use later expiry
         if (existing) {
           if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
             merged.expiresAt = existing.expiresAt;
           }
-          if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
-            merged.startTime = existing.startTime;
+          // Use the LATEST startTime when reactivating (new activation = new startTime)
+          // Only preserve old startTime if the room is still active (extending time scenario)
+          const wasActive = existing.isActive === true;
+          const isNowActive = merged.isActive === true;
+          if (wasActive && isNowActive) {
+            // Room was active before and still active - use earlier startTime (extending time)
+            if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
+              merged.startTime = existing.startTime;
+            }
+          } else if (!wasActive && isNowActive) {
+            // Room was inactive and now active - use NEW startTime from server (reactivation)
+            // Don't preserve old startTime - let server's startTime be used
           }
           if (existing.isActive) merged.isActive = existing.isActive;
           if (existing.customerName) merged.customerName = existing.customerName;
@@ -534,11 +554,18 @@ class MultiSocketService {
             if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
               incomingAgent.expiresAt = existingExpiresAt;
             }
-            // Use earlier startTime (first activation)
-            const existingStartTime = existingAgent.startTime;
-            const incomingStartTime = incomingAgent.startTime;
-            if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
-              incomingAgent.startTime = existingStartTime;
+            // Use the LATEST startTime when reactivating (new activation = new startTime)
+            // Only preserve old startTime if the room is still active (extending time scenario)
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              // Room was active before and still active - use earlier startTime (extending time)
+              const existingStartTime = existingAgent.startTime;
+              const incomingStartTime = incomingAgent.startTime;
+              if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+                incomingAgent.startTime = existingStartTime;
+              }
+            } else if (incomingAgent.isActive && !existingAgent.isActive) {
+              // Room was inactive and now active - use NEW startTime from server (reactivation)
+              // Don't preserve old startTime - let server's startTime be used
             }
             if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
             // Preserve customer info
@@ -580,11 +607,18 @@ class MultiSocketService {
             if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
               incomingAgent.expiresAt = existingExpiresAt;
             }
-            // Use earlier startTime (first activation)
-            const existingStartTime = existingAgent.startTime;
-            const incomingStartTime = incomingAgent.startTime;
-            if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
-              incomingAgent.startTime = existingStartTime;
+            // Use the LATEST startTime when reactivating (new activation = new startTime)
+            // Only preserve old startTime if the room is still active (extending time scenario)
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              // Room was active before and still active - use earlier startTime (extending time)
+              const existingStartTime = existingAgent.startTime;
+              const incomingStartTime = incomingAgent.startTime;
+              if (existingStartTime && (!incomingStartTime || existingStartTime < incomingStartTime)) {
+                incomingAgent.startTime = existingStartTime;
+              }
+            } else if (incomingAgent.isActive && !existingAgent.isActive) {
+              // Room was inactive and now active - use NEW startTime from server (reactivation)
+              // Don't preserve old startTime - let server's startTime be used
             }
             if (existingAgent.isActive) incomingAgent.isActive = existingAgent.isActive;
             // Preserve customer info
@@ -699,10 +733,22 @@ class MultiSocketService {
           merged.expiresAt = newExpiresAt;
         }
         
-        // Use earlier startTime (first activation)
-        if (data.startTime && data.isActive) {
-          if (!merged.startTime || data.startTime < merged.startTime) {
-            merged.startTime = data.startTime;
+        // Use the LATEST startTime when reactivating (new activation = new startTime)
+        // Only preserve old startTime if the room is still active (extending time scenario)
+        if (data.isActive) {
+          const existingIsActive = existingData?.isActive;
+          if (existingIsActive) {
+            // Room was active before and still active - use earlier startTime (extending time)
+            if (data.startTime && data.isActive) {
+              if (!merged.startTime || data.startTime < merged.startTime) {
+                merged.startTime = data.startTime;
+              }
+            }
+          } else {
+            // Room was inactive and now active - use NEW startTime from server (reactivation)
+            if (data.startTime) {
+              merged.startTime = data.startTime;
+            }
           }
         }
         
