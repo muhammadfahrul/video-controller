@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CreditCard, Banknote, FileText, X, Check } from 'lucide-react';
+import type { Transaction } from '../types';
+import { PrintReceipt } from './PrintReceipt';
 
 interface PaymentConfirmModalProps {
   roomName: string;
   customerName?: string;
   duration: number;
   totalPrice: number;
+  transaction?: Transaction;
   onConfirm: (paymentMethod: 'cash' | 'transfer' | 'other', notes?: string) => void;
   onCancel: () => void;
 }
@@ -31,14 +34,20 @@ export function PaymentConfirmModal({
   customerName, 
   duration, 
   totalPrice, 
+  transaction,
   onConfirm, 
   onCancel 
 }: PaymentConfirmModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'transfer' | 'other'>('cash');
   const [notes, setNotes] = useState('');
+  const [showPrintReceipt, setShowPrintReceipt] = useState(false);
 
   const handleConfirm = () => {
     onConfirm(paymentMethod, notes || undefined);
+    // Show print receipt after confirmation if we have transaction data
+    if (transaction) {
+      setShowPrintReceipt(true);
+    }
   };
 
   const modalContent = (
@@ -148,6 +157,17 @@ export function PaymentConfirmModal({
           </button>
         </div>
       </div>
+
+      {/* Print Receipt Modal - shown after payment */}
+      {showPrintReceipt && transaction && (
+        <PrintReceipt
+          transaction={transaction}
+          onClose={() => {
+            setShowPrintReceipt(false);
+            onCancel();
+          }}
+        />
+      )}
     </div>
   );
 

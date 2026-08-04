@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { PaymentConfirmModal } from './PaymentConfirmModal';
-import { Receipt, X, Trash2, Search } from 'lucide-react';
+import { PrintReceipt } from './PrintReceipt';
+import { Transaction } from '../types';
+import { Receipt, X, Trash2, Search, Printer } from 'lucide-react';
 
 interface TransactionModalProps {
   roomId: string;
@@ -46,6 +48,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+  const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
   
   // Load transactions for this room
   useEffect(() => {
@@ -115,9 +118,9 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     setShowPaymentConfirm(false);
     try {
       // Mark transaction as paid - find from filtered transactions
-      const currentUnpaid = filteredTransactions.find(t => t.paidAt === 0);
+      const currentUnpaid = unpaidTransaction;
       if (currentUnpaid) {
-        const updatedData = {
+        const updatedData: Transaction = {
           ...currentUnpaid,
           paymentMethod,
           notes,
@@ -128,7 +131,6 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
         // Send to server to persist
         multiSocketService.updateTransaction(updatedData);
       }
-      onClose();
     } catch (error) {
       console.error('Payment error:', error);
     }
@@ -254,21 +256,30 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                     <p className="text-sm font-bold text-yellow-400">
                       {formatPrice(transaction.totalPrice)}
                     </p>
-                    {transaction.paidAt > 0 ? (
-                      <button
-                        onClick={() => handleDeleteTransaction(transaction.id)}
-                        className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handlePayment(transaction.id)}
-                        className="px-2 py-1 text-xs font-medium bg-yellow-600 hover:bg-yellow-500 text-white rounded mt-1"
-                      >
-                        Bayar
-                      </button>
-                    )}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setPrintTransaction(transaction)}
+                          className="p-1 text-blue-400 hover:bg-blue-500/20 rounded mt-1"
+                          title="Cetak Nota"
+                        >
+                          <Printer className="w-3 h-3" />
+                        </button>
+                        {transaction.paidAt > 0 ? (
+                          <button
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                            className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handlePayment(transaction.id)}
+                            className="px-2 py-1 text-xs font-medium bg-yellow-600 hover:bg-yellow-500 text-white rounded mt-1"
+                          >
+                            Bayar
+                          </button>
+                        )}
+                      </div>
                   </div>
                 </div>
               </div>
@@ -296,8 +307,17 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
           customerName={unpaidTransaction.customerName}
           duration={unpaidTransaction.duration}
           totalPrice={unpaidTransaction.totalPrice}
+          transaction={unpaidTransaction}
           onConfirm={handlePaymentConfirm}
           onCancel={() => setShowPaymentConfirm(false)}
+        />
+      )}
+
+      {/* Print Receipt Modal */}
+      {printTransaction && (
+        <PrintReceipt
+          transaction={printTransaction}
+          onClose={() => setPrintTransaction(null)}
         />
       )}
     </div>
