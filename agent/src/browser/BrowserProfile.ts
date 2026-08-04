@@ -6,6 +6,7 @@ export class BrowserProfile {
     private readonly profileDir =
         path.join(
             process.cwd(),
+            "data",
             "browser-profile"
         );
 
