@@ -79,20 +79,17 @@ export default function DashboardPage() {
 
   const activeRooms = roomList.filter(r => r.isActive).length;
   const connectedRooms = connectedCount;
-  const totalRevenue = roomList.reduce((sum, r) => sum + Math.ceil(r.currentDuration / 3600) * 50000, 0);
 
   const stats = [
     { label: 'Ruangan', value: roomConfigs.length, icon: Tv, color: 'blue' },
     { label: 'Aktif', value: activeRooms, icon: CircleDot, color: 'green' },
-    { label: 'Online', value: connectedRooms, icon: Wifi, color: 'cyan' },
-    { label: 'Pendapatan', value: new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalRevenue), icon: TrendingUp, color: 'yellow', isFormatted: true }
+    { label: 'Online', value: connectedRooms, icon: Wifi, color: 'cyan' }
   ];
 
   const colorMap: Record<string, string> = {
     blue: 'text-blue-400 bg-blue-500/20',
     green: 'text-green-400 bg-green-500/20',
-    cyan: 'text-cyan-400 bg-cyan-500/20',
-    yellow: 'text-yellow-400 bg-yellow-500/20'
+    cyan: 'text-cyan-400 bg-cyan-500/20'
   };
 
   return (
@@ -123,12 +120,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {stats.map((stat, index) => (
           <div key={index} className="bg-[#1a1a2e] rounded-lg p-3 flex items-center justify-between">
             <div>
               <p className="text-[10px] text-gray-500 uppercase">{stat.label}</p>
-              <p className={`text-lg font-bold ${stat.isFormatted ? 'text-yellow-400' : 'text-white'}`}>{stat.value}</p>
+              <p className={`text-lg font-bold text-white`}>{stat.value}</p>
             </div>
             <div className={`p-2 rounded ${colorMap[stat.color]}`}>
               <stat.icon className="w-4 h-4" />
