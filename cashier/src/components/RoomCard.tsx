@@ -3,8 +3,10 @@ import type { RoomBilling } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
 import { useRoomStore } from '../store/useRoomStore';
+import { useTransactionStore } from '../store/useTransactionStore';
 import type { LoadingMessage } from '../components/FullPageLoading';
 import { TransactionModal } from './TransactionModal';
+import { PaymentConfirmModal } from './PaymentConfirmModal';
 import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText, Receipt } from 'lucide-react';
 
 interface RoomCardProps {
@@ -27,11 +29,19 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const [customerEmailInput, setCustomerEmailInput] = useState('');
   const [customerNoteInput, setCustomerNoteInput] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+  const [pendingDeactivation, setPendingDeactivation] = useState<{
+    roomId: string;
+    customerName?: string;
+    duration: number;
+    totalPrice: number;
+  } | null>(null);
   const setGlobalLoading = useRoomStore((state) => state.setLoading);
   const isLoading = useRoomStore((state) => state.isLoading);
   
   // Countdown timer for expiry
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showExpiredConfirm, setShowExpiredConfirm] = useState(false);
   
   // Memoized billing calculation - total cost for full duration
   const { totalSeconds, isTimerBased } = useMemo(() => {
@@ -47,6 +57,12 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       const updateCountdown = () => {
         const remaining = Math.max(0, Math.floor((roomBilling.expiresAt! - Date.now()) / 1000));
         setCountdown(remaining);
+        
+        // Auto-deactivate when time expires
+        if (remaining === 0 && roomBilling.isActive) {
+          // Automatically deactivate when time expires - creates transaction
+          multiSocketService.deactivateRoom(roomBilling.roomId, undefined, undefined, () => {});
+        }
       };
       
       updateCountdown();
@@ -55,39 +71,51 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     } else {
       setCountdown(null);
     }
-  }, [roomBilling.expiresAt]);
+  }, [roomBilling.expiresAt, roomBilling.isActive]);
   
   const handleToggleActive = async () => {
     const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
-    setGlobalLoading(true, loadingType);
-    try {
-      if (roomBilling.isActive) {
-        await multiSocketService.deactivateRoom(roomBilling.roomId, () => {
+    
+    // Check if there's unpaid transaction for this room - prevent activation if exists
+    const roomTransactions = useTransactionStore.getState().transactions;
+    const unpaidTx = roomTransactions.find(t => (t.roomId === roomBilling.roomId || t.roomName === roomBilling.roomName) && !t.isPaid);
+    if (!roomBilling.isActive && unpaidTx) {
+      alert(`Tidak dapat mengaktifkan ruangan. Ada transaksi belum lunas: ${formatPrice(unpaidTx.totalPrice)}\nSilakan lunasi terlebih dahulu di Riwayat Transaksi.`);
+      setShowTransactionModal(true);
+      return;
+    }
+    
+    if (roomBilling.isActive) {
+      // Deactivate room - will create transaction automatically
+      setGlobalLoading(true, 'deactivating');
+      try {
+        await multiSocketService.deactivateRoom(roomBilling.roomId, undefined, undefined, () => {
           setGlobalLoading(false);
         });
-        setDurationInput('');
-        setCustomerNameInput('');
-        setCustomerPhoneInput('');
-        setCustomerEmailInput('');
-        setCustomerNoteInput('');
-      } else {
-        const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
-        const customerName = customerNameInput.trim() || undefined;
-        const customerPhone = customerPhoneInput.trim() || undefined;
-        const customerEmail = customerEmailInput.trim() || undefined;
-        const customerNote = customerNoteInput.trim() || undefined;
-        
-        if (minutes && minutes > 0) {
-          await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote, () => {
-            setGlobalLoading(false);
-          });
-        } else {
-          await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote, () => {
-            setGlobalLoading(false);
-          });
-        }
-        setDurationInput('');
+      } catch (error) {
+        setGlobalLoading(false);
       }
+      return;
+    }
+    
+    setGlobalLoading(true, loadingType);
+    try {
+      const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
+      const customerName = customerNameInput.trim() || undefined;
+      const customerPhone = customerPhoneInput.trim() || undefined;
+      const customerEmail = customerEmailInput.trim() || undefined;
+      const customerNote = customerNoteInput.trim() || undefined;
+      
+      if (minutes && minutes > 0) {
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote, () => {
+          setGlobalLoading(false);
+        });
+      } else {
+        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote, () => {
+          setGlobalLoading(false);
+        });
+      }
+      setDurationInput('');
     } catch (error) {
       setGlobalLoading(false);
     }
@@ -106,6 +134,37 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       setExtendTimeInput('');
     } catch (error) {
       setGlobalLoading(false);
+    }
+  };
+
+  // Perform the actual deactivation
+  const performDeactivation = async (paymentMethod: 'cash' | 'transfer' | 'other', notes?: string) => {
+    setShowPaymentConfirm(false);
+    setGlobalLoading(true, 'deactivating');
+    try {
+      await multiSocketService.deactivateRoom(
+        roomBilling.roomId, 
+        paymentMethod,
+        notes,
+        () => {
+          setGlobalLoading(false);
+        }
+      );
+      setDurationInput('');
+      setCustomerNameInput('');
+      setCustomerPhoneInput('');
+      setCustomerEmailInput('');
+      setCustomerNoteInput('');
+    } catch (error) {
+      setGlobalLoading(false);
+    }
+  };
+
+  // Handle payment confirmation
+  const handlePaymentConfirm = (paymentMethod: 'cash' | 'transfer' | 'other', notes?: string) => {
+    if (pendingDeactivation) {
+      performDeactivation(paymentMethod, notes);
+      setPendingDeactivation(null);
     }
   };
   
@@ -356,6 +415,82 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
           roomName={roomBilling.roomName}
           onClose={() => setShowTransactionModal(false)}
         />
+      )}
+
+      {/* Payment Confirmation Modal */}
+      {showPaymentConfirm && pendingDeactivation && (
+        <PaymentConfirmModal
+          roomName={roomBilling.roomName}
+          customerName={pendingDeactivation.customerName}
+          duration={pendingDeactivation.duration}
+          totalPrice={pendingDeactivation.totalPrice}
+          onConfirm={handlePaymentConfirm}
+          onCancel={() => {
+            setShowPaymentConfirm(false);
+            setPendingDeactivation(null);
+            setGlobalLoading(false);
+          }}
+        />
+      )}
+
+      {/* Expired Time Confirmation Modal */}
+      {showExpiredConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]">
+          <div className="bg-[#1a1a2e] rounded-xl p-6 w-full max-w-md shadow-2xl border border-red-500/30">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Timer className="w-8 h-8 text-red-400" />
+              </div>
+              <h3 className="text-xl font-bold text-white mb-2">Waktu Habis!</h3>
+              <p className="text-gray-400 mb-6">
+                Waktu ruangan {roomBilling.roomName} telah habis. Apakah ingin memperpanjang atau mengakhiri sesi?
+              </p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    setShowExpiredConfirm(false);
+                    // Extend by 1 hour default
+                    setGlobalLoading(true, 'extending');
+                    try {
+                      await multiSocketService.extendTime(roomBilling.roomId, 60, () => {
+                        setGlobalLoading(false);
+                      });
+                    } catch (error) {
+                      setGlobalLoading(false);
+                    }
+                  }}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Perpanjang 1 Jam
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowExpiredConfirm(false);
+                    // Deactivate room - this will create transaction automatically
+                    setGlobalLoading(true, 'deactivating');
+                    try {
+                      await multiSocketService.deactivateRoom(roomBilling.roomId, undefined, undefined, () => {
+                        setGlobalLoading(false);
+                      });
+                    } catch (error) {
+                      setGlobalLoading(false);
+                    }
+                  }}
+                  className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Akhiri Sesi (Buat Transaksi)
+                </button>
+                <button
+                  onClick={() => setShowExpiredConfirm(false)}
+                  className="w-full py-2 text-gray-400 hover:text-white text-sm transition-colors"
+                >
+                  Nanti Saja
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

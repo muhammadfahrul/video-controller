@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { multiSocketService } from '../services/MultiSocketService';
+import { PaymentConfirmModal } from './PaymentConfirmModal';
 import { Receipt, X, Trash2, Search } from 'lucide-react';
 
 interface TransactionModalProps {
@@ -44,6 +45,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
   
   // Load transactions for this room
   useEffect(() => {
@@ -85,7 +87,37 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   };
   
   const totalRevenue = dateFilter === 'today' ? calculateTodayRevenue() : calculateTotalRevenue();
-  
+
+  // Get unpaid transactions for this room (from filtered transactions)
+  const unpaidTransaction = filteredTransactions.find(t => !t.isPaid);
+
+  // Handle payment - show confirmation modal for unpaid transaction
+  const handlePayment = (transactionId?: string) => {
+    const tx = transactionId ? filteredTransactions.find(t => t.id === transactionId) : unpaidTransaction;
+    if (tx) {
+      setShowPaymentConfirm(true);
+    }
+  };
+
+  const handlePaymentConfirm = async (paymentMethod: 'cash' | 'transfer' | 'other', notes?: string) => {
+    setShowPaymentConfirm(false);
+    try {
+      // Mark transaction as paid - find from filtered transactions
+      const currentUnpaid = filteredTransactions.find(t => !t.isPaid);
+      if (currentUnpaid) {
+        useTransactionStore.getState().updateTransaction(currentUnpaid.id, {
+          paymentMethod,
+          notes,
+          isPaid: true,
+          paidAt: Date.now()
+        });
+      }
+      onClose();
+    } catch (error) {
+      console.error('Payment error:', error);
+    }
+  };
+
   const handleDeleteTransaction = (transactionId: string) => {
     if (!confirm('Hapus transaksi ini?')) return;
     removeTransaction(transactionId);
@@ -119,6 +151,8 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
             <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
+        
+
         
         {/* Stats */}
         <div className="px-4 py-3 border-b border-white/5">
@@ -202,12 +236,21 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                     <p className="text-sm font-bold text-yellow-400">
                       {formatPrice(transaction.totalPrice)}
                     </p>
-                    <button
-                      onClick={() => handleDeleteTransaction(transaction.id)}
-                      className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    {transaction.isPaid ? (
+                      <button
+                        onClick={() => handleDeleteTransaction(transaction.id)}
+                        className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handlePayment(transaction.id)}
+                        className="px-2 py-1 text-xs font-medium bg-yellow-600 hover:bg-yellow-500 text-white rounded mt-1"
+                      >
+                        Bayar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -227,6 +270,18 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
           </div>
         )}
       </div>
+
+      {/* Payment Confirmation Modal */}
+      {showPaymentConfirm && unpaidTransaction && (
+        <PaymentConfirmModal
+          roomName={roomName}
+          customerName={unpaidTransaction.customerName}
+          duration={unpaidTransaction.duration}
+          totalPrice={unpaidTransaction.totalPrice}
+          onConfirm={handlePaymentConfirm}
+          onCancel={() => setShowPaymentConfirm(false)}
+        />
+      )}
     </div>
   );
 

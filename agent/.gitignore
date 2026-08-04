@@ -18,4 +18,4 @@ npm-debug.log*
 Thumbs.db
 
 # Browser profile (contains cookies/login session)
-browser-profile/
+data/browser-profile/

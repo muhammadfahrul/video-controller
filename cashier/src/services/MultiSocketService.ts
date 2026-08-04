@@ -181,7 +181,7 @@ class MultiSocketService {
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
-  async deactivateRoom(roomId: string, onComplete?: () => void): Promise<void> {
+  async deactivateRoom(roomId: string, paymentMethod?: 'cash' | 'transfer' | 'other', notes?: string, onComplete?: () => void): Promise<void> {
     console.log('[MultiSocket] deactivateRoom called with roomId:', roomId);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({
       key: k,
@@ -277,7 +277,10 @@ class MultiSocketService {
         duration: durationSeconds,
         pricePerHour,
         totalPrice,
+        paymentMethod,
         paidAt: endTime,
+        notes,
+        isPaid: false, // unpaid by default - needs payment confirmation
       });
       
       // Send transaction to server
@@ -293,7 +296,10 @@ class MultiSocketService {
         duration: durationSeconds,
         pricePerHour,
         totalPrice,
+        paymentMethod,
         paidAt: endTime,
+        notes,
+        isPaid: false,
       });
     }
   }
@@ -684,6 +690,7 @@ class MultiSocketService {
             pricePerHour,
             totalPrice,
             paidAt: endTime,
+            isPaid: false,
           });
           
           // Send transaction to server

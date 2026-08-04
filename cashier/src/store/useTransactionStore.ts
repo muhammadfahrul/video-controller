@@ -10,6 +10,7 @@ interface TransactionStore {
   
   // Actions
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
   clearTransactions: () => void;
   setTransactions: (transactions: Transaction[]) => void;
@@ -44,6 +45,14 @@ export const useTransactionStore = create<TransactionStore>()(
     removeTransaction: (id) => {
       set((state) => ({
         transactions: state.transactions.filter(t => t.id !== id),
+      }));
+    },
+    
+    updateTransaction: (id, updates) => {
+      set((state) => ({
+        transactions: state.transactions.map(t => 
+          t.id === id ? { ...t, ...updates } : t
+        ),
       }));
     },
     

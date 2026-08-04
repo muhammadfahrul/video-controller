@@ -59,6 +59,7 @@ export interface Transaction {
   paymentMethod?: 'cash' | 'transfer' | 'other';
   paidAt: number;
   notes?: string;
+  isPaid: boolean; // whether payment has been confirmed
 }
 
 // Match server's PlayerState
