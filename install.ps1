@@ -441,34 +441,34 @@ $BillingEnabled = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
 if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
-    $input = Read-Host "Server IP (kosongkan untuk skip)"
+    $input = Read-Host "Server IP (contoh: 192.168.1.100, kosongkan untuk skip)"
     if ($input -ne "") { $ServerIP = $input }
     
-    $input = Read-Host "Room ID (kosongkan untuk skip)"
+    $input = Read-Host "Room ID (contoh: room-001, kosongkan untuk skip)"
     if ($input -ne "") { $RoomID = $input }
     
-    $input = Read-Host "Room Name (kosongkan untuk skip)"
+    $input = Read-Host "Room Name (contoh: Room 1, kosongkan untuk skip)"
     if ($input -ne "") { $RoomName = $input }
     
-    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
     if ($input -ne "") { $BillingEnabled = $input }
 }
 
 # Kasir mode - only needs Rooms JSON
 if ($INSTALL_MODE -eq "kasir") {
-    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+    $input = Read-Host "Rooms JSON (contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}], kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
     
-    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
     if ($input -ne "") { $BillingEnabled = $input }
 }
 
 # All mode - also needs Rooms JSON
 if ($INSTALL_MODE -eq "all") {
-    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+    $input = Read-Host "Rooms JSON (contoh: [{`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}], kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
     
-    $input = Read-Host "Billing Enabled (true/false, kosongkan untuk skip)"
+    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
     if ($input -ne "") { $BillingEnabled = $input }
 }
 

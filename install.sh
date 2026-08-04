@@ -37,27 +37,27 @@ prompt_env_config() {
     
     # Room App mode - needs Server IP, Room ID, Room Name
     if [[ "$mode" == "room" || "$mode" == "all" ]]; then
-        read -p "Server IP (kosongkan untuk skip): " server_ip
+        read -p "Server IP (contoh: 192.168.1.100, kosongkan untuk skip): " server_ip
         
-        read -p "Room ID (kosongkan untuk skip): " room_id
+        read -p "Room ID (contoh: room-001, kosongkan untuk skip): " room_id
         
-        read -p "Room Name (kosongkan untuk skip): " room_name
+        read -p "Room Name (contoh: Room 1, kosongkan untuk skip): " room_name
         
-        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # Kasir mode - only needs Rooms JSON
     if [[ "$mode" == "kasir" ]]; then
-        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+        read -p "Rooms JSON (contoh: [{"name":"Room 1","ip":"192.168.1.101","port":53331,"pricePerHour":50000}], kosongkan untuk skip): " rooms_json
         
-        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # All mode - needs everything
     if [[ "$mode" == "all" ]]; then
-        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+        read -p "Rooms JSON (contoh: [{"name":"Room 1","ip":"192.168.1.101","port":53331,"pricePerHour":50000}], kosongkan untuk skip): " rooms_json
         
-        read -p "Billing Enabled (true/false, kosongkan untuk skip): " billing_enabled
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
     fi
     
     # Apply configuration - only non-empty values will be applied
