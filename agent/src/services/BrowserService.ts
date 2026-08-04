@@ -46,4 +46,18 @@ export class BrowserService {
         return this.browserManager;
 
     }
+
+    /**
+     * Display an image in the browser page.
+     */
+    public async showImage(imagePath: string): Promise<void> {
+        await this.browserManager.showImage(imagePath);
+    }
+
+    /**
+     * Get the path to the data directory.
+     */
+    public getDataPath(): string {
+        return this.browserManager.getDataPath();
+    }
 }

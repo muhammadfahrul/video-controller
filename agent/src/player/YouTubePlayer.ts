@@ -168,8 +168,16 @@ export class YouTubePlayer {
 
         await this.dom.pause();
 
-        this.state = PlayerState.PAUSED;
+    }
 
+    /**
+     * Navigate to any URL (used for showing images).
+     */
+    public async goto(url: string): Promise<void> {
+        this.ensureReady();
+        
+        await this.page.goto(url, { waitUntil: "domcontentloaded" });
+        await this.page.waitForTimeout(1000);
     }
 
     public async skipAd(): Promise<boolean> {

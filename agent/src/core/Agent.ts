@@ -214,6 +214,9 @@ export class Agent {
                 this.playerRepository
             );
 
+        // Show start image when room is activated
+        await this.player.showStartImage();
+
         // Set player service in socket client for clear data functionality
         this.socketClient?.setPlayerService(this.player);
         
@@ -246,11 +249,14 @@ export class Agent {
 
         await this.player.restore()
 
-        // If no saved video, open YouTube home
+        // If no saved video, show start image (stay on start screen until user plays something)
         const snapshot = await this.player.getSnapshot();
         if (!snapshot || !snapshot.videoId) {
-            console.log("[AGENT] No saved video, opening YouTube home");
-            await this.player.openVideo("");
+            console.log("[AGENT] No saved video, showing start image");
+            // Keep showing start image - don't navigate to YouTube
+        } else {
+            // Restore video playback if there was a saved video
+            console.log("[AGENT] Restored video, playing:", snapshot.videoId);
         }
 
         // Load playlist state BEFORE setting up ended callback

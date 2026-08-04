@@ -267,16 +267,63 @@ export class SocketClient {
                     } catch (err) {
                         console.error("Error stopping playback:", err);
                     }
+                    
+                    // Show expired image when room is deactivated
+                    try {
+                        await this.playerService?.showExpiredImage();
+                        console.log("Displayed expired image");
+                    } catch (err) {
+                        console.error("Error showing expired image:", err);
+                    }
                 } else if (data.isActive) {
                     // Room was reactivated - resume state sync
                     console.log("Room reactivated, resuming state sync");
                     this.resumeStateSync();
+                    
+                    // Show start image when room is reactivated
+                    try {
+                        await this.playerService?.showStartImage();
+                        console.log("Displayed start image on reactivation");
+                    } catch (err) {
+                        console.error("Error showing start image:", err);
+                    }
                 }
             }
         );
 
         // Set up clear data listener
         this.setupClearDataListener();
+        
+        // Set up deactivation listener (for cashier:deactivate-room event)
+        this.setupDeactivationListener();
+    }
+
+    // Listen for explicit deactivation from cashier
+    private setupDeactivationListener() {
+        this.socket?.off(SocketEvents.CASHIER_DEACTIVATE_ROOM);
+        
+        this.socket?.on(
+            SocketEvents.CASHIER_DEACTIVATE_ROOM,
+            async () => {
+                console.log("[SOCKET] Received deactivate room event from cashier");
+                
+                // Stop playback
+                try {
+                    await this.commandRouter?.handle({ type: "STOP" } as any);
+                    console.log("Playback stopped due to deactivation");
+                } catch (err) {
+                    console.error("Error stopping playback:", err);
+                }
+                
+                // Show expired image
+                try {
+                    await this.playerService?.showExpiredImage();
+                    console.log("Displayed expired image");
+                } catch (err) {
+                    console.error("Error showing expired image:", err);
+                }
+            }
+        );
     }
 
     // Listen for player/playlist data restored from server database
@@ -349,10 +396,10 @@ export class SocketClient {
                     
                     console.log("All data cleared successfully");
                     
-                    // Navigate to YouTube home after clearing
+                    // Show expired image after clearing (not YouTube home)
                     if (this.playerService) {
-                        await this.playerService.openVideo("");
-                        console.log("Navigated to YouTube home");
+                        await this.playerService.showExpiredImage();
+                        console.log("Displayed expired image after clear-data");
                     }
                     
                     // Send empty state to update UI on cashier and web PWA

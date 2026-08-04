@@ -1,4 +1,5 @@
 import { Page } from "playwright";
+import path from "path";
 
 import {
     YouTubePlayer
@@ -628,5 +629,44 @@ export class PlayerService {
 
         return this.lastHealthySnapshot;
 
+    }
+
+    /**
+     * Show start image when room is activated.
+     * Uses the image from agent/data/start_image.jpeg
+     */
+    public async showStartImage(): Promise<void> {
+        const dataPath = path.join(process.cwd(), "data");
+        const startImagePath = path.join(dataPath, "start_image.jpeg");
+        
+        await this.showImage(startImagePath);
+    }
+
+    /**
+     * Show expired image when room time is expired/deactivated.
+     * Uses the image from agent/data/expired_image.jpeg
+     */
+    public async showExpiredImage(): Promise<void> {
+        const dataPath = path.join(process.cwd(), "data");
+        const expiredImagePath = path.join(dataPath, "expired_image.jpeg");
+        
+        await this.showImage(expiredImagePath);
+    }
+
+    /**
+     * Display an image in the browser page.
+     */
+    private async showImage(imagePath: string): Promise<void> {
+        const fs = await import("fs");
+        if (!fs.existsSync(imagePath)) {
+            console.warn(`[PlayerService] Image file not found: ${imagePath}`);
+            return;
+        }
+
+        // Convert to file:// URL
+        const fileUrl = `file://${imagePath}`;
+        
+        await this.player.goto(fileUrl);
+        console.log(`[PlayerService] Displayed image: ${imagePath}`);
     }
 }

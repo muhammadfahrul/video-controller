@@ -1,3 +1,5 @@
+import path from "path";
+
 import {
     Browser,
     BrowserContext,
@@ -289,6 +291,35 @@ export class BrowserManager {
 
         return this.page;
 
+    }
+
+    /**
+     * Display an image in the browser page using a local file path.
+     * Useful for showing start screen or expired screen images.
+     */
+    public async showImage(imagePath: string): Promise<void> {
+        if (!this.page) {
+            throw new Error("Page has not been created.");
+        }
+
+        const fs = await import("fs");
+        if (!fs.existsSync(imagePath)) {
+            LoggerService.warn(`Image file not found: ${imagePath}`);
+            return;
+        }
+
+        // Convert to file:// URL
+        const fileUrl = `file://${imagePath}`;
+        
+        await this.page.goto(fileUrl, { waitUntil: "domcontentloaded" });
+        LoggerService.info(`Displayed image: ${imagePath}`);
+    }
+
+    /**
+     * Get the path to the data directory.
+     */
+    public getDataPath(): string {
+        return path.join(process.cwd(), "data");
     }
 
     public getState(): BrowserState {
