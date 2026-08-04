@@ -336,51 +336,52 @@ function Setup-Autostart {
 
     Write-Host "[INFO] Setting up auto-start for mode: $mode" -ForegroundColor Yellow
 
-    $taskFolder = "VideoController"
-
-    # Get Node.js path
-    $nodePath = (Get-Command node -ErrorAction SilentlyContinue).Source
-    if (-not $nodePath) {
-        $nodePath = "node"
-    }
-
+    # Use Startup folder approach (simpler and more reliable)
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+    
     if ($mode -eq "room" -or $mode -eq "all") {
-        # Server auto-start
-        $serverTaskName = "VideoController_Server"
-        $serverAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\server`" && npm run start" -WorkingDirectory (Join-Path $PROJECT_ROOT "server")
-        $serverTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $serverPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-        Register-ScheduledTask -TaskName $serverTaskName -TaskPath "\$taskFolder\" -Action $serverAction -Trigger $serverTrigger -Principal $serverPrincipal -Description "Video Controller Server" -Force
-        Write-Host "[OK] Server auto-start configured" -ForegroundColor Green
+        # Server startup script
+        $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
+        @"
+@echo off
+cd /d "$PROJECT_ROOT\server"
+npm run start
+"@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
+        Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
 
-        # Agent auto-start (with BROWSER_HEADLESS=false for visible browser)
-        $agentTaskName = "VideoController_Agent"
-        $agentEnv = "set BROWSER_HEADLESS=false&& "
-        $agentAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c $agentEnv cd /d `"$PROJECT_ROOT\agent`" && npm run start" -WorkingDirectory (Join-Path $PROJECT_ROOT "agent")
-        $agentTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $agentPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-        Register-ScheduledTask -TaskName $agentTaskName -TaskPath "\$taskFolder\" -Action $agentAction -Trigger $agentTrigger -Principal $agentPrincipal -Description "Video Controller Agent" -Force
-        Write-Host "[OK] Agent auto-start configured" -ForegroundColor Green
+        # Agent startup script
+        $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
+        @"
+@echo off
+set BROWSER_HEADLESS=false
+cd /d "$PROJECT_ROOT\agent"
+npm run start
+"@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
+        Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
 
-        # Web auto-start
-        $webTaskName = "VideoController_Web"
-        $webAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\web`" && npm run preview:host" -WorkingDirectory (Join-Path $PROJECT_ROOT "web")
-        $webTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $webPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-        Register-ScheduledTask -TaskName $webTaskName -TaskPath "\$taskFolder\" -Action $webAction -Trigger $webTrigger -Principal $webPrincipal -Description "Video Controller Web" -Force
-        Write-Host "[OK] Web auto-start configured" -ForegroundColor Green
+        # Web startup script
+        $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
+        @"
+@echo off
+cd /d "$PROJECT_ROOT\web"
+npm run preview:host
+"@ | Out-File -FilePath $webStartupScript -Encoding ASCII
+        Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Cashier auto-start
-        $cashierTaskName = "VideoController_Cashier"
-        $cashierAction = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c cd /d `"$PROJECT_ROOT\cashier`" && npm run preview:host" -WorkingDirectory (Join-Path $PROJECT_ROOT "cashier")
-        $cashierTrigger = New-ScheduledTaskTrigger -AtLogOn
-        $cashierPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
-        Register-ScheduledTask -TaskName $cashierTaskName -TaskPath "\$taskFolder\" -Action $cashierAction -Trigger $cashierTrigger -Principal $cashierPrincipal -Description "Video Controller Cashier" -Force
-        Write-Host "[OK] Cashier auto-start configured" -ForegroundColor Green
+        # Cashier startup script - use start command to run in new window
+        $cashierStartupScript = Join-Path $startupFolder "VideoController_Cashier.bat"
+        @"
+@echo off
+start "Cashier" cmd /c "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
+"@ | Out-File -FilePath $cashierStartupScript -Encoding ASCII
+        Write-Host "[OK] Cashier auto-start configured: $cashierStartupScript" -ForegroundColor Green
     }
 
+    Write-Host ""
+    Write-Host "[INFO] Auto-start menggunakan Windows Startup folder" -ForegroundColor Yellow
+    Write-Host "[INFO] File terletak di: $startupFolder" -ForegroundColor Yellow
     Write-Host "[OK] Auto-start ($mode) configured successfully!" -ForegroundColor Green
 }
 
@@ -392,34 +393,151 @@ function Remove-Autostart {
 
     Write-Host "[INFO] Removing auto-start for mode: $mode" -ForegroundColor Yellow
 
-    $taskFolder = "VideoController"
+    # Use Startup folder approach
+    $startupFolder = [Environment]::GetFolderPath('Startup')
 
     if ($mode -eq "room" -or $mode -eq "all") {
-        # Remove Room App tasks
-        $tasksToRemove = @("VideoController_Server", "VideoController_Agent", "VideoController_Web")
-        foreach ($taskName in $tasksToRemove) {
-            if (Get-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $taskName -ErrorAction SilentlyContinue) {
-                Unregister-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $taskName -Confirm:$false
-                Write-Host "[OK] Removed $taskName" -ForegroundColor Green
+        # Remove Room App startup scripts
+        $scriptsToRemove = @("VideoController_Server.bat", "VideoController_Agent.bat", "VideoController_Web.bat")
+        foreach ($scriptName in $scriptsToRemove) {
+            $scriptPath = Join-Path $startupFolder $scriptName
+            if (Test-Path $scriptPath) {
+                Remove-Item -Path $scriptPath -Force
+                Write-Host "[OK] Removed $scriptName" -ForegroundColor Green
             }
         }
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Remove Cashier task
-        $cashierTaskName = "VideoController_Cashier"
-        if (Get-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $cashierTaskName -ErrorAction SilentlyContinue) {
-            Unregister-ScheduledTask -TaskPath "\$taskFolder\" -TaskName $cashierTaskName -Confirm:$false
-            Write-Host "[OK] Removed $cashierTaskName" -ForegroundColor Green
+        # Remove Cashier startup script
+        $cashierScript = Join-Path $startupFolder "VideoController_Cashier.bat"
+        if (Test-Path $cashierScript) {
+            Remove-Item -Path $cashierScript -Force
+            Write-Host "[OK] Removed VideoController_Cashier.bat" -ForegroundColor Green
         }
     }
 
     Write-Host "[OK] Auto-start ($mode) removed successfully!" -ForegroundColor Green
 }
 
+# ============================================
+# Find Node.js installation
+# ============================================
+function Find-NodeJS {
+    # Try to find node.exe in common installation directories
+    # Priority: C:\nodejs (ZIP) > Program Files (MSI)
+    $nodePaths = @(
+        # ZIP installations (newer)
+        "C:\nodejs\node-v22.13.1-win-x64\node.exe",
+        "C:\nodejs\node-v20.18.1-win-x64\node.exe",
+        # MSI installations
+        "C:\Program Files\nodejs\node.exe",
+        "C:\Program Files (x86)\nodejs\node.exe",
+        "$env:APPDATA\nodejs\node.exe",
+        "$env:LOCALAPPDATA\nodejs\node.exe"
+    )
+    
+    $foundNode = $null
+    $foundVersion = $null
+    
+    foreach ($path in $nodePaths) {
+        if (Test-Path $path) {
+            # Get version to compare
+            try {
+                $version = & $path --version 2>$null
+                if ($version -match 'v(\d+)\.(\d+)') {
+                    $major = [int]$matches[1]
+                    $minor = [int]$matches[2]
+                    
+                    # Always prefer v22 if found
+                    if ($major -ge 22 -and $foundVersion -notmatch 'v2[2-9]') {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                    # Store first found (v20) if no v22 found yet
+                    elseif (-not $foundNode) {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                }
+            } catch {
+                # If version check fails, still return the path
+                if (-not $foundNode) {
+                    $foundNode = $path
+                }
+            }
+        }
+    }
+    return $foundNode
+}
+
 Write-Host "[INFO] Starting Video Controller..." -ForegroundColor Cyan
 
+# Find project root - look in script directory, parent directories, AND sibling directories
 $PROJECT_ROOT = $PSScriptRoot
+$found = $false
+
+# 1. First check current directory (where script is located)
+if (Test-Path (Join-Path $PSScriptRoot 'package.json')) {
+    $PROJECT_ROOT = $PSScriptRoot
+    $found = $true
+}
+
+# 2. If not found, walk up parent directories
+if (-not $found) {
+    $checkPath = $PSScriptRoot
+    $maxLevels = 5
+    for ($i = 0; $i -lt $maxLevels; $i++) {
+        if (Test-Path (Join-Path $checkPath 'package.json')) {
+            $PROJECT_ROOT = $checkPath
+            $found = $true
+            break
+        }
+        $parent = Split-Path $checkPath -Parent
+        if (-not $parent) { break }
+        $checkPath = $parent
+    }
+}
+
+# 3. If still not found, check for "video-controller" folder in current directory
+if (-not $found) {
+    $siblingPath = Join-Path $PSScriptRoot 'video-controller'
+    if (Test-Path (Join-Path $siblingPath 'package.json')) {
+        $PROJECT_ROOT = $siblingPath
+        $found = $true
+    }
+}
+
+# 4. Check for video-controller in parent directory (common case for Downloads)
+if (-not $found) {
+    $parentDir = Split-Path $PSScriptRoot -Parent
+    if ($parentDir) {
+        $siblingPath = Join-Path $parentDir 'video-controller'
+        if (Test-Path (Join-Path $siblingPath 'package.json')) {
+            $PROJECT_ROOT = $siblingPath
+            $found = $true
+        }
+    }
+}
+
+# Show where we found the project
+if ($found) {
+    Write-Host "[INFO] Project root: $PROJECT_ROOT" -ForegroundColor Cyan
+} else {
+    Write-Host "[ERROR] Cannot find project root (package.json)" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "[INFO] Searched locations:" -ForegroundColor Yellow
+    Write-Host "  - $PSScriptRoot (script location)"
+    $parentDir = Split-Path $PSScriptRoot -Parent
+    if ($parentDir) {
+        Write-Host "  - $parentDir (parent)"
+        Write-Host "  - $parentDir\video-controller (sibling in parent)"
+    }
+    Write-Host ""
+    Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller" -ForegroundColor Yellow
+    exit 1
+}
+
 $INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
 
 # ============================================
@@ -521,8 +639,8 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
     $nodeVersion = & $nodeExePath --version 2>$null
     $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
 
-    if (-not $nodeVersion -or $nodeMajorVersion -lt 16) {
-        Write-Host "[ERROR] Node.js $nodeVersion is too old or not installed!" -ForegroundColor Red
+    if (-not $nodeVersion -or $nodeMajorVersion -lt 22) {
+        Write-Host "[ERROR] Node.js $nodeVersion requires v22+ for this project (Vite 8.x)!" -ForegroundColor Red
         exit 1
     }
 
@@ -608,54 +726,6 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
 }
 
 # Normal mode - continue with service start
-
-function Find-NodeJS {
-    # Try to find node.exe in common installation directories
-    # Priority: C:\nodejs (ZIP) > Program Files (MSI)
-    $nodePaths = @(
-        # ZIP installations (newer)
-        "C:\nodejs\node-v22.13.1-win-x64\node.exe",
-        "C:\nodejs\node-v20.18.1-win-x64\node.exe",
-        # MSI installations
-        "C:\Program Files\nodejs\node.exe",
-        "C:\Program Files (x86)\nodejs\node.exe",
-        "$env:APPDATA\nodejs\node.exe",
-        "$env:LOCALAPPDATA\nodejs\node.exe"
-    )
-    
-    $foundNode = $null
-    $foundVersion = $null
-    
-    foreach ($path in $nodePaths) {
-        if (Test-Path $path) {
-            # Get version to compare
-            try {
-                $version = & $path --version 2>$null
-                if ($version -match 'v(\d+)\.(\d+)') {
-                    $major = [int]$matches[1]
-                    $minor = [int]$matches[2]
-                    
-                    # Always prefer v22 if found
-                    if ($major -ge 22 -and $foundVersion -notmatch 'v2[2-9]') {
-                        $foundNode = $path
-                        $foundVersion = $version
-                    }
-                    # Store first found (v20) if no v22 found yet
-                    elseif (-not $foundNode) {
-                        $foundNode = $path
-                        $foundVersion = $version
-                    }
-                }
-            } catch {
-                # If version check fails, still return the path
-                if (-not $foundNode) {
-                    $foundNode = $path
-                }
-            }
-        }
-    }
-    return $foundNode
-}
 
 $nodeExePath = Find-NodeJS
 
