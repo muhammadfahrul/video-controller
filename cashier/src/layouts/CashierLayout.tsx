@@ -1,28 +1,21 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useState, useEffect } from 'react';
-import { Mic, LayoutDashboard, Receipt } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { useRoomStore } from '../store/useRoomStore';
-import { useTransactionStore } from '../store/useTransactionStore';
 import { FullPageLoading, loadingDurations } from '../components/FullPageLoading';
-import { MenuLink } from '../components/MenuLink';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const location = useLocation();
   
   const roomLoading = useRoomStore((state) => state.isLoading);
   const roomLoadingType = useRoomStore((state) => state.loadingType);
   const roomLoadingMessage = useRoomStore((state) => state.loadingMessage);
   
-  const transactionLoading = useTransactionStore((state) => state.isLoading);
-  const transactionLoadingType = useTransactionStore((state) => state.loadingType);
-  const transactionLoadingMessage = useTransactionStore((state) => state.loadingMessage);
+  const isLoading = roomLoading;
   
-  const isLoading = roomLoading || transactionLoading;
-  
-  // Determine which loading type and message to show (prefer the more specific one)
-  const activeLoadingType = transactionLoading ? transactionLoadingType : roomLoadingType;
-  const activeLoadingMessage = transactionLoading ? transactionLoadingMessage : roomLoadingMessage;
+  // Determine which loading type and message to show
+  const activeLoadingType = roomLoadingType;
+  const activeLoadingMessage = roomLoadingMessage;
   
   // Auto-clear loading after duration timeout
   useEffect(() => {
@@ -32,7 +25,6 @@ export default function CashierLayout() {
     const timeoutId = setTimeout(() => {
       console.log('[CashierLayout] Auto-clearing loading after timeout:', duration);
       useRoomStore.getState().setLoading(false);
-      useTransactionStore.getState().setLoading(false);
     }, duration);
     
     return () => clearTimeout(timeoutId);
@@ -77,32 +69,6 @@ export default function CashierLayout() {
             <p className="text-[10px] text-gray-500">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
         </header>
-
-        {/* Navigation */}
-        <nav className="flex gap-1 px-4 sm:px-6 py-2 border-b border-white/5">
-          <MenuLink
-            to="/"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
-              location.pathname === '/'
-                ? 'bg-purple-600/20 text-purple-400'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <LayoutDashboard className="w-4 h-4" />
-            <span>Dashboard</span>
-          </MenuLink>
-          <MenuLink
-            to="/transactions"
-            className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors ${
-              location.pathname === '/transactions'
-                ? 'bg-purple-600/20 text-purple-400'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>Transaksi</span>
-          </MenuLink>
-        </nav>
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto w-full px-4 sm:px-6 py-4">

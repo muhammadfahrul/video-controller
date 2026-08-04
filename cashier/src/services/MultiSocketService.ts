@@ -307,6 +307,15 @@ class MultiSocketService {
     socket.emit('transaction:save', transactionWithId);
   }
 
+  // Load transactions from server for a specific room
+  loadTransactions(roomId: string): void {
+    const connection = this.connections.get(roomId);
+    if (connection && connection.socket.connected) {
+      console.log('[MultiSocket] Requesting transactions for room:', roomId);
+      connection.socket.emit('transaction:get');
+    }
+  }
+  
   // Delete transaction on server
   deleteTransaction(transactionId: string, onComplete?: () => void): void {
     const timeoutMs = 3000;

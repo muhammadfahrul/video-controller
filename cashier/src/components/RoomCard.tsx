@@ -4,7 +4,8 @@ import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
 import { useRoomStore } from '../store/useRoomStore';
 import type { LoadingMessage } from '../components/FullPageLoading';
-import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText } from 'lucide-react';
+import { TransactionModal } from './TransactionModal';
+import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText, Receipt } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -25,6 +26,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const [customerPhoneInput, setCustomerPhoneInput] = useState('');
   const [customerEmailInput, setCustomerEmailInput] = useState('');
   const [customerNoteInput, setCustomerNoteInput] = useState('');
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
   const setGlobalLoading = useRoomStore((state) => state.setLoading);
   const isLoading = useRoomStore((state) => state.isLoading);
   
@@ -146,20 +148,32 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
           <h3 className="text-sm font-semibold text-white">{roomBilling.roomName}</h3>
         </div>
         
-        {/* Right: Button - same height as icon */}
-        {billingConfig.enabled && roomBilling.isConnected && (
+        {/* Right: Buttons */}
+        <div className="flex items-center gap-1">
+          {/* Transaction History Button */}
           <button 
-            onClick={handleToggleActive} 
-            disabled={isLoading}
-            className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => setShowTransactionModal(true)}
+            className="w-6 h-6 flex items-center justify-center rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+            title="Riwayat Transaksi"
           >
-            {roomBilling.isActive ? (
-              <PowerOff className="w-3.5 h-3.5" />
-            ) : (
-              <Power className="w-3.5 h-3.5" />
-            )}
+            <Receipt className="w-3.5 h-3.5" />
           </button>
-        )}
+          
+          {/* Power Button */}
+          {billingConfig.enabled && roomBilling.isConnected && (
+            <button 
+              onClick={handleToggleActive} 
+              disabled={isLoading}
+              className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {roomBilling.isActive ? (
+                <PowerOff className="w-3.5 h-3.5" />
+              ) : (
+                <Power className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
       
       {/* Header - Row 2 */}
@@ -333,6 +347,15 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             <span className="text-[10px] text-gray-500">(menit)</span>
           </div>
         </div>
+      )}
+      
+      {/* Transaction Modal */}
+      {showTransactionModal && (
+        <TransactionModal
+          roomId={roomBilling.roomId}
+          roomName={roomBilling.roomName}
+          onClose={() => setShowTransactionModal(false)}
+        />
       )}
     </div>
   );

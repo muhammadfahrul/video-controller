@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { RoomConfig } from '../types';
+import type { RoomConfig, Transaction } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import type { LoadingMessage } from '../components/FullPageLoading';
 
@@ -10,6 +10,12 @@ interface RoomStore {
   loadingType: LoadingMessage;
   loadingMessage: string;
   
+  // Transaction data per room
+  transactions: Map<string, Transaction[]>;
+  // Modal state
+  selectedRoomId: string | null;
+  isTransactionModalOpen: boolean;
+  
   // Actions
   addRoom: (config: Omit<RoomConfig, 'id'>) => Promise<void>;
   removeRoom: (roomId: string) => void;
@@ -18,6 +24,21 @@ interface RoomStore {
   reconnectAll: () => void;
   initFromEnv: () => void;
   setLoading: (loading: boolean, type?: LoadingMessage, message?: string) => void;
+  
+  // Transaction actions
+  setTransactions: (roomId: string, transactions: Transaction[]) => void;
+  addTransaction: (roomId: string, transaction: Omit<Transaction, 'id'>) => void;
+  removeTransaction: (roomId: string, transactionId: string) => void;
+  clearTransactions: (roomId: string) => void;
+  getTransactionsByRoom: (roomId: string) => Transaction[];
+  getTotalRevenue: (roomId: string) => number;
+  getTodayRevenue: (roomId: string) => number;
+  getAllRoomsRevenue: () => number;
+  getAllRoomsTodayRevenue: () => number;
+  
+  // Modal actions
+  openTransactionModal: (roomId: string) => void;
+  closeTransactionModal: () => void;
 }
 
 // Generate unique ID
@@ -111,6 +132,11 @@ export const useRoomStore = create<RoomStore>()(
       set({ isLoading: loading, loadingType: type, loadingMessage: message });
     },
     
+    // Transaction state
+    transactions: new Map(),
+    selectedRoomId: null,
+    isTransactionModalOpen: false,
+    
     initFromEnv: () => {
       const envRooms = loadRoomsFromEnv();
       console.log('[Store] Loading rooms from .env:', envRooms);
@@ -126,6 +152,97 @@ export const useRoomStore = create<RoomStore>()(
           multiSocketService.addRoom(config);
         }
       });
+    },
+    
+    // Transaction actions
+    setTransactions: (roomId, transactions) => {
+      set((state) => {
+        const newTransactions = new Map(state.transactions);
+        newTransactions.set(roomId, transactions);
+        return { transactions: newTransactions };
+      });
+    },
+    
+    addTransaction: (roomId, transaction) => {
+      const newTransaction: Transaction = {
+        ...transaction,
+        id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
+      };
+      
+      set((state) => {
+        const newTransactions = new Map(state.transactions);
+        const existing = newTransactions.get(roomId) || [];
+        newTransactions.set(roomId, [newTransaction, ...existing]);
+        return { transactions: newTransactions };
+      });
+    },
+    
+    removeTransaction: (roomId, transactionId) => {
+      set((state) => {
+        const newTransactions = new Map(state.transactions);
+        const existing = newTransactions.get(roomId) || [];
+        newTransactions.set(roomId, existing.filter(t => t.id !== transactionId));
+        return { transactions: newTransactions };
+      });
+    },
+    
+    clearTransactions: (roomId) => {
+      set((state) => {
+        const newTransactions = new Map(state.transactions);
+        newTransactions.set(roomId, []);
+        return { transactions: newTransactions };
+      });
+    },
+    
+    getTransactionsByRoom: (roomId) => {
+      return get().transactions.get(roomId) || [];
+    },
+    
+    getTotalRevenue: (roomId) => {
+      const transactions = get().transactions.get(roomId) || [];
+      return transactions.reduce((sum, t) => sum + t.totalPrice, 0);
+    },
+    
+    getTodayRevenue: (roomId) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.getTime();
+      
+      const transactions = get().transactions.get(roomId) || [];
+      return transactions
+        .filter(t => t.paidAt >= todayStart)
+        .reduce((sum, t) => sum + t.totalPrice, 0);
+    },
+    
+    getAllRoomsRevenue: () => {
+      let total = 0;
+      get().transactions.forEach((transactions) => {
+        total += transactions.reduce((sum, t) => sum + t.totalPrice, 0);
+      });
+      return total;
+    },
+    
+    getAllRoomsTodayRevenue: () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayStart = today.getTime();
+      
+      let total = 0;
+      get().transactions.forEach((transactions) => {
+        total += transactions
+          .filter(t => t.paidAt >= todayStart)
+          .reduce((sum, t) => sum + t.totalPrice, 0);
+      });
+      return total;
+    },
+    
+    // Modal actions
+    openTransactionModal: (roomId) => {
+      set({ selectedRoomId: roomId, isTransactionModalOpen: true });
+    },
+    
+    closeTransactionModal: () => {
+      set({ selectedRoomId: null, isTransactionModalOpen: false });
     },
   })
 );

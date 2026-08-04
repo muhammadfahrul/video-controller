@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useRoomStore } from '../store/useRoomStore';
-import { useTransactionStore } from '../store/useTransactionStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { RoomCard } from '../components/RoomCard';
 import { Tv, TrendingUp, Wifi, WifiOff, Server, CircleDot } from 'lucide-react';
 
 export default function DashboardPage() {
   const { roomConfigs, connectionStatus, setRoomConnected, setLoading: setRoomLoading } = useRoomStore();
-  const setTransactionLoading = useTransactionStore((state) => state.setLoading);
   const [roomBillings, setRoomBillings] = useState<Map<string, any>>(new Map());
   const [hasNavigated, setHasNavigated] = useState(false);
   
@@ -17,7 +15,6 @@ export default function DashboardPage() {
     
     // Set loading state for initial connection
     setRoomLoading(true, 'connecting');
-    setTransactionLoading(true, 'connecting');
     
     const unsubscribeUpdate = multiSocketService.onUpdate((billings) => {
       setRoomBillings(billings);
@@ -32,7 +29,7 @@ export default function DashboardPage() {
       unsubscribeUpdate();
       unsubscribeStatus();
     };
-  }, [setRoomConnected, setRoomLoading, setTransactionLoading]);
+  }, [setRoomConnected, setRoomLoading]);
   
   // Clear global loading when data is received from server (connection established)
   useEffect(() => {
@@ -42,7 +39,6 @@ export default function DashboardPage() {
     if (roomBillings && roomBillings.size > 0) {
       console.log('[Dashboard] Data already available, clearing loadings');
       setRoomLoading(false);
-      setTransactionLoading(false);
       return;
     }
     
@@ -50,21 +46,19 @@ export default function DashboardPage() {
     const unsubscribe = multiSocketService.onUpdate(() => {
       console.log('[Dashboard] First data received, clearing loadings');
       setRoomLoading(false);
-      setTransactionLoading(false);
     });
     
     // Fallback timeout in case no data is received
     const timeoutId = setTimeout(() => {
       console.log('[Dashboard] Timeout, clearing loadings');
       setRoomLoading(false);
-      setTransactionLoading(false);
     }, 5000);
     
     return () => {
       unsubscribe();
       clearTimeout(timeoutId);
     };
-  }, [hasNavigated, setRoomLoading, setTransactionLoading]);
+  }, [hasNavigated, setRoomLoading]);
   
   const roomList = Array.from(roomBillings?.values?.() || []);
   const statusMap = connectionStatus instanceof Map ? connectionStatus : new Map();
