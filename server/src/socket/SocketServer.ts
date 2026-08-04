@@ -575,11 +575,14 @@ export class SocketServer {
                             (agent as any).customerEmail = undefined;
                             (agent as any).customerNote = undefined;
                             
-                            // Broadcast deactivation to all clients
+                            // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
                             this.io.emit("room:activation", {
                                 roomId: data.roomId,
+                                roomName: agent.roomName,
                                 isActive: false,
-                                reason: "deactivated"
+                                reason: "deactivated",
+                                expiresAt: agent.expiresAt,
+                                startTime: agent.startTime
                             });
                             
                             this.broadcastAgents(registry.getAll());
@@ -879,6 +882,9 @@ export class SocketServer {
         // Use ref method for mutation
         const agent = registry.getByRoomIdRef(roomId);
         
+        // Capture expiry time BEFORE clearing (for broadcast)
+        const expiryTime = agent?.expiresAt || Date.now();
+        
         if (agent) {
             agent.isActive = false;
             agent.expiresAt = null;
@@ -921,11 +927,14 @@ export class SocketServer {
             this.broadcastAgents(registry.getAll());
         }
         
-        // Broadcast deactivation to all clients
+        // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
         this.io.emit("room:activation", {
             roomId,
+            roomName: agent?.roomName,
             isActive: false,
-            reason: "expired"
+            reason: "expired",
+            expiresAt: expiryTime,
+            startTime: agent?.startTime
         });
     }
 }

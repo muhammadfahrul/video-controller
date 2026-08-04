@@ -603,7 +603,12 @@ class MultiSocketService {
 
     // Listen for room activation updates (includes expiry info)
     socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string }) => {
-      console.log('[MultiSocket] Room activation update:', config.name, data);
+      console.log('[MultiSocket] Room activation update:', config.name, {
+        ...data,
+        expiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
+        nowFormatted: new Date().toISOString(),
+        timeDiff: data.expiresAt ? data.expiresAt - Date.now() : null
+      });
       
       // Capture state BEFORE queuing for transaction recording
       const existingAgent = connection.agents[0];
@@ -618,6 +623,18 @@ class MultiSocketService {
         // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
         const endTime = data.expiresAt || agent.expiresAt || Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
+        
+        console.log('[MultiSocket] Transaction calculation:', {
+          startTime,
+          startTimeFormatted: startTime ? new Date(startTime).toISOString() : 'null',
+          dataExpiresAt: data.expiresAt,
+          dataExpiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : 'null/undefined',
+          agentExpiresAt: agent.expiresAt,
+          endTime,
+          endTimeFormatted: new Date(endTime).toISOString(),
+          durationSeconds,
+          durationFormatted: formatDuration(durationSeconds),
+        });
         // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
         const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
         
