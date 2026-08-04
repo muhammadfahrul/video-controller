@@ -256,29 +256,32 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                     <p className="text-sm font-bold text-yellow-400">
                       {formatPrice(transaction.totalPrice)}
                     </p>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setPrintTransaction(transaction)}
-                          className="p-1 text-blue-400 hover:bg-blue-500/20 rounded mt-1"
-                          title="Cetak Nota"
-                        >
-                          <Printer className="w-3 h-3" />
-                        </button>
-                        {transaction.paidAt > 0 ? (
+                      <div className="flex flex-col items-center gap-1 mt-1">
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                            className="p-1 text-red-400 hover:bg-red-500/20 rounded mt-1"
+                            onClick={() => setPrintTransaction(transaction)}
+                            className="p-1.5 text-blue-400 hover:bg-blue-500/20 rounded flex items-center justify-center"
+                            title="Cetak Nota"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Printer className="w-3.5 h-3.5" />
                           </button>
-                        ) : (
-                          <button
-                            onClick={() => handlePayment(transaction.id)}
-                            className="px-2 py-1 text-xs font-medium bg-yellow-600 hover:bg-yellow-500 text-white rounded mt-1"
-                          >
-                            Bayar
-                          </button>
-                        )}
+                          {transaction.paidAt > 0 ? (
+                            <button
+                              onClick={() => handleDeleteTransaction(transaction.id)}
+                              className="p-1.5 text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center"
+                              title="Hapus"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handlePayment(transaction.id)}
+                              className="px-2.5 py-1 text-xs font-medium bg-yellow-600 hover:bg-yellow-500 text-white rounded"
+                            >
+                              Bayar
+                            </button>
+                          )}
+                        </div>
                       </div>
                   </div>
                 </div>

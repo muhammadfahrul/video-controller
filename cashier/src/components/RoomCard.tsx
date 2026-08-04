@@ -231,13 +231,15 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         {/* Right: Buttons */}
         <div className="flex items-center gap-1">
           {/* Transaction History Button */}
-          <button 
-            onClick={() => setShowTransactionModal(true)}
-            className="w-6 h-6 flex items-center justify-center rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
-            title="Riwayat Transaksi"
-          >
-            <Receipt className="w-3.5 h-3.5" />
-          </button>
+          {billingConfig.enabled && roomBilling.isConnected && (
+            <button 
+              onClick={() => setShowTransactionModal(true)}
+              className="w-6 h-6 flex items-center justify-center rounded bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+              title="Riwayat Transaksi"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+            </button>
+          )}
           
           {/* Power Button */}
           {billingConfig.enabled && roomBilling.isConnected && (
