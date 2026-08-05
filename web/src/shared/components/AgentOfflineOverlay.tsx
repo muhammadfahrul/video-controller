@@ -30,7 +30,7 @@ export default function AgentOfflineOverlay() {
       </div>
       
       <h2 className="text-2xl font-bold text-white">
-        Pemain sedang offline
+        Ruangan Sedang Offline
       </h2>
       
       <div className="flex items-center gap-2 text-slate-300">

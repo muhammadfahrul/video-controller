@@ -3,13 +3,16 @@ import { playerCommandService } from "../../../services/player";
 import { useAppStore } from "../../../store/appStore";
 
 export default function PlaylistToolbar() {
-    const { agent, playlist, processing, setProcessing } = useAppStore();
+    const { agent, playlist, processing, setProcessing, setPlaylist } = useAppStore();
     const disabled = !agent.online || !agent.id;
 
-    const command = (action: "shufflePlaylist" | "clearPlaylist" | "repeat", run: () => void) => {
+    const command = (action: "shufflePlaylist" | "clearPlaylist" | "repeat", run: () => void, onOptimisticUpdate?: () => void) => {
         if (disabled) return;
         
         setProcessing(action, true);
+        
+        // Apply optimistic update immediately for better UX
+        onOptimisticUpdate?.();
         
         // Execute command with error handling callback
         run();
@@ -26,8 +29,33 @@ export default function PlaylistToolbar() {
     };
 
     const repeatMode = playlist.repeat === "OFF" ? "ALL" : playlist.repeat === "ALL" ? "ONE" : "OFF";
+    const nextRepeatMode = repeatMode === "OFF" ? "OFF" : repeatMode === "ALL" ? "ONE" : "OFF";
     const repeatLabel = playlist.repeat === "OFF" ? "Ulang: mati" : playlist.repeat === "ALL" ? "Ulang semua" : "Ulang satu";
     const buttonClass = "inline-flex min-h-12 items-center gap-3 rounded-2xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45";
+
+    const handleRepeatClick = () => {
+        const nextMode = repeatMode === "OFF" ? "ALL" : repeatMode === "ALL" ? "ONE" : "OFF";
+        
+        command(
+            "repeat",
+            () => playerCommandService.repeat(agent.id, nextMode, {
+                onSuccess: () => {
+                    console.log("[PlaylistToolbar] Repeat command sent:", nextMode);
+                },
+                onError: (error) => {
+                    console.error("[PlaylistToolbar] Repeat failed:", error);
+                    setProcessing("repeat", false);
+                }
+            }),
+            // Optimistic update - update UI immediately
+            () => {
+                setPlaylist({
+                    ...playlist,
+                    repeat: nextMode
+                });
+            }
+        );
+    };
 
     return (
         <div className="flex flex-wrap items-center gap-3 border-b border-white/8 pb-4">
@@ -51,17 +79,7 @@ export default function PlaylistToolbar() {
             </button>
             <button
                 type="button"
-                onClick={() => command("repeat", () =>
-                    playerCommandService.repeat(agent.id, repeatMode, {
-                        onSuccess: () => {
-                            console.log("[PlaylistToolbar] Repeat command sent");
-                        },
-                        onError: (error) => {
-                            console.error("[PlaylistToolbar] Repeat failed:", error);
-                            setProcessing("repeat", false);
-                        }
-                    })
-                )}
+                onClick={handleRepeatClick}
                 disabled={disabled || processing.repeat}
                 className={`${buttonClass} ${playlist.repeat === "OFF" ? "bg-white/[0.07] text-slate-200 hover:bg-white/[0.12]" : "bg-teal-300/12 text-teal-100"}`}
             >
@@ -69,8 +87,9 @@ export default function PlaylistToolbar() {
             </button>
             <button
                 type="button"
-                onClick={() => command("clearPlaylist", () =>
-                    playerCommandService.clearPlaylist(agent.id, {
+                onClick={() => command(
+                    "clearPlaylist",
+                    () => playerCommandService.clearPlaylist(agent.id, {
                         onSuccess: () => {
                             console.log("[PlaylistToolbar] Clear command sent");
                         },
@@ -78,7 +97,15 @@ export default function PlaylistToolbar() {
                             console.error("[PlaylistToolbar] Clear failed:", error);
                             setProcessing("clearPlaylist", false);
                         }
-                    })
+                    }),
+                    // Optimistic update - clear playlist immediately
+                    () => {
+                        setPlaylist({
+                            ...playlist,
+                            items: [],
+                            currentIndex: -1
+                        });
+                    }
                 )}
                 disabled={disabled || processing.clearPlaylist || playlist.items.length === 0}
                 className={`${buttonClass} ml-auto bg-rose-400/10 text-rose-200 hover:bg-rose-400/18`}

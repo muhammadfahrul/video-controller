@@ -13,7 +13,8 @@ export default function PlaylistPanel() {
         removingItemId,
         setRemovingItemId,
         processing,
-        setProcessing
+        setProcessing,
+        setPlaylist
     } = useAppStore();
 
     // Pagination state
@@ -28,6 +29,38 @@ export default function PlaylistPanel() {
     const startIndex = (activePage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const paginatedItems = playlist.items.slice(startIndex, endIndex);
+
+    const handleRemoveItem = (itemId: string) => {
+        if (!agent.online) return;
+        
+        // Optimistic update: remove item immediately from UI
+        const updatedItems = playlist.items.filter(item => item.id !== itemId);
+        setPlaylist({
+            ...playlist,
+            items: updatedItems,
+            // Adjust currentIndex if needed
+            currentIndex: Math.max(-1, Math.min(playlist.currentIndex, updatedItems.length - 1))
+        });
+        
+        setRemovingItemId(itemId);
+        setProcessing("removeFromPlaylist", true);
+        
+        // Send command to server
+        playerCommandService.removePlaylist(agent.id, itemId, {
+            onSuccess: () => {
+                console.log("[PlaylistPanel] Remove success");
+            },
+            onError: (error) => {
+                console.error("[PlaylistPanel] Remove failed:", error);
+            }
+        });
+        
+        // Reset state after timeout
+        setTimeout(() => {
+            setRemovingItemId(null);
+            setProcessing("removeFromPlaylist", false);
+        }, 3000);
+    };
 
     return (
         <section className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 sm:p-5">
@@ -56,16 +89,7 @@ export default function PlaylistPanel() {
                                     if (!agent.online) return;
                                     playerCommandService.playPlaylistItem(agent.id, item.id);
                                 }}
-                                onRemove={() => {
-                                    if (!agent.online) return;
-                                    setRemovingItemId(item.id);
-                                    setProcessing("removeFromPlaylist", true);
-                                    playerCommandService.removePlaylist(agent.id, item.id);
-                                    setTimeout(() => {
-                                        setRemovingItemId(null);
-                                        setProcessing("removeFromPlaylist", false);
-                                    }, 500);
-                                }}
+                                onRemove={() => handleRemoveItem(item.id)}
                             />
                         ))}
                     </div>
