@@ -370,18 +370,61 @@ npm run preview:host
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Cashier startup script - use start command to run in new window
-        $cashierStartupScript = Join-Path $startupFolder "VideoController_Cashier.bat"
-        @"
+        # Find Node.js and npm location
+        $nodePath = $null
+        $npmPath = $null
+        
+        # Try to find npm.exe
+        try {
+            $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+            if ($npmCmd) {
+                $npmPath = $npmCmd.Source
+                $nodePath = Split-Path (Split-Path $npmCmd.Source -Parent) -Parent
+            }
+        } catch {}
+        
+        # Cashier startup script
+        $cashierBatScript = Join-Path $startupFolder "VideoController_Cashier.bat"
+        $logFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        
+        if ($npmPath) {
+            # Use full path to npm
+            $npmDir = Split-Path $npmPath -Parent
+            @"
 @echo off
-start "Cashier" cmd /c "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
-"@ | Out-File -FilePath $cashierStartupScript -Encoding ASCII
-        Write-Host "[OK] Cashier auto-start configured: $cashierStartupScript" -ForegroundColor Green
+echo Starting Cashier at %date% %time% > "$logFile"
+echo Using npm: $npmPath >> "$logFile"
+set PATH=$npmDir;%PATH%
+cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
+"@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
+        } else {
+            # Fallback to regular npm command
+            @"
+@echo off
+echo Starting Cashier at %date% %time% > "$logFile"
+echo WARNING: npm not found in PATH >> "$logFile"
+cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
+"@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
+        }
+        
+        Write-Host "[OK] Cashier auto-start configured: $cashierBatScript" -ForegroundColor Green
+        if ($npmPath) {
+            Write-Host "[OK] Using npm: $npmPath" -ForegroundColor Green
+        } else {
+            Write-Host "[WARNING] npm not found in PATH, using default" -ForegroundColor Yellow
+        }
+        Write-Host "[OK] Log file: $logFile" -ForegroundColor Green
     }
 
     Write-Host ""
     Write-Host "[INFO] Auto-start menggunakan Windows Startup folder" -ForegroundColor Yellow
     Write-Host "[INFO] File terletak di: $startupFolder" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "[INFO] Untuk testing manual:" -ForegroundColor Yellow
+    Write-Host "  1. Buka folder: $startupFolder" -ForegroundColor Yellow
+    Write-Host "  2. Klik dua kali file VideoController_Cashier.bat" -ForegroundColor Yellow
+    Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
+    Write-Host ""
     Write-Host "[OK] Auto-start ($mode) configured successfully!" -ForegroundColor Green
 }
 
@@ -409,11 +452,20 @@ function Remove-Autostart {
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Remove Cashier startup script
-        $cashierScript = Join-Path $startupFolder "VideoController_Cashier.bat"
-        if (Test-Path $cashierScript) {
-            Remove-Item -Path $cashierScript -Force
-            Write-Host "[OK] Removed VideoController_Cashier.bat" -ForegroundColor Green
+        # Remove Cashier startup scripts
+        $cashierScripts = @("VideoController_Cashier.bat", "VideoController_Cashier.ps1")
+        foreach ($scriptName in $cashierScripts) {
+            $scriptPath = Join-Path $startupFolder $scriptName
+            if (Test-Path $scriptPath) {
+                Remove-Item -Path $scriptPath -Force
+                Write-Host "[OK] Removed $scriptName" -ForegroundColor Green
+            }
+        }
+        # Also remove log file if exists
+        $logFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        if (Test-Path $logFile) {
+            Remove-Item -Path $logFile -Force
+            Write-Host "[OK] Removed cashier_startup.log" -ForegroundColor Green
         }
     }
 
