@@ -282,11 +282,17 @@ function Install-Dependencies {
         [switch]$ForceReinstall
     )
 
+    # Skip if path doesn't exist
+    if (-not (Test-Path $Path)) {
+        Write-Host "[INFO] Skipping $Name - folder not found" -ForegroundColor Yellow
+        return
+    }
+
     # Remove node_modules if ForceReinstall or doesn't exist properly
     if ($ForceReinstall -or -not (Test-Path (Join-Path $Path 'node_modules'))) {
         if (Test-Path (Join-Path $Path 'node_modules')) {
             Write-Host "[INFO] Removing $Name node_modules (fresh install)..." -ForegroundColor Yellow
-            Remove-NodeModules -Path $Path
+            Remove-NodeModules -Path (Join-Path $Path 'node_modules')
         }
         
         $lockFile = Join-Path $Path 'package-lock.json'
@@ -339,61 +345,90 @@ function Setup-Autostart {
     # Use Startup folder approach (simpler and more reliable)
     $startupFolder = [Environment]::GetFolderPath('Startup')
     
+    # Find Node.js and npm location (used for all autostart scripts)
+    $npmPath = $null
+    try {
+        $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+        if ($npmCmd) {
+            $npmPath = $npmCmd.Source
+        }
+    } catch {}
+    
     if ($mode -eq "room" -or $mode -eq "all") {
-        # Server startup script
-        $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
-        @"
+        $logFile = Join-Path $PROJECT_ROOT "room_startup.log"
+        
+        if ($npmPath) {
+            $npmDir = Split-Path $npmPath -Parent
+            
+            # Server startup script
+            $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
+            @"
 @echo off
-cd /d "$PROJECT_ROOT\server"
-npm run start
+echo Starting Server at %date% %time% > "$logFile"
+set PATH=$npmDir;%PATH%
+cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
 "@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
-        Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
+            Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
 
-        # Agent startup script
-        $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
-        @"
+            # Agent startup script
+            $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
+            @"
+@echo off
+echo Starting Agent at %date% %time% >> "$logFile"
+set PATH=$npmDir;%PATH%
+set BROWSER_HEADLESS=false
+cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
+"@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
+            Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
+
+            # Web startup script
+            $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
+            @"
+@echo off
+echo Starting Web at %date% %time% >> "$logFile"
+set PATH=$npmDir;%PATH%
+cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
+"@ | Out-File -FilePath $webStartupScript -Encoding ASCII
+            Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
+        } else {
+            # Fallback if npm not found
+            $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
+            @"
+@echo off
+echo WARNING: npm not found in PATH >> "$logFile"
+cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
+"@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
+            Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
+
+            $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
+            @"
 @echo off
 set BROWSER_HEADLESS=false
-cd /d "$PROJECT_ROOT\agent"
-npm run start
+cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
 "@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
-        Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
+            Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
 
-        # Web startup script
-        $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
-        @"
+            $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
+            @"
 @echo off
-cd /d "$PROJECT_ROOT\web"
-npm run preview:host
+cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
 "@ | Out-File -FilePath $webStartupScript -Encoding ASCII
-        Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
+            Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
+        }
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Find Node.js and npm location
-        $nodePath = $null
-        $npmPath = $null
-        
-        # Try to find npm.exe
-        try {
-            $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
-            if ($npmCmd) {
-                $npmPath = $npmCmd.Source
-                $nodePath = Split-Path (Split-Path $npmCmd.Source -Parent) -Parent
-            }
-        } catch {}
-        
         # Cashier startup script
         $cashierBatScript = Join-Path $startupFolder "VideoController_Cashier.bat"
-        $logFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        $cashierLogFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
         
         if ($npmPath) {
             # Use full path to npm
             $npmDir = Split-Path $npmPath -Parent
             @"
 @echo off
-echo Starting Cashier at %date% %time% > "$logFile"
-echo Using npm: $npmPath >> "$logFile"
+echo Starting Cashier at %date% %time% > "$cashierLogFile"
+echo Using npm: $npmPath >> "$cashierLogFile"
 set PATH=$npmDir;%PATH%
 cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
 "@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
@@ -401,8 +436,8 @@ cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
             # Fallback to regular npm command
             @"
 @echo off
-echo Starting Cashier at %date% %time% > "$logFile"
-echo WARNING: npm not found in PATH >> "$logFile"
+echo Starting Cashier at %date% %time% > "$cashierLogFile"
+echo WARNING: npm not found in PATH >> "$cashierLogFile"
 cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
 "@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
         }
@@ -413,7 +448,7 @@ cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
         } else {
             Write-Host "[WARNING] npm not found in PATH, using default" -ForegroundColor Yellow
         }
-        Write-Host "[OK] Log file: $logFile" -ForegroundColor Green
+        Write-Host "[OK] Log file: $cashierLogFile" -ForegroundColor Green
     }
 
     Write-Host ""
@@ -422,8 +457,16 @@ cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
     Write-Host ""
     Write-Host "[INFO] Untuk testing manual:" -ForegroundColor Yellow
     Write-Host "  1. Buka folder: $startupFolder" -ForegroundColor Yellow
-    Write-Host "  2. Klik dua kali file VideoController_Cashier.bat" -ForegroundColor Yellow
-    Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
+    if ($mode -eq "room") {
+        Write-Host "  2. Klik dua kali file VideoController_Server.bat / Agent.bat / Web.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\room_startup.log" -ForegroundColor Yellow
+    } elseif ($mode -eq "kasir") {
+        Write-Host "  2. Klik dua kali file VideoController_Cashier.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
+    } else {
+        Write-Host "  2. Klik dua kali file VideoController_*.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log di $PROJECT_ROOT" -ForegroundColor Yellow
+    }
     Write-Host ""
     Write-Host "[OK] Auto-start ($mode) configured successfully!" -ForegroundColor Green
 }
@@ -529,8 +572,14 @@ Write-Host "[INFO] Starting Video Controller..." -ForegroundColor Cyan
 $PROJECT_ROOT = $PSScriptRoot
 $found = $false
 
-# 1. First check current directory (where script is located)
-if (Test-Path (Join-Path $PSScriptRoot 'package.json')) {
+# 0. Check current working directory (where user runs the script)
+if (Test-Path (Join-Path $PWD 'package.json')) {
+    $PROJECT_ROOT = $PWD
+    $found = $true
+}
+
+# 1. Check script directory (where script file is located)
+if (-not $found -and (Test-Path (Join-Path $PSScriptRoot 'package.json'))) {
     $PROJECT_ROOT = $PSScriptRoot
     $found = $true
 }
@@ -551,12 +600,14 @@ if (-not $found) {
     }
 }
 
-# 3. If still not found, check for "video-controller" folder in current directory
+# 3. Check for "video-controller" folder in script directory
 if (-not $found) {
     $siblingPath = Join-Path $PSScriptRoot 'video-controller'
-    if (Test-Path (Join-Path $siblingPath 'package.json')) {
-        $PROJECT_ROOT = $siblingPath
-        $found = $true
+    if (Test-Path $siblingPath) {
+        if (Test-Path (Join-Path $siblingPath 'package.json')) {
+            $PROJECT_ROOT = $siblingPath
+            $found = $true
+        }
     }
 }
 
@@ -565,9 +616,11 @@ if (-not $found) {
     $parentDir = Split-Path $PSScriptRoot -Parent
     if ($parentDir) {
         $siblingPath = Join-Path $parentDir 'video-controller'
-        if (Test-Path (Join-Path $siblingPath 'package.json')) {
-            $PROJECT_ROOT = $siblingPath
-            $found = $true
+        if (Test-Path $siblingPath) {
+            if (Test-Path (Join-Path $siblingPath 'package.json')) {
+                $PROJECT_ROOT = $siblingPath
+                $found = $true
+            }
         }
     }
 }
@@ -576,18 +629,74 @@ if (-not $found) {
 if ($found) {
     Write-Host "[INFO] Project root: $PROJECT_ROOT" -ForegroundColor Cyan
 } else {
-    Write-Host "[ERROR] Cannot find project root (package.json)" -ForegroundColor Red
+    Write-Host "[WARNING] Cannot find project root (package.json)" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "[INFO] Searched locations:" -ForegroundColor Yellow
+    Write-Host "  - $PWD (current directory)"
     Write-Host "  - $PSScriptRoot (script location)"
+    
+    $checkPath = $PSScriptRoot
+    for ($i = 0; $i -lt 3; $i++) {
+        $parent = Split-Path $checkPath -Parent
+        if (-not $parent) { break }
+        Write-Host "  - $parent (parent $i)"
+        $checkPath = $parent
+    }
+    
+    Write-Host "  - $PSScriptRoot\video-controller (sibling)"
     $parentDir = Split-Path $PSScriptRoot -Parent
     if ($parentDir) {
-        Write-Host "  - $parentDir (parent)"
         Write-Host "  - $parentDir\video-controller (sibling in parent)"
     }
+    
     Write-Host ""
-    Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller" -ForegroundColor Yellow
-    exit 1
+    Write-Host "[Q] Download dari GitHub? [y/N]: " -ForegroundColor Cyan -NoNewline
+    $download = Read-Host
+    if ($download -eq 'y' -or $download -eq 'Y') {
+        Write-Host "[INFO] Downloading video-controller from GitHub..." -ForegroundColor Yellow
+        
+        $zipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+        $zipFile = "$env:TEMP\video-controller.zip"
+        $extractDir = Split-Path $PSScriptRoot -Parent
+        if (-not $extractDir) { $extractDir = $PSScriptRoot }
+        
+        Write-Host "[INFO] Downloading from $zipUrl..." -ForegroundColor Yellow
+        try {
+            Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
+            Write-Host "[INFO] Extracting..." -ForegroundColor Yellow
+            
+            # Use current working directory where user runs the script
+            $extractDir = $PWD
+            
+            Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
+            
+            # Move contents from video-controller-main to video-controller
+            $extractedPath = Join-Path $extractDir "video-controller-main"
+            $targetPath = Join-Path $extractDir "video-controller"
+            
+            # Only create/move if target doesn't have package.json
+            if (-not (Test-Path (Join-Path $targetPath 'package.json'))) {
+                if (Test-Path $targetPath) {
+                    Remove-Item -Path $targetPath -Recurse -Force
+                }
+                Move-Item -Path $extractedPath -Destination $targetPath
+            }
+            
+            $PROJECT_ROOT = $targetPath
+            $found = $true
+            Write-Host "[OK] Using project at: $PROJECT_ROOT" -ForegroundColor Green
+            
+            # Clean up zip
+            Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "[ERROR] Failed to download: $_" -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host ""
+        Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller" -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 $INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
@@ -779,6 +888,9 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
 
 # Normal mode - continue with service start
 
+# Apply .env configuration for existing project
+Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled
+
 $nodeExePath = Find-NodeJS
 
 if (-not $nodeExePath) {
@@ -860,40 +972,43 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
         Install-7Zip
     }
 
-    # Remove existing destination folder if exists
-    if (Test-Path $destDir) {
-        Remove-Item -Path $destDir -Recurse -Force
-    }
-
-    New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-
-    Write-Host "[INFO] Downloading repository archive..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath -UseBasicParsing
-
-    Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
-    Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
-
-    # Move contents from video-controller-main to destDir
-    if (Test-Path $extractDir) {
-        $items = Get-ChildItem -Path $extractDir
-        foreach ($item in $items) {
-            $itemDestPath = Join-Path $destDir $item.Name
-            if (Test-Path $itemDestPath) {
-                if ($item.PSIsContainer) {
-                    Remove-Item -Path $itemDestPath -Recurse -Force
-                } else {
-                    Remove-Item -Path $itemDestPath -Force
-                }
-            }
-            Move-Item -Path $item.FullName -Destination $itemDestPath -Force
+    # Only download if destination folder doesn't exist
+    if (-not (Test-Path (Join-Path $destDir 'package.json'))) {
+        # Remove existing destination folder if exists (but no package.json)
+        if (Test-Path $destDir) {
+            Remove-Item -Path $destDir -Recurse -Force
         }
-        Remove-Item -Path $extractDir -Recurse -Force
-    }
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
 
-    Remove-Item -Path $archivePath -Force -ErrorAction SilentlyContinue
+        Write-Host "[INFO] Downloading repository archive..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath -UseBasicParsing
+
+        Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
+        Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
+
+        # Move contents from video-controller-main to destDir
+        if (Test-Path $extractDir) {
+            $items = Get-ChildItem -Path $extractDir
+            foreach ($item in $items) {
+                $itemDestPath = Join-Path $destDir $item.Name
+                if (Test-Path $itemDestPath) {
+                    if ($item.PSIsContainer) {
+                        Remove-Item -Path $itemDestPath -Recurse -Force
+                    } else {
+                        Remove-Item -Path $itemDestPath -Force
+                    }
+                }
+                Move-Item -Path $item.FullName -Destination $itemDestPath -Force
+            }
+            Remove-Item -Path $extractDir -Recurse -Force
+        }
+
+        Remove-Item -Path $archivePath -Force -ErrorAction SilentlyContinue
+    } else {
+        Write-Host "[OK] Using existing project at $destDir" -ForegroundColor Green
+    }
 
     $PROJECT_ROOT = $destDir
-    Write-Host "[OK] Project ready at $PROJECT_ROOT" -ForegroundColor Green
 
     # Apply .env configuration AFTER PROJECT_ROOT is set correctly
     Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled
@@ -901,21 +1016,26 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
 
-Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'web/node_modules')
-Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
-Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'cashier/node_modules')
-Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+# Only remove node_modules if folders exist
+if (Test-Path (Join-Path $PROJECT_ROOT 'web')) {
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'web/node_modules')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
+}
+if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) {
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'cashier/node_modules')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+}
 
 if (-not (Test-Path (Join-Path $PROJECT_ROOT 'node_modules'))) {
     Write-Host "[INFO] Removing old workspace node_modules..." -ForegroundColor Yellow
-    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'node_modules')
-    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'agent/node_modules')
-    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'server/node_modules')
-    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'package-lock.json')
-    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'agent/package-lock.json')
-    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'server/package-lock.json')
-    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
-    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+    if (Test-Path (Join-Path $PROJECT_ROOT 'node_modules')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'agent/node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'server/node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'package-lock.json')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'agent/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'server/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'web')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json') }
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
@@ -960,17 +1080,69 @@ Write-Host "[INFO] Starting services..." -ForegroundColor Yellow
 
 $processes = @()
 
+# Function to wait for server to be ready
+function Wait-ForServer {
+    param(
+        [string]$ServerIP = "127.0.0.1",
+        [int]$Port = 53331,
+        [int]$MaxWaitSeconds = 30
+    )
+    
+    Write-Host "   Waiting for server to be ready..." -ForegroundColor Yellow
+    $startTime = Get-Date
+    $serverUrl = "http://${ServerIP}:${Port}"
+    
+    while (((Get-Date) - $startTime).TotalSeconds -lt $MaxWaitSeconds) {
+        try {
+            $response = Invoke-WebRequest -Uri "$serverUrl/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                Write-Host "   [OK] Server is ready!" -ForegroundColor Green
+                return $true
+            }
+        } catch {
+            # Server not ready yet
+        }
+        Start-Sleep -Seconds 1
+    }
+    
+    Write-Host "   [WARNING] Server may not be ready, but continuing..." -ForegroundColor Yellow
+    return $false
+}
+
 if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
 
+    # Start Server first
     $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -PassThru
     $processes += $serverProcess
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
+    
+    # Wait for server to be ready before starting agent
+    Wait-ForServer -ServerIP $ServerIP -Port 53331 -MaxWaitSeconds 30
+    
+    # Check if server is still running after wait
+    if ($serverProcess.HasExited) {
+        Write-Host "   [ERROR] Server exited with code: $($serverProcess.ExitCode)" -ForegroundColor Red
+    } else {
+        Write-Host "   [OK] Server is running" -ForegroundColor Green
+    }
 
-    $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
-    $processes += $agentProcess
-    Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
+    # Start Agent (only if server is still running)
+    if (-not $serverProcess.HasExited) {
+        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
+        $processes += $agentProcess
+        Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
+        Start-Sleep -Seconds 2
+        
+        # Check if agent is still running
+        if ($agentProcess.HasExited) {
+            Write-Host "   [ERROR] Agent exited with code: $($agentProcess.ExitCode)" -ForegroundColor Red
+        } else {
+            Write-Host "   [OK] Agent is running" -ForegroundColor Green
+        }
+    }
 
+    # Start Web
     $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -PassThru
     $processes += $webProcess
     Write-Host "   - Web: PID $($webProcess.Id)" -ForegroundColor Cyan
