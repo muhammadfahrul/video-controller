@@ -72,7 +72,7 @@ export default function Pagination({
             {/* Info section - hidden on small screens */}
             <div className="
                 text-sm 
-                text-[#b8b8d0]
+                text-slate-400
                 order-2 
                 sm:order-1
             ">
@@ -117,7 +117,7 @@ export default function Pagination({
                         transition-colors
                         ${currentPage === 1
                             ? "cursor-not-allowed opacity-50"
-                            : "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542]"}
+                            : "bg-white/[0.07] text-teal-200 hover:bg-white/[0.13]"}
                     `}
                     aria-label="Previous page"
                 >
@@ -146,8 +146,8 @@ export default function Pagination({
                                     font-medium
                                     transition-all
                                     ${page === currentPage
-                                        ? "bg-[#ff2d95] text-white shadow-[0_0_10px_rgba(255,45,149,0.5)]"
-                                        : "bg-[#1a1a2e] text-[#b8b8d0] hover:bg-[#252542] hover:text-[#00f0ff]"}
+                                        ? "bg-teal-300 text-slate-950 shadow-lg shadow-teal-400/20"
+                                        : "bg-white/[0.05] text-slate-300 hover:bg-white/[0.1] hover:text-teal-200"}
                                 `}
                             >
                                 {page}
@@ -155,7 +155,7 @@ export default function Pagination({
                         ) : (
                             <span
                                 key={index}
-                                className="px-1 sm:px-2 text-[#a855f7]"
+                                className="px-1 sm:px-2 text-violet-400"
                             >
                                 {page}
                             </span>
@@ -181,7 +181,7 @@ export default function Pagination({
                         transition-colors
                         ${currentPage === totalPages
                             ? "cursor-not-allowed opacity-50"
-                            : "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542]"}
+                            : "bg-white/[0.07] text-teal-200 hover:bg-white/[0.13]"}
                     `}
                     aria-label="Next page"
                 >

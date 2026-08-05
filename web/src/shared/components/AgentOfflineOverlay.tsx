@@ -1,10 +1,12 @@
-import { WifiOff, Lock } from "lucide-react";
+import { WifiOff, Lock, Settings } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { useAppStore } from "../../store/appStore";
 
 export default function AgentOfflineOverlay() {
-  const { agent } = useAppStore();
+  const { agent, initialLoading } = useAppStore();
+  const location = useLocation();
 
-  if (agent.online) {
+  if (agent.online || initialLoading || location.pathname === "/settings") {
     return null;
   }
 
@@ -18,32 +20,40 @@ export default function AgentOfflineOverlay() {
         flex-col
         items-center
         justify-center
-        bg-[#0a0a14]/95
+        bg-[#090b12]/95
         backdrop-blur-sm
         gap-4
       "
     >
-      <div className="flex items-center justify-center p-6 rounded-full bg-[#1a1a2e]">
-        <WifiOff size={64} className="text-[#ff2d95]" />
+      <div className="flex items-center justify-center p-6 rounded-full bg-white/8 ring-1 ring-white/10">
+        <WifiOff size={56} className="text-teal-300" />
       </div>
       
       <h2 className="text-2xl font-bold text-white">
-        Agent Offline
+        Pemain sedang offline
       </h2>
       
-      <div className="flex items-center gap-2 text-[#b8b8d0]">
+      <div className="flex items-center gap-2 text-slate-300">
         <Lock size={18} />
         <span className="text-center">
-          Silakan aktifkan ruangan dari cashier<br />
-          untuk menggunakan aplikasi
+          Aktifkan ruangan dari kasir<br />
+          untuk mulai menggunakan kontrol
         </span>
       </div>
       
-      <div className="mt-4 px-4 py-2 rounded-lg bg-[#1a1a2e] border border-[#2a2a4a]">
-        <p className="text-sm text-gray-400">
-          Room: <span className="text-white">{agent.name || 'Tidak ada'}</span>
+      <div className="mt-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
+        <p className="text-sm text-slate-400">
+          Ruangan: <span className="text-white">{agent.name || 'Belum tersedia'}</span>
         </p>
       </div>
+
+      <Link
+        to="/settings"
+        className="mt-4 flex items-center gap-2 rounded-xl bg-teal-300 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-teal-400/20 hover:bg-teal-200 active:scale-95 transition"
+      >
+        <Settings size={17} />
+        Buka Info Perangkat
+      </Link>
     </div>
   );
 }

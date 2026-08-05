@@ -1,200 +1,31 @@
-import {
-
-    Trash2,
-
-    Play,
-
-    Loader2
-
-} from "lucide-react";
-
-import type {
-
-    PlaylistItem
-
-} from "../types/PlaylistItem";
+import { Loader2, Play, Trash2 } from "lucide-react";
+import type { PlaylistItem } from "../types/PlaylistItem";
 import Card from "../../../shared/components/Card";
 
-
-
 interface Props {
-
     item: PlaylistItem;
-
     active: boolean;
-
     onPlay(): void;
-
     onRemove(): void;
-
     removing?: boolean;
-    
     disabled?: boolean;
-
 }
 
-export default function PlaylistItemCard({
-
-    item,
-
-    active,
-
-    onPlay,
-
-    onRemove,
-
-    removing = false,
-    
-    disabled = false
-
-}: Props) {
-
+export default function PlaylistItemCard({ item, active, onPlay, onRemove, removing = false, disabled = false }: Props) {
     return (
-
-        <Card
-            className="
-                cursor-pointer
-                transition
-                hover:scale-[1.01]
-                landscape:flex
-                landscape:items-center
-                landscape:gap-3
-            "
-            onClick={onPlay}
-        >
-
-            <img
-
-                src={item.thumbnail}
-
-                alt={item.title}
-
-                className="
-                    h-16
-                    w-100
-                    rounded-lg
-                    object-cover
-                "
-
-            />
-
-            <div
-                className="
-                    min-w-0
-                    flex-1
-                "
-            >
-
-                <div
-                    className="
-                        flex
-                        items-center
-                        gap-2
-                    "
-                >
-
-                    <h3
-                        className="
-                            flex-1
-                            truncate
-                            font-semibold
-                        "
-                    >
-
-                        {item.title}
-
-                    </h3>
-
-                    {
-
-                        active && (
-
-                            <span
-                                className="
-                                    flex
-                                    items-center
-                                    gap-1
-                                    rounded-full
-                                    bg-[#ff2d95]
-                                    px-2
-                                    py-1
-                                    text-[10px]
-                                    font-semibold
-                                    text-white
-                                    animate-pulse
-                                    shadow-[0_0_10px_rgba(255,45,149,0.6)]
-                                "
-                            >
-
-                                <Play size={10} />
-
-                                NOW
-
-                            </span>
-
-                        )
-
-                    }
-
+        <Card className={`flex gap-3 p-3 sm:items-center sm:gap-4 sm:p-4 ${active ? "border-teal-300/30 bg-teal-300/[0.06]" : ""}`} onClick={onPlay}>
+            <img src={item.thumbnail} alt="" className="h-16 w-24 shrink-0 rounded-xl object-cover sm:h-20 sm:w-32" loading="lazy" />
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <h3 className="flex-1 truncate font-semibold text-white">{item.title}</h3>
+                    {active && <span className="inline-flex items-center gap-1 rounded-full bg-teal-300 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-950"><Play size={10} fill="currentColor" /> Kini</span>}
                 </div>
-
-                <p
-                    className="
-                        text-sm
-                        text-[#b8b8d0]
-                    "
-                >
-
-                    {item.channel}
-
-                </p>
-
-                <p
-                    className="
-                        text-xs
-                        text-[#a855f7]
-                    "
-                >
-
-                    {item.duration}
-
-                </p>
-
+                <p className="mt-1 truncate text-sm text-slate-400">{item.channel}</p>
+                <p className="mt-1 text-xs font-medium text-teal-200">{item.duration}</p>
             </div>
-
-            <button
-                onClick={(e)=>{
-
-                    e.stopPropagation();
-
-                    onRemove();
-
-                }}
-
-                disabled={removing || disabled}
-
-                className={`
-                    self-start
-                    rounded-lg
-                    p-2
-                    text-red-500
-                    transition
-                    ${removing || disabled
-                        ? "opacity-50 cursor-not-allowed" 
-                        : "hover:bg-red-50"}
-                `}
-            >
-
-                {removing || disabled ? (
-                    <Loader2 size={18} className="animate-spin" />
-                ) : (
-                    <Trash2 size={18} />
-                )}
-
+            <button type="button" aria-label={`Hapus ${item.title}`} onClick={(event) => { event.stopPropagation(); onRemove(); }} disabled={removing || disabled} className={`grid size-10 shrink-0 place-items-center self-start rounded-xl text-rose-300 transition sm:self-center ${removing || disabled ? "cursor-not-allowed opacity-45" : "hover:bg-rose-400/15"}`}>
+                {removing ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             </button>
-
         </Card>
-
     );
-
 }

@@ -1,106 +1,31 @@
-import type {
-
-    ReactNode
-
-} from "react";
-
-import {
-
-    Loader2
-
-} from "lucide-react";
+import type { ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 
 interface Props {
-
     icon: ReactNode;
-
     label: string;
-
     onClick?(): void;
-
-    variant?:
-        | "primary"
-        | "secondary"
-        | "danger";
-
+    variant?: "primary" | "secondary" | "danger";
     disabled: boolean;
-
     loading?: boolean;
-
 }
 
-export default function ControlButton({
-
-    icon,
-
-    label,
-
-    onClick,
-
-    variant = "secondary",
-
-    disabled = false,
-
-    loading = false
-
-}: Props) {
-
+export default function ControlButton({ icon, label, onClick, variant = "secondary", disabled, loading = false }: Props) {
     const styles = {
-
-        primary:
-            "bg-[#ff2d95] text-white hover:bg-[#ff4da6] shadow-[0_0_15px_rgba(255,45,149,0.5)]",
-
-        secondary:
-            "bg-[#1a1a2e] text-[#00f0ff] hover:bg-[#252542] shadow-[0_0_10px_rgba(0,240,255,0.3)]",
-
-        danger:
-            "bg-[#1a1a2e] text-red-400 hover:bg-[#252542]"
-
+        primary: "bg-teal-300 text-slate-950 hover:bg-teal-200 shadow-lg shadow-teal-400/20",
+        secondary: "bg-white/[0.07] text-slate-100 hover:bg-white/[0.12]",
+        danger: "bg-rose-400/10 text-rose-300 hover:bg-rose-400/20"
     };
 
     return (
-
         <button
-
+            type="button"
             onClick={onClick}
-
-            className={`
-                flex
-                flex-col
-                items-center
-                justify-center
-                gap-2
-                rounded-xl
-                p-4
-                transition
-                ${styles[variant]}
-                ${disabled || loading ? "opacity-50 cursor-not-allowed" : ""}
-            `}
-
             disabled={disabled || loading}
-
+            className={`flex min-h-[88px] w-full flex-col items-center justify-center gap-2 rounded-2xl px-4 py-3 text-center text-sm transition-all duration-200 active:scale-[0.97] ${styles[variant]} ${disabled || loading ? "cursor-not-allowed opacity-45" : ""}`}
         >
-
-            {loading ? (
-                <Loader2 
-                    className="animate-spin" 
-                    size={24} 
-                />
-            ) : icon}
-
-            <span
-                className="
-                    text-xs
-                    font-medium
-                "
-            >
-
-                {label}
-
-            </span>
-
+            {loading ? <Loader2 className="animate-spin" size={24} /> : icon}
+            <span className="text-sm font-semibold">{label}</span>
         </button>
-
     );
-
 }

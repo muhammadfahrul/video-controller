@@ -1,68 +1,53 @@
 import { useAppStore } from "../../../store/appStore";
 
-// Helper function to format seconds to MM:SS
 function formatDuration(seconds: number): string {
     if (!seconds || seconds <= 0) return "";
-    
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 export default function CurrentVideo() {
-
     const { playlist, player } = useAppStore();
 
-    // If no player video, show nothing
     if (!player.videoId) {
         return (
-            <div className="rounded-xl bg-[#12121f] p-4 shadow-[0_0_15px_rgba(255,45,149,0.1)] border border-[#2a2a4a]">
-                <p className="text-[#b8b8d0]">No video playing</p>
+            <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] p-6 text-center">
+                <p className="font-medium text-white">Belum ada lagu yang diputar</p>
+                <p className="mt-1 text-sm text-slate-400">Cari lagu atau pilih dari daftar lagu untuk memulai karaoke.</p>
             </div>
         );
     }
 
-    // Try to find the current video in playlist by matching videoId
-    let playlistVideo = null;
-    if (playlist.items && playlist.items.length > 0) {
-        playlistVideo = playlist.items.find(item => item.videoId === player.videoId);
-    }
-
-    // Use playlist video if found, otherwise use player video info (title, channel, thumbnail, duration from agent)
+    const playlistVideo = playlist.items?.find((item) => item.videoId === player.videoId);
     const video = playlistVideo || {
         title: player.title || `Video ${player.videoId}`,
-        channel: player.channel || "Unknown Channel",
+        channel: player.channel || "Channel tidak diketahui",
         thumbnail: player.thumbnail || `https://img.youtube.com/vi/${player.videoId}/mqdefault.jpg`,
         duration: formatDuration(player.duration)
     };
 
     return (
-        <div className="rounded-xl bg-[#12121f] p-4 shadow-[0_0_20px_rgba(255,45,149,0.2)] border border-[#2a2a4a] landscape:p-3">
-            <h3 className="text-sm font-semibold text-[#00f0ff] mb-2 landscape:mb-1 uppercase tracking-wider">
-                Now Playing
-            </h3>
-            <div className="flex gap-4 landscape:gap-3">
+        <section className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#182131] to-[#101520] p-4 shadow-xl shadow-black/10 sm:p-5">
+            <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-teal-300">
+                <span className="size-2 rounded-full bg-teal-300 shadow-[0_0_12px_rgba(94,234,212,0.9)]" />
+                Lagu sedang diputar
+            </div>
+            <div className="flex gap-4 sm:gap-5">
                 <img
                     src={video.thumbnail}
                     alt={video.title}
-                    className="w-32 h-20 object-cover rounded-lg landscape:w-40 landscape:h-24 shadow-[0_0_10px_rgba(255,45,149,0.3)]"
-                    onError={(e) => {
-                        // Fallback thumbnail
-                        (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${player.videoId}/default.jpg`;
+                    className="h-24 w-36 shrink-0 rounded-xl object-cover shadow-lg shadow-black/20 sm:h-28 sm:w-48"
+                    onError={(event) => {
+                        (event.target as HTMLImageElement).src = `https://img.youtube.com/vi/${player.videoId}/default.jpg`;
                     }}
                 />
-                <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold truncate landscape:text-base text-white">
-                        {video.title}
-                    </h4>
-                    <p className="text-sm text-[#b8b8d0] truncate landscape:text-sm">
-                        {video.channel}
-                    </p>
-                    <p className="text-xs text-[#ff2d95] mt-1 landscape:mt-2 font-mono">
-                        {video.duration}
-                    </p>
+                <div className="min-w-0 flex-1">
+                    <h2 className="line-clamp-2 text-base font-semibold leading-snug text-white sm:text-lg">{video.title}</h2>
+                    <p className="mt-1 truncate text-sm text-slate-400">{video.channel}</p>
+                    <p className="mt-2 text-xs font-semibold text-teal-200">{video.duration}</p>
                 </div>
             </div>
-        </div>
+        </section>
     );
 }

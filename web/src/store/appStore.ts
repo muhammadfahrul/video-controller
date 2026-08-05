@@ -62,6 +62,8 @@ interface ProcessingState {
 
     playPlaylistItem: boolean;
 
+    atmosphere: boolean;
+
 }
 
 interface AppStore {
@@ -217,7 +219,9 @@ create<AppStore>((set)=>({
 
         openVideo: false,
 
-        playPlaylistItem: false
+        playPlaylistItem: false,
+
+        atmosphere: false
 
     },
 

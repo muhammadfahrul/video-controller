@@ -15,6 +15,7 @@ export class SocketService {
 
     private socket?: Socket;
     private pendingHandlers: PendingHandler[] = [];
+    private stateReceived = false;
 
     connect() {
 
@@ -48,7 +49,8 @@ export class SocketService {
                 this.socket?.id
             );
 
-            // Mark as connected
+            // Reset state received flag on reconnect
+            this.stateReceived = false;
             
             // Register pending handlers after connection
             this.registerPendingHandlers();
@@ -56,10 +58,17 @@ export class SocketService {
             // Request current state from server to ensure we have latest data
             this.socket?.emit("client:request-state");
 
-            // Disable initial loading after data is received
-            setTimeout(() => {
-                useAppStore.getState().setInitialLoading(false);
-            }, 1000);
+            // Set a timeout to disable loading if state isn't received
+            // This prevents indefinite loading if server doesn't respond
+            const loadingTimeout = setTimeout(() => {
+                if (!this.stateReceived) {
+                    console.warn("[Socket] State not received after 5s, disabling loading anyway");
+                    useAppStore.getState().setInitialLoading(false);
+                }
+            }, 5000);
+
+            // Store timeout ID for cleanup if state arrives before timeout
+            (this.socket as any)._loadingTimeout = loadingTimeout;
 
         });
 
@@ -78,7 +87,8 @@ export class SocketService {
 
             );
 
-            // Mark as disconnected
+            // Reset state received flag
+            this.stateReceived = false;
 
         });
 
@@ -104,6 +114,21 @@ export class SocketService {
                         handler.event,
                         payload
                     );
+
+                    // Mark state as received when agent or playlist state arrives
+                    if (handler.event === "agent:state" || handler.event === "playlist:state" || handler.event === "agent" || handler.event === "playlist") {
+                        if (!this.stateReceived) {
+                            this.stateReceived = true;
+                            // Clear loading timeout since state arrived
+                            const timeout = (this.socket as any)._loadingTimeout;
+                            if (timeout) {
+                                clearTimeout(timeout);
+                            }
+                            // Disable loading immediately when state is received
+                            useAppStore.getState().setInitialLoading(false);
+                            console.log("[Socket] Initial state received, loading disabled");
+                        }
+                    }
 
                     originalCallback(payload);
 
@@ -145,6 +170,18 @@ export class SocketService {
                         event,
                         payload
                     );
+
+                    // Mark state as received for state-related events
+                    if ((event === "agent:state" || event === "playlist:state" || event === "agent" || event === "playlist") && !this.stateReceived) {
+                        this.stateReceived = true;
+                        const timeout = (this.socket as any)._loadingTimeout;
+                        if (timeout) {
+                            clearTimeout(timeout);
+                        }
+                        useAppStore.getState().setInitialLoading(false);
+                        console.log("[Socket] Initial state received via on(), loading disabled");
+                    }
+
                     // Debug: Log ALL events
                     console.log("[Socket] All events - event:", event, "payload:", payload);
                     callback(payload);
