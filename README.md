@@ -1,186 +1,242 @@
 # Video Controller
 
-A real-time video playlist management system with YouTube integration, featuring a web frontend, Node.js server, and Windows agent. Control video playback remotely and manage a shared playlist across multiple clients.
+Sistem manajemen playlist video real-time dengan integrasi YouTube untuk karaoke. Terdiri dari web frontend, Node.js server, dan agent. Kontrol pemutaran video dari jarak jauh dan kelola playlist bersama.
 
-## Features
+## Fitur
 
-- **Real-time Playlist Management** - Add, remove, and reorder videos in a shared playlist
-- **Remote Playback Control** - Play, pause, skip, and adjust volume from any connected client
-- **YouTube Integration** - Seamlessly play YouTube videos with full DOM control
-- **Multi-client Support** - Multiple web clients can connect simultaneously via Socket.IO
-- **Health Monitoring** - Automatic health checks for browser, player, and network status
-- **Auto-recovery** - Intelligent recovery system handles common failure scenarios
-- **Persistent Storage** - Playlist and player state are persisted to JSON files
+- **Manajemen Playlist Real-time** - Tambah, hapus, dan urutkan video dalam playlist bersama
+- **Kontrol Pemutaran Jarak Jauh** - Play, pause, skip, dan atur volume dari client manapun
+- **Integrasi YouTube** - Mainkan video YouTube dengan kontrol penuh via DOM
+- **Multi-client Support** - Multiple web clients dapat terhubung bersamaan via Socket.IO
+- **Monitoring Kesehatan** - Health check otomatis untuk browser, player, dan network
+- **Auto-recovery** - Sistem recovery cerdas untuk menangani failure scenarios
+- **Billing Otomatis** - Perhitungan biaya berdasarkan durasi dan tarif per ruangan
+- **Multi-room** - Kelola multiple ruangan karaoke secara bersamaan
 
-## Architecture
+## Arsitektur
 
 ```
-┌─────────┐     Socket.IO      ┌─────────┐     Socket.IO      ┌─────────┐
-│   Web   │ ◄─────────────────► │ Server  │ ◄─────────────────► │  Agent  │
-│ (React) │                     │ (Node.js)│                    │(Windows)│
-└─────────┘                     └─────────┘                     └─────────┘
-        │                            │                              │
-        │                            │                              │
-        ▼                            ▼                              ▼
-┌─────────┐                  YouTube API
-│ Cashier │
-│ (React) │
-└─────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                           SERVER (Port 53331)                       │
+│                   Socket.IO + Express + SQLite                      │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+       ┌───────────────────────┼───────────────────────┐
+       │                       │                       │
+       ▼                       ▼                       ▼
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│   Agent     │         │  Cashier    │         │     Web     │
+│  (Room 1)   │         │  (Reception)│         │  (Mobile)   │
+└─────────────┘         └─────────────┘         └─────────────┘
+       │
+       ▼
+┌─────────────┐
+│   Agent     │
+│  (Room 2)  │
+└─────────────┘
 ```
 
-- **Web** - React PWA frontend for user interface (放在PC包厢)
-- **Cashier** - React frontend for billing and timer management (放在PC收银台)
-- **Server** - Socket.io server for real-time communication and API
-- **Agent** - Windows agent that controls the browser and player (放在每个PC包厢)
+- **Server** - Socket.io server untuk komunikasi real-time dan API (port 53331)
+- **Agent** - Browser automation (Playwright) untuk mengontrol video di setiap ruangan
+- **Cashier** - React frontend untuk billing dan manajemen timer (PC kasir)
+- **Web** - React PWA frontend untuk kontrol via mobile/web
 
 ## Prerequisites
 
 - Node.js 18+
-- npm or yarn
-- Google Chrome/Chromium (for Playwright)
+- npm atau yarn
+- Google Chrome/Chromium (untuk Playwright)
 
 ## Installation
 
 ```bash
-# Install dependencies for all packages
+# Install dependencies untuk semua packages
 cd agent && npm install
 cd ../server && npm install
 cd ../web && npm install
+cd ../cashier && npm install
 ```
 
-## Configuration
+## Konfigurasi
 
-Each component has its own configuration file:
+Setiap komponen memiliki file `.env` sendiri:
 
-| File | Description |
-|------|-------------|
-| `agent/src/config/config.json` | Agent settings (port, browser options) |
-| `server/src/config/` | Server settings |
-| `web/src/config/` | Frontend settings |
+| File | Komponen | Deskripsi |
+|------|----------|-----------|
+| `server/.env` | Server | PORT, YouTube API Key, Billing |
+| `agent/.env` | Agent | ROOM_ID, ROOM_NAME, Browser options |
+| `web/.env` | Web | SERVER_URL |
+| `cashier/.env` | Cashier | Rooms config, harga per jam |
+
+### Room ID Matching
+
+Server mendukung fuzzy matching untuk room ID:
+1. Coba `roomId` (exact match)
+2. Coba `altRoomId` (jika ada)
+3. Coba `roomName` (fuzzy match)
+
+Contoh konfigurasi:
+```bash
+# Agent (.env)
+ROOM_ID=room-002
+ROOM_NAME=Room 2
+
+# Cashier (.env)
+VITE_ROOMS=[{"name":"Room 1","ip":"192.168.1.10","port":53331,"pricePerHour":50000}]
+```
 
 ## Development
 
-Run each service in separate terminals:
+Jalankan setiap service di terminal terpisah:
 
 ```bash
-# Terminal 1 - Start the server
+# Terminal 1 - Start server
 cd server
 npm run dev
 
-# Terminal 2 - Start the agent (repeat for each room)
+# Terminal 2 - Start agent (ulang untuk setiap ruangan)
 cd agent
 npm run dev
 
-# Terminal 3 - Start the web frontend
+# Terminal 3 - Start web frontend
 cd web
 npm run dev
 
-# Terminal 4 - Start the cashier app
+# Terminal 4 - Start cashier app
 cd cashier
 npm run dev
 ```
 
-The services will be available at:
+Services akan tersedia di:
+- **Server API**: http://localhost:53331
 - **Web UI**: http://localhost:5173
 - **Cashier UI**: http://localhost:5174
-- **Server API**: http://localhost:53331
 
-## Deployment
-
-### Quick Deploy
+## Cara Menjalankan (Production)
 
 ```bash
-# Linux/macOS
-./deploy.sh
-
-# Windows PowerShell
-./deploy.ps1
-```
-
-### Manual Deployment
-
-```bash
-# Build all packages
+# Build semua packages
 cd agent && npm run build
 cd ../server && npm run build
 cd ../web && npm run build
+cd ../cashier && npm run build
 
-# Start services (production)
+# Start services
 cd server && npm start
-cd ../agent && npm start
+cd agent && npm start  # untuk setiap ruangan
 ```
 
-## API Overview
+## Socket Events
 
-### Socket Events
+### Client → Server
 
-| Event | Direction | Description |
-|-------|-----------|-------------|
-| `playlist:add` | Web → Server | Add video to playlist |
-| `playlist:remove` | Web → Server | Remove video from playlist |
-| `playlist:update` | Server → Web | Playlist updated |
-| `player:control` | Server → Agent | Play/pause/skip commands |
-| `player:status` | Agent → Server | Current player state |
-| `heartbeat` | Agent → Server | Agent heartbeat |
+| Event | Payload | Deskripsi |
+|-------|---------|-----------|
+| `agent:register` | `{ roomId, roomName }` | Agent register ke server |
+| `agent:heartbeat` | `{ roomId, status }` | Heartbeat dari agent |
+| `agent:state` | `{ roomId, state }` | Update state agent |
+| `command:execute` | `{ roomId, command, payload }` | Eksekusi perintah |
 
-### REST Endpoints
+### Server → Client
 
-- `GET /api/playlist` - Get current playlist
-- `GET /api/player/status` - Get player status
-- `GET /api/health` - Get system health
+| Event | Payload | Deskripsi |
+|-------|---------|-----------|
+| `agents:update` | `Agent[]` | Broadcast semua agent state |
+| `command:result` | `{ success, result }` | Result dari perintah |
+| `error` | `{ message }` | Error message |
 
-## Project Structure
+## REST Endpoints
+
+- `GET /health` - Health check
+- `GET /api/rooms` - Get semua room
+- `GET /api/rooms/:roomId` - Get room tertentu
+- `GET /api/youtube/search?q=query` - Search YouTube
+- `GET /api/youtube/video/:videoId` - Get video info
+
+## Struktur Project
 
 ```
 video-controller/
-├── agent/           # Windows Agent (browser automation)
-│   └── src/
-│       ├── browser/  # Playwright browser management
-│       ├── commands/# Command handlers
-│       ├── config/  # Configuration
-│       ├── player/  # YouTube player control
-│       ├── playlist/  # Playlist management
-│       ├── services/ # Business logic
-│       └── socket/  # Socket.io client
+├── agent/           # Agent (browser automation)
+│   ├── src/
+│   │   ├── browser/    # Playwright browser management
+│   │   ├── commands/   # Command handlers
+│   │   ├── config/     # Configuration
+│   │   ├── health/     # Health check
+│   │   ├── player/     # YouTube player control
+│   │   ├── playlist/   # Playlist management
+│   │   ├── socket/     # Socket.io client
+│   │   └── index.ts    # Entry point
+│   ├── data/          # Browser profile
+│   └── .env           # ROOM_ID, ROOM_NAME, dll
 ├── server/          # Socket.io server
-│   └── src/
-│       ├── controllers/ # HTTP controllers
-│       ├── routes/     # API routes
-│       ├── services/   # Backend services
-│       └── socket/    # Socket.io handlers
-├── web/             # React frontend
-│   └── src/
-│       ├── components/ # React components
-│       ├── hooks/     # Custom hooks
-│       ├── pages/     # Page components
-│       ├── services/  # API services
-│       └── store/     # Zustand state
-├── deploy.sh         # Linux/macOS deployment script
-└── deploy.ps1        # Windows deployment script
+│   ├── src/
+│   │   ├── controllers/  # HTTP controllers
+│   │   ├── routes/      # API routes
+│   │   ├── services/    # Backend services
+│   │   ├── socket/      # Socket.io handlers
+│   │   ├── youtube/     # YouTube API helpers
+│   │   └── index.ts     # Entry point
+│   ├── data/           # SQLite database
+│   └── .env            # PORT, YOUTUBE_API_KEY
+├── web/              # React PWA frontend
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── hooks/       # Custom hooks
+│   │   ├── pages/       # Page components
+│   │   ├── services/    # API services
+│   │   └── store/       # Zustand state
+│   └── .env            # SERVER_URL
+├── cashier/          # React cashier frontend
+│   ├── src/
+│   │   ├── components/  # UI components
+│   │   ├── pages/       # Pages
+│   │   ├── services/    # Socket service
+│   │   └── store/       # Zustand state
+│   └── .env            # VITE_ROOMS, BILLING_ENABLED
+├── install.sh          # Linux installation script
+├── install.ps1        # Windows installation script
+└── README.md
 ```
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS, Zustand, React Router
-- **Server**: Express, Socket.io, Google APIs
-- **Agent**: Playwright, Socket.io Client, Pino (logging)
+- **Frontend**: React 19, Vite, Tailwind CSS 4, Zustand, React Router
+- **Server**: Express, Socket.io, SQLite (sql.js), Google APIs
+- **Agent**: Playwright, Socket.io Client, Pino (logging), Zod
+
+## Billing
+
+Sistem billing menghitung biaya berdasarkan:
+- `pricePerHour` - Tarif per jam per ruangan (dari cashier config)
+- `activeTime` - Waktu aktif ruangan
+
+Rumus:
+```
+biaya = (activeTime dalam jam) × pricePerHour
+```
 
 ## Troubleshooting
 
-### Agent won't connect
-- Verify server is running on the configured port
-- Check network/firewall settings
-- Review agent logs for connection errors
+### Agent tidak terhubung
+- Pastikan server running di port yang dikonfigurasi
+- Cek network/firewall settings
+- Review agent logs untuk connection errors
 
-### YouTube player not responding
-- Ensure browser is launched with required permissions
-- Check that YouTube page loads correctly
-- Verify player DOM selectors are up to date
+### YouTube player tidak responsif
+- Pastikan browser launched dengan permissions yang benar
+- Cek YouTube page load dengan benar
+- Verify player DOM selectors up to date
 
-### Playlist not syncing
-- Check Socket.IO connection status
-- Verify JSON storage files are writable
+### Billing tidak berfungsi
+- Pastikan `BILLING_ENABLED=true` di server dan cashier
+- Cek `pricePerHour` di cashier config
 - Review server logs
+
+### Room tidak terdeteksi
+- Cek `ROOM_ID` dan `ROOM_NAME` di agent .env
+- Cek konfigurasi room di cashier `.env`
+- Server melakukan fuzzy matching - coba restart server
 
 ## License
 
