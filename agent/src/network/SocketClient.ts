@@ -110,7 +110,7 @@ export class SocketClient {
         );
 
         this.socket.on(
-            "command",
+            SocketEvents.COMMAND,
             async (command) => {
 
                 // Check if room is activated before processing any command

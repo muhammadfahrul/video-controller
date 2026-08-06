@@ -294,11 +294,19 @@ export class SocketServer {
 
                         console.log(
 
-                            "[SERVER] Player Command",
+                            "[SERVER] Player Command Received",
 
                             command
 
                         );
+
+                        if (!command?.agentId) {
+                            console.warn(
+                                "[SERVER] Ignoring player command without agentId",
+                                command
+                            );
+                            return;
+                        }
 
                         try {
 
@@ -314,7 +322,7 @@ export class SocketServer {
 
                         catch (err) {
 
-                            console.error(err);
+                            console.error("[SERVER] sendCommand error", err);
 
                         }
 
@@ -760,10 +768,12 @@ export class SocketServer {
         if(!agent){
 
             throw new Error(
-                "Agent offline"
+                `Agent offline or not registered: ${agentId}`
             );
 
         }
+
+        console.log(`[SERVER] Sending command to agent ${agentId}, active=${agent.isActive}`);
 
         // Check if agent is active before sending command
         if (!agent.isActive) {

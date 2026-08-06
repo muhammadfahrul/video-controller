@@ -381,7 +381,6 @@ export class PlayerCommandService {
     }
 
 
-
     shufflePlaylist(
 
         agentId:string,

@@ -51,10 +51,10 @@ export class SocketService {
 
             // Reset state received flag on reconnect
             this.stateReceived = false;
-            
+
             // Register pending handlers after connection
             this.registerPendingHandlers();
-            
+
             // Request current state from server to ensure we have latest data
             this.socket?.emit("client:request-state");
 
@@ -196,7 +196,7 @@ export class SocketService {
                 event,
                 callback: callback as EventCallback
             });
-            
+
         }
 
     }
