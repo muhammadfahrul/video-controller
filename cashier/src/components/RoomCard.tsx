@@ -238,74 +238,29 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const CLEANING_THRESHOLD = 30 * 60 * 1000; // 30 minutes
   const CLEANED_THRESHOLD = 60 * 60 * 1000; // 60 minutes
   
-  // Determine status based on time since payment was made OR cleanedAt
-  // BERSIHKAN: < 30 min after payment (or < 60 min if cleanedAt not set)
-  // SUDAH DIBERSIHKAN: >= 30 min after payment with cleanedAt, or >= 60 min without manual clean
+  // Determine status based on transactions and time
+  // Priority: has unpaid → has cleaned → time-based
   const getPaidStatus = () => {
+    // If there's any unpaid transaction, don't return cleaning status
+    if (hasUnpaid) return null;
+    
     if (!lastPaid || !latestTransaction) return null;
-    // If manually marked as cleaned, show SUDAH DIBERSIHKAN
-    if (latestTransaction.cleanedAt && latestTransaction.cleanedAt > 0) {
+    
+    // Check if ALL paid transactions have been cleaned
+    const allPaidCleaned = roomTransactions
+      .filter(t => t.paidAt > 0)
+      .every(t => t.cleanedAt && t.cleanedAt > 0);
+    
+    if (allPaidCleaned) {
       return 'SUDAH DIBERSIHKAN';
     }
-    // Otherwise use time-based logic
+    
+    // Time-based logic only when all paid transactions are cleaned OR no transactions yet
     if (timeSincePaid < CLEANING_THRESHOLD) return 'BERSIHKAN';
     if (timeSincePaid < CLEANED_THRESHOLD) return 'SUDAH DIBERSIHKAN';
     return null; // Return to ONLINE after > 60 min
   };
   const paidStatus = getPaidStatus();
-  
-  // Handle manual cleaning - mark room as cleaned
-  const handleMarkCleaned = async () => {
-    // Define room keys for this component
-    const roomKey = roomBilling.roomId.toLowerCase();
-    const roomNameKey = roomBilling.roomName.toLowerCase();
-    
-    // Get fresh transaction from store to ensure we have the latest
-    const allTx = useTransactionStore.getState().transactions;
-    const roomTx = allTx.filter(t => 
-      t.roomId.toLowerCase() === roomKey || t.roomName.toLowerCase() === roomNameKey
-    );
-    const txToClean = roomTx[0];
-    
-    console.log('[RoomCard] handleMarkCleaned called', { roomKey, txToClean });
-    
-    if (!txToClean || !txToClean.id) {
-      console.error('[RoomCard] No transaction found to mark as cleaned');
-      return;
-    }
-    
-    const cleanedAt = Date.now();
-    const updatedData = {
-      ...txToClean,
-      cleanedAt
-    };
-    
-    console.log('[RoomCard] Marking transaction as cleaned:', txToClean.id, cleanedAt);
-    
-    // Show loading
-    setGlobalLoading(true, 'cleaning');
-    
-    try {
-      // Update local store
-      useTransactionStore.getState().updateTransaction(txToClean.id, { cleanedAt });
-      console.log('[RoomCard] Updated local transaction store');
-      
-      // Send to server
-      console.log('[RoomCard] Sending to server:', JSON.stringify(updatedData, null, 2));
-      multiSocketService.updateTransaction(updatedData);
-      console.log('[RoomCard] updateTransaction called');
-      
-      // Verify update in local store after a short delay
-      setTimeout(() => {
-        const verifyTx = useTransactionStore.getState().transactions.find(t => t.id === txToClean.id);
-        console.log('[RoomCard] Verify transaction after update:', verifyTx);
-      }, 500);
-    } finally {
-      setGlobalLoading(false);
-    }
-  };
-  
-
   
   // Determine status priority: OFFLINE > AKTIF > UNPAID > BERSIHKAN (0-30 min) > SUDAH DIBERSIHKAN (30-60 min) > ONLINE (>60 min)
   const getStatusInfo = () => {
@@ -408,16 +363,6 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             <p className="text-[9px] text-gray-500 uppercase">Tertunda</p>
             <p className="text-sm font-bold text-orange-400">{formatPrice(latestTransaction.totalPrice)}</p>
           </div>
-        )}
-        {/* Manual cleaning button - only show for BERSIHKAN status */}
-        {!roomBilling.isActive && paidStatus === 'BERSIHKAN' && (
-          <button
-            onClick={handleMarkCleaned}
-            className="text-[9px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded hover:bg-yellow-500/30"
-            title="Tandai ruangan sudah dibersihkan"
-          >
-            ✓ Sudah Bersih
-          </button>
         )}
       </div>
       

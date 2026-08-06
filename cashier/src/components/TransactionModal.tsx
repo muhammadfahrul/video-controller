@@ -157,6 +157,23 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     multiSocketService.clearTransactions();
     setTimeout(() => setGlobalLoading(false), 500);
   };
+
+  // Handle mark as cleaned - update transaction with cleanedAt timestamp
+  const handleMarkCleaned = (transactionId: string) => {
+    const tx = filteredTransactions.find(t => t.id === transactionId);
+    if (!tx) return;
+    
+    const cleanedAt = Date.now();
+    const updatedData: Transaction = {
+      ...tx,
+      cleanedAt
+    };
+    
+    // Update local store
+    useTransactionStore.getState().updateTransaction(transactionId, { cleanedAt });
+    // Send to server to persist
+    multiSocketService.updateTransaction(updatedData);
+  };
   
   const modalContent = (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" style={{ isolation: 'isolate' }}>
@@ -276,13 +293,28 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                             <Printer className="w-3.5 h-3.5" />
                           </button>
                           {transaction.paidAt > 0 ? (
-                            <button
-                              onClick={() => handleDeleteTransaction(transaction.id)}
-                              className="p-1.5 text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center"
-                              title="Hapus"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            transaction.cleanedAt ? (
+                              <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded">
+                                ✓ Bersih
+                              </span>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleMarkCleaned(transaction.id)}
+                                  className="px-2 py-1 text-xs font-medium bg-green-600 hover:bg-green-500 text-white rounded"
+                                  title="Tandai sudah dibersihkan"
+                                >
+                                  ✓ Sudah Bersih
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteTransaction(transaction.id)}
+                                  className="p-1.5 text-red-400 hover:bg-red-500/20 rounded flex items-center justify-center"
+                                  title="Hapus"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )
                           ) : (
                             <button
                               onClick={() => handlePayment(transaction.id)}
