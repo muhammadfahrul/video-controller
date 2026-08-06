@@ -7,7 +7,8 @@ import { useTransactionStore } from '../store/useTransactionStore';
 import type { LoadingMessage } from '../components/FullPageLoading';
 import { TransactionModal } from './TransactionModal';
 import { PaymentConfirmModal } from './PaymentConfirmModal';
-import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText, Receipt } from 'lucide-react';
+import { MoveRoomModal } from './MoveRoomModal';
+import { Clock, Wallet, Disc3, Power, PowerOff, Timer, User, Phone, Mail, FileText, Receipt, ArrowRightLeft } from 'lucide-react';
 
 interface RoomCardProps {
   roomBilling: RoomBilling;
@@ -30,6 +31,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const [customerNoteInput, setCustomerNoteInput] = useState('');
   const [showTransactionModal, setShowTransactionModal] = useState(false);
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+  const [showMoveRoom, setShowMoveRoom] = useState(false);
   const [pendingDeactivation, setPendingDeactivation] = useState<{
     roomId: string;
     customerName?: string;
@@ -217,8 +219,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;
   
-  // Check for unpaid transactions and needs cleaning
-  const allTransactions = useTransactionStore.getState().transactions;
+  // Check for unpaid transactions and needs cleaning - use hook for reactivity
+  const allTransactions = useTransactionStore((state) => state.transactions);
   const roomKey = roomBilling.roomId.toLowerCase();
   const roomNameKey = roomBilling.roomName.toLowerCase();
   const roomTransactions = allTransactions.filter(t => 
@@ -286,12 +288,24 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     try {
       // Update local store
       useTransactionStore.getState().updateTransaction(txToClean.id, { cleanedAt });
+      console.log('[RoomCard] Updated local transaction store');
+      
       // Send to server
+      console.log('[RoomCard] Sending to server:', JSON.stringify(updatedData, null, 2));
       multiSocketService.updateTransaction(updatedData);
+      console.log('[RoomCard] updateTransaction called');
+      
+      // Verify update in local store after a short delay
+      setTimeout(() => {
+        const verifyTx = useTransactionStore.getState().transactions.find(t => t.id === txToClean.id);
+        console.log('[RoomCard] Verify transaction after update:', verifyTx);
+      }, 500);
     } finally {
       setGlobalLoading(false);
     }
   };
+  
+
   
   // Determine status priority: OFFLINE > AKTIF > UNPAID > BERSIHKAN (0-30 min) > SUDAH DIBERSIHKAN (30-60 min) > ONLINE (>60 min)
   const getStatusInfo = () => {
@@ -362,6 +376,17 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
               ) : (
                 <Power className="w-3.5 h-3.5" />
               )}
+            </button>
+          )}
+          
+          {/* Move Room Button - only show when active */}
+          {billingConfig.enabled && roomBilling.isActive && (
+            <button 
+              onClick={() => setShowMoveRoom(true)}
+              className="w-6 h-6 flex items-center justify-center rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30"
+              title="Pindahkan ke ruangan lain"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -578,6 +603,15 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             setPendingDeactivation(null);
             setGlobalLoading(false);
           }}
+        />
+      )}
+
+      {/* Move Room Modal */}
+      {showMoveRoom && (
+        <MoveRoomModal
+          roomBilling={roomBilling}
+          onClose={() => setShowMoveRoom(false)}
+          onMoveComplete={() => setShowMoveRoom(false)}
         />
       )}
 

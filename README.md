@@ -13,6 +13,7 @@ Sistem manajemen playlist video real-time dengan integrasi YouTube untuk karaoke
 - **Billing Otomatis** - Perhitungan biaya berdasarkan durasi dan tarif per ruangan
 - **Multi-room** - Kelola multiple ruangan karaoke secara bersamaan
 - **Status Ruangan** - Monitoring real-time status ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
+- **Pindah Ruangan** - Pindahkan billing customer ke ruangan lain saat ingin pindah kamar
 - **Full Page Loading** - Feedback visual untuk setiap proses operasi
 
 ## Arsitektur

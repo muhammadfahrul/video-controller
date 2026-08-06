@@ -655,11 +655,14 @@ export class SocketServer {
                 socket.on(
                     SocketEvents.TRANSACTION_SAVE,
                     async (transaction) => {
-                        console.log("[SERVER] Saving transaction:", transaction.id);
+                        console.log("[SERVER] Saving transaction:", transaction.id, "cleanedAt:", transaction.cleanedAt);
+                        console.log("[SERVER] Full transaction data:", JSON.stringify(transaction));
                         try {
                             await this.database.saveTransaction(transaction);
                             // Broadcast to all connected cashiers
-                            this.io.emit(SocketEvents.TRANSACTION_GET, await this.database.getTransactions());
+                            const allTransactions = await this.database.getTransactions();
+                            console.log("[SERVER] Broadcasting transactions, count:", allTransactions.length);
+                            this.io.emit(SocketEvents.TRANSACTION_GET, allTransactions);
                         } catch (error) {
                             console.error("[SOCKET SERVER] Error saving transaction:", error);
                         }

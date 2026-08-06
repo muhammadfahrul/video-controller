@@ -60,8 +60,45 @@ export const useTransactionStore = create<TransactionStore>()(
       set({ transactions: [] });
     },
     
-    setTransactions: (transactions) => {
-      set({ transactions });
+    // Set transactions from server - merge with any pending local updates
+    // This prevents server data from overwriting local changes (like cleanedAt)
+    setTransactions: (serverTransactions) => {
+      const currentTransactions = get().transactions;
+      
+      // If no local changes, just use server data
+      const hasLocalChanges = currentTransactions.some(t => 
+        t.cleanedAt && !serverTransactions.find(st => st.id === t.id && st.cleanedAt === t.cleanedAt)
+      );
+      
+      if (!hasLocalChanges) {
+        set({ transactions: serverTransactions });
+        return;
+      }
+      
+      // Merge: keep local changes (like cleanedAt) even if server doesn't have them yet
+      const serverMap = new Map(serverTransactions.map(t => [t.id, t]));
+      
+      const merged = currentTransactions.map(localTx => {
+        const serverTx = serverMap.get(localTx.id);
+        if (serverTx) {
+          // Prefer local version if it has more data (like cleanedAt)
+          if (localTx.cleanedAt && !serverTx.cleanedAt) {
+            console.log('[TransactionStore] Keeping local cleanedAt:', localTx.id, localTx.cleanedAt);
+            return localTx;
+          }
+          return serverTx;
+        }
+        return localTx;
+      });
+      
+      // Add new transactions from server
+      serverTransactions.forEach(serverTx => {
+        if (!currentTransactions.find(t => t.id === serverTx.id)) {
+          merged.push(serverTx);
+        }
+      });
+      
+      set({ transactions: merged });
     },
     
     setLoading: (loading, type = 'loading', message = '') => {

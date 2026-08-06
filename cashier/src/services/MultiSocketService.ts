@@ -269,12 +269,17 @@ class MultiSocketService {
 
   // Update transaction on server (e.g., mark as paid)
   updateTransaction(transaction: any): void {
+    console.log('[MultiSocket] updateTransaction called with:', transaction.id, 'cleanedAt:', transaction.cleanedAt);
     // Send update to server - saveTransaction handles both insert and update
+    let sentCount = 0;
     for (const conn of this.connections.values()) {
       if (conn.socket.connected) {
+        console.log('[MultiSocket] Emitting transaction:save to:', conn.config.name);
         conn.socket.emit('transaction:save', transaction);
+        sentCount++;
       }
     }
+    console.log('[MultiSocket] updateTransaction sent to', sentCount, 'connections');
   }
   
   // Delete transaction on server
@@ -417,6 +422,9 @@ class MultiSocketService {
     // Listen for transactions from server
     socket.on('transaction:get', (transactions: any[]) => {
       console.log('[MultiSocket] Received transactions from server:', transactions.length);
+      // Find the cleanedAt value for debugging
+      const cleanedTx = transactions.find(t => t.cleanedAt && t.cleanedAt > 0);
+      console.log('[MultiSocket] Transaction with cleanedAt:', cleanedTx);
       useTransactionStore.getState().setTransactions(transactions);
     });
 

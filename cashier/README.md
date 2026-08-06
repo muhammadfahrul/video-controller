@@ -11,6 +11,7 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 - **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
 - **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`)
 - **Full Page Loading**: Setiap proses menampilkan loading screen dengan estimasi waktu
+- **Pindah Ruangan**: Memindahkan billing dari satu ruangan ke ruangan lain saat customer ingin pindah
 
 ## Cara Menjalankan
 
