@@ -261,6 +261,7 @@ class MultiSocketService {
   // Load transactions from server for a specific room
   loadTransactions(roomId: string): void {
     const connection = this.connections.get(roomId);
+    console.log('[MultiSocket] loadTransactions called for:', roomId, 'connection exists:', !!connection, 'connected:', connection?.socket.connected);
     if (connection && connection.socket.connected) {
       console.log('[MultiSocket] Requesting transactions for room:', roomId);
       connection.socket.emit('transaction:get');
@@ -422,6 +423,7 @@ class MultiSocketService {
     // Listen for transactions from server
     socket.on('transaction:get', (transactions: any[]) => {
       console.log('[MultiSocket] Received transactions from server:', transactions.length);
+      console.log('[MultiSocket] Socket ID:', socket.id, 'Room:', config.name);
       // Find the cleanedAt value for debugging
       const cleanedTx = transactions.find(t => t.cleanedAt && t.cleanedAt > 0);
       console.log('[MultiSocket] Transaction with cleanedAt:', cleanedTx);

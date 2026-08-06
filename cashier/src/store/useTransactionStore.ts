@@ -65,12 +65,41 @@ export const useTransactionStore = create<TransactionStore>()(
     setTransactions: (serverTransactions) => {
       const currentTransactions = get().transactions;
       
+      console.log('[TransactionStore] setTransactions called - current:', currentTransactions.length, 'server:', serverTransactions.length);
+      
+      // Check for duplicates in current
+      const currentIds = currentTransactions.map(t => t.id);
+      const currentDuplicates = currentIds.filter((id, i) => currentIds.indexOf(id) !== i);
+      if (currentDuplicates.length > 0) {
+        console.log('[TransactionStore] DUPLICATES in current:', currentDuplicates);
+      }
+      
+      // Check for duplicates in server
+      const serverIds = serverTransactions.map(t => t.id);
+      const serverDuplicates = serverIds.filter((id, i) => serverIds.indexOf(id) !== i);
+      if (serverDuplicates.length > 0) {
+        console.log('[TransactionStore] DUPLICATES in server:', serverDuplicates);
+      }
+      
+      // Debug: Show which transactions are only in local
+      const localOnly = currentTransactions.filter(ct => !serverTransactions.find(st => st.id === ct.id));
+      if (localOnly.length > 0) {
+        console.log('[TransactionStore] Transactions only in local:', localOnly.map(t => ({ id: t.id, cleanedAt: t.cleanedAt, paidAt: t.paidAt })));
+      }
+      
+      // Debug: Show which transactions are only in server
+      const serverOnly = serverTransactions.filter(st => !currentTransactions.find(ct => ct.id === st.id));
+      if (serverOnly.length > 0) {
+        console.log('[TransactionStore] Transactions only in server:', serverOnly.map(t => ({ id: t.id, cleanedAt: t.cleanedAt, paidAt: t.paidAt })));
+      }
+      
       // If no local changes, just use server data
       const hasLocalChanges = currentTransactions.some(t => 
         t.cleanedAt && !serverTransactions.find(st => st.id === t.id && st.cleanedAt === t.cleanedAt)
       );
       
       if (!hasLocalChanges) {
+        console.log('[TransactionStore] No local changes, using server data');
         set({ transactions: serverTransactions });
         return;
       }
@@ -78,27 +107,62 @@ export const useTransactionStore = create<TransactionStore>()(
       // Merge: keep local changes (like cleanedAt) even if server doesn't have them yet
       const serverMap = new Map(serverTransactions.map(t => [t.id, t]));
       
-      const merged = currentTransactions.map(localTx => {
+      // First, identify orphaned transactions (exist only locally with cleanedAt)
+      // These were marked cleaned locally but server never received them - treat as synced
+      const merged: Transaction[] = [];
+      
+      currentTransactions.forEach(localTx => {
         const serverTx = serverMap.get(localTx.id);
+        
         if (serverTx) {
-          // Prefer local version if it has more data (like cleanedAt)
+          // Transaction exists on both - merge local changes with server data
           if (localTx.cleanedAt && !serverTx.cleanedAt) {
             console.log('[TransactionStore] Keeping local cleanedAt:', localTx.id, localTx.cleanedAt);
-            return localTx;
+            merged.push(localTx);
+          } else {
+            merged.push(serverTx);
           }
-          return serverTx;
+        } else {
+          // Transaction only exists locally - this is an orphan
+          // If it has cleanedAt, assume it was synced to server and remove from local
+          // If it has paidAt > 0 (valid paid transaction), keep it to sync later
+          // If paidAt is 0, discard it (incomplete/failed transaction)
+          if (localTx.cleanedAt) {
+            console.log('[TransactionStore] Removing orphan transaction (cleaned locally):', localTx.id);
+            // Don't add to merged - effectively removing it
+          } else if (localTx.paidAt > 0) {
+            console.log('[TransactionStore] Keeping unsynced paid transaction:', localTx.id, 'paidAt:', localTx.paidAt);
+            merged.push(localTx);
+          } else {
+            // paidAt is 0 - incomplete transaction, discard
+            console.log('[TransactionStore] Discarding incomplete transaction:', localTx.id);
+          }
         }
-        return localTx;
       });
       
-      // Add new transactions from server
+      // Add new transactions from server that aren't already in merged
       serverTransactions.forEach(serverTx => {
-        if (!currentTransactions.find(t => t.id === serverTx.id)) {
+        if (!merged.find(t => t.id === serverTx.id)) {
           merged.push(serverTx);
         }
       });
       
-      set({ transactions: merged });
+      // Deduplicate by ID - keep first occurrence
+      const seen = new Set<string>();
+      const deduplicated = merged.filter(t => {
+        if (seen.has(t.id)) {
+          console.log('[TransactionStore] Deduplicated:', t.id);
+          return false;
+        }
+        seen.add(t.id);
+        return true;
+      });
+      
+      if (deduplicated.length !== merged.length) {
+        console.log('[TransactionStore] Deduplication removed', merged.length - deduplicated.length, 'duplicates');
+      }
+      
+      set({ transactions: deduplicated });
     },
     
     setLoading: (loading, type = 'loading', message = '') => {
