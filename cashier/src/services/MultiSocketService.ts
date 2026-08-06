@@ -137,10 +137,10 @@ class MultiSocketService {
     
     let connection: RoomConnection | undefined;
     
-    // Find connection by matching roomId (from agent) or config.id
+    // Find connection by config.id only (roomId is now mandatory in config)
     for (const conn of this.connections.values()) {
-      console.log('[MultiSocket] Checking connection:', { configId: conn.config.id, agentRoomId: conn.agents[0]?.roomId, lookingFor: roomId });
-      if (conn.agents[0]?.roomId === roomId || conn.config.id === roomId) {
+      console.log('[MultiSocket] Checking connection:', { configId: conn.config.id, lookingFor: roomId });
+      if (conn.config.id === roomId) {
         connection = conn;
         break;
       }

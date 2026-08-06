@@ -6,6 +6,7 @@ export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'PLAYING' | 'PAUSED' | 'WAITING
 export interface RoomConfig {
   id: string;
   name: string;
+  roomId?: string; // Optional roomId from env (maps to agent's ROOM_ID)
   ip: string;
   port: number;
   pricePerHour?: number; // Tarif per ruangan, bisa berbeda-beda

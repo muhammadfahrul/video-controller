@@ -53,9 +53,10 @@ function loadRoomsFromEnv(): RoomConfig[] {
     const parsed = JSON.parse(envRooms);
     if (!Array.isArray(parsed)) return [];
     
-    return parsed.map((room: { name: string; ip: string; port: number; pricePerHour?: number }, index: number) => ({
-      id: `env-room-${index}`,
+    return parsed.map((room: { name: string; roomId?: string; ip: string; port: number; pricePerHour?: number }, index: number) => ({
+      id: room.roomId || `env-room-${index}`, // Pakai roomId jika ada, fallback ke env-room-{index}
       name: room.name || `Room ${index + 1}`,
+      roomId: room.roomId,
       ip: room.ip || '127.0.0.1',
       port: room.port || 53331,
       pricePerHour: room.pricePerHour || 50000, // Default Rp 50,000 jika tidak ada
