@@ -29,7 +29,6 @@ export default function PlaylistToolbar() {
     };
 
     const repeatMode = playlist.repeat === "OFF" ? "ALL" : playlist.repeat === "ALL" ? "ONE" : "OFF";
-    const nextRepeatMode = repeatMode === "OFF" ? "OFF" : repeatMode === "ALL" ? "ONE" : "OFF";
     const repeatLabel = playlist.repeat === "OFF" ? "Ulang: mati" : playlist.repeat === "ALL" ? "Ulang semua" : "Ulang satu";
     const buttonClass = "inline-flex min-h-12 items-center gap-3 rounded-2xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45";
 
