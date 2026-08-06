@@ -525,7 +525,8 @@ export class Agent {
             CommandType.REPEAT_OFF,
             new RepeatModeHandler(
                 this.playlist,
-                RepeatMode.OFF
+                RepeatMode.OFF,
+                (snapshot) => this.socketClient?.sendPlaylistState(snapshot)
             )
         );
 
@@ -533,7 +534,8 @@ export class Agent {
             CommandType.REPEAT_ONE,
             new RepeatModeHandler(
                 this.playlist,
-                RepeatMode.ONE
+                RepeatMode.ONE,
+                (snapshot) => this.socketClient?.sendPlaylistState(snapshot)
             )
         );
 
@@ -541,7 +543,8 @@ export class Agent {
             CommandType.REPEAT_ALL,
             new RepeatModeHandler(
                 this.playlist,
-                RepeatMode.ALL
+                RepeatMode.ALL,
+                (snapshot) => this.socketClient?.sendPlaylistState(snapshot)
             )
         );
 

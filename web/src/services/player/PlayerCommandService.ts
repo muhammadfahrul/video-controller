@@ -16,11 +16,17 @@ import type {
 
 } from "../../features/playlist/types/PlaylistItem";
 
+type CommandCallback = {
+    onSuccess?: () => void;
+    onError?: (error: string) => void;
+};
+
 export class PlayerCommandService {
 
     private emit(
 
-        command: PlayerCommand
+        command: PlayerCommand,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -32,6 +38,13 @@ export class PlayerCommandService {
 
         );
 
+        // Check if socket is connected before emitting
+        if (!socketService.isConnected()) {
+            console.error("[PlayerCommand] Socket not connected");
+            callbacks?.onError?.("Socket not connected");
+            return;
+        }
+
         socketService.emit(
 
             "player:command",
@@ -40,11 +53,15 @@ export class PlayerCommandService {
 
         );
 
+        // Call success callback immediately (actual confirmation will come from server)
+        callbacks?.onSuccess?.();
+
     }
 
     play(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -54,13 +71,14 @@ export class PlayerCommandService {
 
             type: "PLAY"
 
-        });
+        }, callbacks);
 
     }
 
     pause(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -70,13 +88,14 @@ export class PlayerCommandService {
 
             type: "PAUSE"
 
-        });
+        }, callbacks);
 
     }
 
     stop(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -86,13 +105,14 @@ export class PlayerCommandService {
 
             type: "STOP"
 
-        });
+        }, callbacks);
 
     }
 
     next(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -102,13 +122,14 @@ export class PlayerCommandService {
 
             type: "NEXT"
 
-        });
+        }, callbacks);
 
     }
 
     previous(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -118,13 +139,14 @@ export class PlayerCommandService {
 
             type: "PREVIOUS"
 
-        });
+        }, callbacks);
 
     }
 
     fullscreen(
 
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -134,12 +156,13 @@ export class PlayerCommandService {
 
             type: "FULLSCREEN"
 
-        });
+        }, callbacks);
 
     }
 
     exitFullscreen(
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
     ) {
 
         this.emit({
@@ -148,22 +171,26 @@ export class PlayerCommandService {
 
             type: "EXIT_FULLSCREEN"
 
-        });
+        }, callbacks);
 
     }
 
-    toggleFullscreen(agentId: string) {
+    toggleFullscreen(
+        agentId: string,
+        callbacks?: CommandCallback
+    ) {
         this.emit({
             agentId,
             type: "TOGGLE_FULLSCREEN"
-        });
+        }, callbacks);
     }
 
     volume(
 
         agentId: string,
 
-        volume: number
+        volume: number,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -175,26 +202,34 @@ export class PlayerCommandService {
 
             volume
 
-        });
+        }, callbacks);
 
     }
 
-    setVolume(agentId: string, volume: number): void {
-        this.volume(agentId, volume);
+    setVolume(
+        agentId: string,
+        volume: number,
+        callbacks?: CommandCallback
+    ): void {
+        this.volume(agentId, volume, callbacks);
     }
 
-    toggleMute(agentId: string): void {
+    toggleMute(
+        agentId: string,
+        callbacks?: CommandCallback
+    ): void {
         this.emit({
             agentId,
             type: "TOGGLE_MUTE"
-        });
+        }, callbacks);
     }
 
     seek(
 
         agentId: string,
 
-        second: number
+        second: number,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -206,7 +241,7 @@ export class PlayerCommandService {
 
             seek: second
 
-        });
+        }, callbacks);
 
     }
 
@@ -214,7 +249,8 @@ export class PlayerCommandService {
 
         agentId: string,
 
-        videoId: string
+        videoId: string,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -226,7 +262,7 @@ export class PlayerCommandService {
 
             videoId
 
-        });
+        }, callbacks);
 
     }
 
@@ -234,7 +270,8 @@ export class PlayerCommandService {
 
         agentId: string,
 
-        item: PlaylistItem
+        item: PlaylistItem,
+        callbacks?: CommandCallback
 
     ): void {
 
@@ -246,12 +283,13 @@ export class PlayerCommandService {
 
             item
 
-        });
+        }, callbacks);
 
     }
 
     mute(
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
     ) {
 
         this.emit({
@@ -260,12 +298,13 @@ export class PlayerCommandService {
 
             type: "MUTE"
 
-        });
+        }, callbacks);
 
     }
 
     unmute(
-        agentId: string
+        agentId: string,
+        callbacks?: CommandCallback
     ) {
 
         this.emit({
@@ -274,7 +313,7 @@ export class PlayerCommandService {
 
             type: "UNMUTE"
 
-        });
+        }, callbacks);
 
     }
 
@@ -282,7 +321,8 @@ export class PlayerCommandService {
 
         agentId:string,
 
-        playlistId:string
+        playlistId:string,
+        callbacks?: CommandCallback
 
     ){
 
@@ -294,7 +334,7 @@ export class PlayerCommandService {
 
             id:playlistId
 
-        });
+        }, callbacks);
 
     }
 
@@ -304,7 +344,8 @@ export class PlayerCommandService {
 
         agentId:string,
 
-        playlistId:string
+        playlistId:string,
+        callbacks?: CommandCallback
 
     ){
 
@@ -316,7 +357,7 @@ export class PlayerCommandService {
 
             id:playlistId
 
-        });
+        }, callbacks);
 
     }
 
@@ -324,7 +365,8 @@ export class PlayerCommandService {
 
     clearPlaylist(
 
-        agentId:string
+        agentId:string,
+        callbacks?: CommandCallback
 
     ){
 
@@ -334,7 +376,7 @@ export class PlayerCommandService {
 
             type:"CLEAR_PLAYLIST"
 
-        });
+        }, callbacks);
 
     }
 
@@ -342,7 +384,8 @@ export class PlayerCommandService {
 
     shufflePlaylist(
 
-        agentId:string
+        agentId:string,
+        callbacks?: CommandCallback
 
     ){
 
@@ -352,7 +395,7 @@ export class PlayerCommandService {
 
             type:"SHUFFLE_PLAYLIST"
 
-        });
+        }, callbacks);
 
     }
 
@@ -362,7 +405,8 @@ export class PlayerCommandService {
 
         agentId:string,
 
-        mode:string
+        mode:string,
+        callbacks?: CommandCallback
 
     ){
 
@@ -372,17 +416,26 @@ export class PlayerCommandService {
 
             type:"REPEAT_" + mode
 
-        });
+        }, callbacks);
 
     }
 
     skipAd(
-        agentId:string
+        agentId:string,
+        callbacks?: CommandCallback
     ){
         this.emit({
             agentId,
             type:"SKIP_AD"
-        });
+        }, callbacks);
+    }
+
+    atmosphere(
+        agentId: string,
+        callbacks?: CommandCallback
+    ): void {
+        console.log("[PlayerCommandService] emit ATMOSPHERE", agentId);
+        this.emit({ agentId, type: "ATMOSPHERE" }, callbacks);
     }
 }
 

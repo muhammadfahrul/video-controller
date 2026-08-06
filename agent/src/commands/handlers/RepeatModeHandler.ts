@@ -11,6 +11,8 @@ import {
     RepeatMode
 } from "../../playlist/RepeatMode";
 
+import { PlaylistSnapshot } from "../../types/PlaylistSnapshot";
+
 export class RepeatModeHandler
 implements CommandHandler {
 
@@ -20,7 +22,11 @@ implements CommandHandler {
             PlaylistService,
 
         private readonly mode:
-            RepeatMode
+            RepeatMode,
+
+        private readonly onChanged?: (
+            snapshot: PlaylistSnapshot
+        ) => void
 
     ) {}
 
@@ -35,6 +41,10 @@ implements CommandHandler {
         console.log(
             "Repeat:",
             this.mode
+        );
+
+        this.onChanged?.(
+            this.playlist.getSnapshot()
         );
 
     }

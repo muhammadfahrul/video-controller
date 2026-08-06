@@ -1,7 +1,5 @@
 import type {
-
     SearchResult
-
 } from "../../features/search/types/SearchResult";
 
 import { getServerUrl } from "../../utils/getServerUrl";
@@ -9,27 +7,20 @@ import { getServerUrl } from "../../utils/getServerUrl";
 export class SearchService {
 
     async search(
-
-        keyword: string
-
+        keyword: string,
+        signal?: AbortSignal
     ): Promise<SearchResult[]> {
 
         const response =
-
             await fetch(
-
-                `${getServerUrl()}/api/search?keyword=${encodeURIComponent(keyword)}`
-
+                `${getServerUrl()}/api/search?keyword=${encodeURIComponent(keyword)}`,
+                { signal }
             );
 
         if (!response.ok) {
-
             throw new Error(
-
                 "Search failed"
-
             );
-
         }
 
         return await response.json();
@@ -39,5 +30,4 @@ export class SearchService {
 }
 
 export const searchService =
-
     new SearchService();

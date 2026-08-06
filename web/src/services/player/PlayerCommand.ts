@@ -45,9 +45,8 @@ export interface PlayerCommand {
         | "OPEN_VIDEO"
 
         | "ADD_PLAYLIST"
-
         | "SKIP_AD"
-
+        | "ATMOSPHERE"
         | string;
 
     volume?: number;

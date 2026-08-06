@@ -10,56 +10,30 @@ export default function Footer() {
     const navItems = [
         {
             path: "/",
-            label: "Home",
+            label: "UTAMA",
             icon: Home
         },
         {
             path: "/playlist",
-            label: "Playlist",
+            label: "PLAYLIST",
             icon: ListMusic
         },
         {
             path: "/search",
-            label: "Search",
+            label: "SEARCH",
             icon: Search
         },
         {
             path: "/settings",
-            label: "Settings",
+            label: "SETTINGS",
             icon: Settings
         }
     ];
 
     return (
 
-        <footer
-            className="
-                fixed
-                bottom-0
-                left-0
-                right-0
-                z-50
-                border-t
-                border-[#2a2a4a]
-                bg-[#0a0a14]
-                px-3
-                py-2
-                pb-[env(safe-area-inset-bottom)]
-                landscape:py-1
-                landscape:pb-1
-            "
-        >
-            <nav
-                className="
-                    flex
-                    justify-between
-                    bg-[#12121f]
-                    rounded-lg
-                    p-1
-                    landscape:max-w-md
-                    landscape:mx-auto
-                "
-            >
+        <footer className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:bottom-4 sm:pb-0">
+            <nav className="mx-auto flex max-w-xl items-center justify-between rounded-2xl border border-white/15 bg-gradient-to-r from-[#2b1439]/90 via-[#281532]/90 to-[#21132f]/90 p-1.5 shadow-2xl shadow-black/40 backdrop-blur-xl">
                 {navItems.map((item) => {
                     const isActive = location.pathname === item.path;
                     return (
@@ -67,15 +41,15 @@ export default function Footer() {
                             key={item.path}
                             to={item.path}
                             className={`
-                                flex items-center gap-1 px-2 py-1.5 rounded-md text-xs transition-all
+                                flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2 text-[11px] font-medium transition-all duration-200 sm:flex-row sm:gap-1.5
                                 ${isActive
-                                    ? "bg-[#ff2d95] text-white shadow-[0_0_10px_rgba(255,45,149,0.5)]"
-                                    : "text-[#b8b8d0] hover:text-[#00f0ff] hover:bg-[#1a1a2e]"
+                                    ? "bg-gradient-to-r from-pink-400 to-fuchsia-400 text-white shadow-lg shadow-pink-500/30"
+                                    : "text-fuchsia-100/65 hover:bg-white/10 hover:text-white"
                                 }
                             `}
                         >
-                            <item.icon className="h-4 w-4" />
-                            <span className="text-xs">{item.label}</span>
+                            <item.icon className="size-[18px]" />
+                            <span>{item.label}</span>
                         </MenuLink>
                     );
                 })}
