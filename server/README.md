@@ -160,6 +160,19 @@ Rumus:
 biaya = (activeTime dalam jam) × pricePerHour
 ```
 
+### Transaksi dan Status Ruangan
+
+Server menyimpan data transaksi dengan field:
+- `paidAt` - Timestamp saat transaksi lunas (0 = unpaid)
+- `cleanedAt` - Timestamp saat ruangan ditandai sudah bersih
+
+Status ruangan dihitung berdasarkan:
+- Jika `paidAt === 0` → UNPAID
+- Jika `paidAt > 0` dan belum ada `cleanedAt`:
+  - Dalam 3 menit setelah paidAt → PAID
+  - 3-4 menit setelah paidAt → BERSIHKAN
+  - Setelah 4 menit atau ada `cleanedAt` → SUDAH DIBERSIHKAN
+
 ## Command Types
 
 | Command | Payload | Deskripsi |

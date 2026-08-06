@@ -392,6 +392,8 @@ class MultiSocketService {
             isActive: false,
             expiresAt: null,
             isConnected: connection.socket.connected,
+            needsCleaning: false,
+            lastTransactionEndTime: undefined,
           };
 
       billings.set(roomId, billing);
@@ -857,6 +859,8 @@ class MultiSocketService {
       isActive: agent.isActive ?? false,
       expiresAt: agent.expiresAt ?? null,
       isConnected: true, // Agent exists = connected
+      needsCleaning: agentAny.needsCleaning ?? false,
+      lastTransactionEndTime: agentAny.lastTransactionEndTime,
       customerName: agentAny.customerName,
       customerPhone: agentAny.customerPhone,
       customerEmail: agentAny.customerEmail,

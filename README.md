@@ -12,6 +12,8 @@ Sistem manajemen playlist video real-time dengan integrasi YouTube untuk karaoke
 - **Auto-recovery** - Sistem recovery cerdas untuk menangani failure scenarios
 - **Billing Otomatis** - Perhitungan biaya berdasarkan durasi dan tarif per ruangan
 - **Multi-room** - Kelola multiple ruangan karaoke secara bersamaan
+- **Status Ruangan** - Monitoring real-time status ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
+- **Full Page Loading** - Feedback visual untuk setiap proses operasi
 
 ## Arsitektur
 
@@ -215,6 +217,29 @@ Rumus:
 ```
 biaya = (activeTime dalam jam) × pricePerHour
 ```
+
+## Status Ruangan (Cashier)
+
+Sistem cashier menampilkan status ruangan secara real-time:
+
+| Status | Deskripsi |
+|--------|-----------|
+| OFFLINE | Ruangan tidak terhubung ke server |
+| AKTIF | Ruangan sedang digunakan |
+| UNPAID | Transaksi belum lunas |
+| PAID | Transaksi lunas, fase pembersihan belum dimulai |
+| BERSIHKAN | Fase pembersihan (3 menit setelah payment) |
+| SUDAH DIBERSIHKAN | Pembersihan selesai, siap digunakan |
+| ONLINE | Terhubung tapi tidak aktif |
+
+### Transisi Status
+- **PAID → BERSIHKAN**: Otomatis 3 menit setelah payment
+- **BERSIHKAN → SUDAH DIBERSIHKAN**: Otomatis 1 menit kemudian
+- **SUDAH DIBERSIHKAN → ONLINE**: Siap diaktifkan kembali
+- Manual: Tombol "Sudah Bersih" untuk加速 pembersihan
+
+### Pemblokiran Aktivasi
+Ruangan dengan status BERSIHKAN tidak dapat diaktifkan sampai status berubah ke SUDAH DIBERSIHKAN.
 
 ## Troubleshooting
 

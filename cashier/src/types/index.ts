@@ -36,6 +36,8 @@ export interface RoomBilling {
   isActive: boolean; // apakah ruangan sudah diaktifkan oleh cashier
   expiresAt: number | null; // Timestamp when room expires (null if no duration set)
   isConnected: boolean; // apakah socket terhubung ke server
+  needsCleaning: boolean; // perlu bersihkan ruangan setelah customer selesai
+  lastTransactionEndTime?: number; // Waktu selesai transaksi terakhir (untuk menentukan perlu bersih)
   customerName?: string;
   customerPhone?: string;
   customerEmail?: string;
@@ -58,6 +60,7 @@ export interface Transaction {
   totalPrice: number;
   paymentMethod?: 'cash' | 'transfer' | 'other';
   paidAt: number; // 0 = unpaid, > 0 = paid (timestamp when payment was confirmed)
+  cleanedAt?: number; // timestamp when room was marked as cleaned (BERSIHKAN → SUDAH DIBERSIHKAN)
   notes?: string;
 }
 

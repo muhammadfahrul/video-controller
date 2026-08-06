@@ -4,6 +4,8 @@ export type LoadingMessage =
   | 'activating'        // Activating a room
   | 'deactivating'     // Deactivating a room
   | 'extending'         // Extending time
+  | 'cleaning'          // Marking room as cleaned
+  | 'paying'            // Processing payment
   | 'saving'            // Saving data
   | 'deleting'          // Deleting data
   | 'clearing';         // Clearing data
@@ -21,6 +23,8 @@ const loadingMessages: Record<LoadingMessage, string> = {
   activating: 'Mengaktifkan ruangan...',
   deactivating: 'Menonaktifkan ruangan...',
   extending: 'Memperpanjang waktu...',
+  cleaning: 'Menandai ruangan bersih...',
+  paying: 'Memproses pembayaran...',
   saving: 'Menyimpan data...',
   deleting: 'Menghapus data...',
   clearing: 'Menghapus semua data...',
@@ -33,6 +37,8 @@ export const loadingDurations: Record<LoadingMessage, number> = {
   activating: 5000,        // Activating: 3s + buffer
   deactivating: 5000,       // Deactivating: 3s + buffer
   extending: 5000,         // Extending: 3s + buffer
+  cleaning: 3000,          // Cleaning: quick operation
+  paying: 3000,            // Payment processing
   saving: 3000,            // Saving: quick operation
   deleting: 3000,          // Deleting: quick operation
   clearing: 3000,          // Clearing: quick operation

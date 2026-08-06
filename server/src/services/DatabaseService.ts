@@ -51,6 +51,7 @@ export interface TransactionData {
     totalPrice: number;
     paymentMethod?: 'cash' | 'transfer' | 'other';
     paidAt: number;
+    cleanedAt?: number;
     notes?: string;
 }
 
@@ -139,9 +140,17 @@ export class DatabaseService {
                 totalPrice REAL NOT NULL,
                 paymentMethod TEXT,
                 paidAt INTEGER DEFAULT 0,
+                cleanedAt INTEGER,
                 notes TEXT
             )
         `);
+        
+        // Migration: Add cleanedAt column if it doesn't exist (for existing databases)
+        try {
+            this.db.run(`ALTER TABLE transactions ADD COLUMN cleanedAt INTEGER`);
+        } catch (e) {
+            // Column already exists, ignore
+        }
 
         // Agent errors table
         this.db.run(`
@@ -299,14 +308,14 @@ export class DatabaseService {
                     roomId = ?, roomName = ?, customerName = ?, customerPhone = ?,
                     customerEmail = ?, customerNote = ?, startTime = ?, endTime = ?,
                     duration = ?, pricePerHour = ?, totalPrice = ?, paymentMethod = ?,
-                    paidAt = ?, notes = ?
+                    paidAt = ?, cleanedAt = ?, notes = ?
                 WHERE id = ?
             `, [
                 transaction.roomId, transaction.roomName, transaction.customerName || null,
                 transaction.customerPhone || null, transaction.customerEmail || null,
                 transaction.customerNote || null, transaction.startTime, transaction.endTime,
                 transaction.duration, transaction.pricePerHour, transaction.totalPrice,
-                transaction.paymentMethod || null, transaction.paidAt, transaction.notes || null,
+                transaction.paymentMethod || null, transaction.paidAt, transaction.cleanedAt || null, transaction.notes || null,
                 transaction.id
             ]);
         } else {
@@ -314,14 +323,14 @@ export class DatabaseService {
                 INSERT INTO transactions (
                     id, roomId, roomName, customerName, customerPhone, customerEmail,
                     customerNote, startTime, endTime, duration, pricePerHour, totalPrice,
-                    paymentMethod, paidAt, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    paymentMethod, paidAt, cleanedAt, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 transaction.id, transaction.roomId, transaction.roomName, transaction.customerName || null,
                 transaction.customerPhone || null, transaction.customerEmail || null,
                 transaction.customerNote || null, transaction.startTime, transaction.endTime,
                 transaction.duration, transaction.pricePerHour, transaction.totalPrice,
-                transaction.paymentMethod || null, transaction.paidAt, transaction.notes || null
+                transaction.paymentMethod || null, transaction.paidAt, transaction.cleanedAt || null, transaction.notes || null
             ]);
         }
         this.save();

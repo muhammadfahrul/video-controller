@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { useRoomStore } from '../store/useRoomStore';
 import { multiSocketService } from '../services/MultiSocketService';
 import { PaymentConfirmModal } from './PaymentConfirmModal';
 import { PrintReceipt } from './PrintReceipt';
@@ -44,6 +45,8 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     removeTransaction, 
     clearTransactions
   } = useTransactionStore();
+  
+  const setGlobalLoading = useRoomStore((state) => state.setLoading);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
@@ -116,6 +119,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
 
   const handlePaymentConfirm = async (paymentMethod: 'cash' | 'transfer' | 'other', notes?: string) => {
     setShowPaymentConfirm(false);
+    setGlobalLoading(true, 'paying');
     try {
       // Mark transaction as paid - find from filtered transactions
       const currentUnpaid = unpaidTransaction;
@@ -130,22 +134,28 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
         useTransactionStore.getState().updateTransaction(currentUnpaid.id, updatedData);
         // Send to server to persist
         multiSocketService.updateTransaction(updatedData);
+        setGlobalLoading(false);
       }
     } catch (error) {
+      setGlobalLoading(false);
       console.error('Payment error:', error);
     }
   };
 
   const handleDeleteTransaction = (transactionId: string) => {
     if (!confirm('Hapus transaksi ini?')) return;
+    setGlobalLoading(true, 'deleting');
     removeTransaction(transactionId);
     multiSocketService.deleteTransaction(transactionId);
+    setTimeout(() => setGlobalLoading(false), 500);
   };
   
   const handleClearTransactions = () => {
     if (!confirm('Hapus semua riwayat transaksi?')) return;
+    setGlobalLoading(true, 'clearing');
     clearTransactions();
     multiSocketService.clearTransactions();
+    setTimeout(() => setGlobalLoading(false), 500);
   };
   
   const modalContent = (

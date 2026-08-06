@@ -106,6 +106,12 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       return;
     }
     
+    // Prevent activation if room is in BERSIHKAN status (needs cleaning first)
+    if (!roomBilling.isActive && paidStatus === 'BERSIHKAN') {
+      alert('Tidak dapat mengaktifkan ruangan. Ruangan masih dalam proses pembersihan.\nSilakan tunggu hingga status berubah menjadi SUDAH DIBERSIHKAN.');
+      return;
+    }
+    
     if (roomBilling.isActive) {
       // Deactivate room - will create transaction automatically
       setGlobalLoading(true, 'deactivating');
@@ -211,10 +217,108 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;
   
-  const borderColor = !roomBilling.isConnected ? 'border-l-red-500' : roomBilling.isActive ? 'border-l-blue-500' : 'border-l-gray-500';
-  const iconColor = !roomBilling.isConnected ? 'text-red-400 bg-red-500/20' : roomBilling.isActive ? 'text-blue-400 bg-blue-500/20' : 'text-gray-400 bg-gray-500/20';
-  const badgeColor = !roomBilling.isConnected ? 'bg-red-500/20 text-red-400' : roomBilling.isActive ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400';
-  const badgeText = !roomBilling.isConnected ? 'OFFLINE' : roomBilling.isActive ? 'AKTIF' : 'ONLINE';
+  // Check for unpaid transactions and needs cleaning
+  const allTransactions = useTransactionStore.getState().transactions;
+  const roomKey = roomBilling.roomId.toLowerCase();
+  const roomNameKey = roomBilling.roomName.toLowerCase();
+  const roomTransactions = allTransactions.filter(t => 
+    t.roomId.toLowerCase() === roomKey || t.roomName.toLowerCase() === roomNameKey
+  );
+  const latestTransaction = roomTransactions[0]; // Most recent transaction (added to front)
+  const hasUnpaid = roomTransactions.some(t => t.paidAt === 0);
+  const lastPaid = latestTransaction && latestTransaction.paidAt > 0;
+  
+  // Check time since payment was made (not since session ended)
+  // This determines cleaning status: immediately after payment = BERSIHKAN
+  const timeSincePaid = latestTransaction && latestTransaction.paidAt > 0 
+    ? Date.now() - latestTransaction.paidAt 
+    : Infinity;
+  const CLEANING_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+  const CLEANED_THRESHOLD = 60 * 60 * 1000; // 60 minutes
+  
+  // Determine status based on time since payment was made OR cleanedAt
+  // BERSIHKAN: < 30 min after payment (or < 60 min if cleanedAt not set)
+  // SUDAH DIBERSIHKAN: >= 30 min after payment with cleanedAt, or >= 60 min without manual clean
+  const getPaidStatus = () => {
+    if (!lastPaid || !latestTransaction) return null;
+    // If manually marked as cleaned, show SUDAH DIBERSIHKAN
+    if (latestTransaction.cleanedAt && latestTransaction.cleanedAt > 0) {
+      return 'SUDAH DIBERSIHKAN';
+    }
+    // Otherwise use time-based logic
+    if (timeSincePaid < CLEANING_THRESHOLD) return 'BERSIHKAN';
+    if (timeSincePaid < CLEANED_THRESHOLD) return 'SUDAH DIBERSIHKAN';
+    return null; // Return to ONLINE after > 60 min
+  };
+  const paidStatus = getPaidStatus();
+  
+  // Handle manual cleaning - mark room as cleaned
+  const handleMarkCleaned = async () => {
+    // Define room keys for this component
+    const roomKey = roomBilling.roomId.toLowerCase();
+    const roomNameKey = roomBilling.roomName.toLowerCase();
+    
+    // Get fresh transaction from store to ensure we have the latest
+    const allTx = useTransactionStore.getState().transactions;
+    const roomTx = allTx.filter(t => 
+      t.roomId.toLowerCase() === roomKey || t.roomName.toLowerCase() === roomNameKey
+    );
+    const txToClean = roomTx[0];
+    
+    console.log('[RoomCard] handleMarkCleaned called', { roomKey, txToClean });
+    
+    if (!txToClean || !txToClean.id) {
+      console.error('[RoomCard] No transaction found to mark as cleaned');
+      return;
+    }
+    
+    const cleanedAt = Date.now();
+    const updatedData = {
+      ...txToClean,
+      cleanedAt
+    };
+    
+    console.log('[RoomCard] Marking transaction as cleaned:', txToClean.id, cleanedAt);
+    
+    // Show loading
+    setGlobalLoading(true, 'cleaning');
+    
+    try {
+      // Update local store
+      useTransactionStore.getState().updateTransaction(txToClean.id, { cleanedAt });
+      // Send to server
+      multiSocketService.updateTransaction(updatedData);
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+  
+  // Determine status priority: OFFLINE > AKTIF > UNPAID > BERSIHKAN (0-30 min) > SUDAH DIBERSIHKAN (30-60 min) > ONLINE (>60 min)
+  const getStatusInfo = () => {
+    if (!roomBilling.isConnected) {
+      return { label: 'OFFLINE', color: 'red', borderColor: 'border-l-red-500', iconColor: 'text-red-400 bg-red-500/20', badgeColor: 'bg-red-500/20 text-red-400' };
+    }
+    if (roomBilling.isActive) {
+      return { label: 'AKTIF', color: 'blue', borderColor: 'border-l-blue-500', iconColor: 'text-blue-400 bg-blue-500/20', badgeColor: 'bg-blue-500/20 text-blue-400' };
+    }
+    if (hasUnpaid) {
+      return { label: 'UNPAID', color: 'orange', borderColor: 'border-l-orange-500', iconColor: 'text-orange-400 bg-orange-500/20', badgeColor: 'bg-orange-500/20 text-orange-400' };
+    }
+    // After payment: BERSIHKAN (0-30 min) → SUDAH DIBERSIHKAN (30-60 min) → ONLINE (>60 min)
+    if (paidStatus === 'BERSIHKAN') {
+      return { label: 'BERSIHKAN', color: 'yellow', borderColor: 'border-l-yellow-500', iconColor: 'text-yellow-400 bg-yellow-500/20', badgeColor: 'bg-yellow-500/20 text-yellow-400' };
+    }
+    if (paidStatus === 'SUDAH DIBERSIHKAN') {
+      return { label: 'SUDAH DIBERSIHKAN', color: 'cyan', borderColor: 'border-l-cyan-500', iconColor: 'text-cyan-400 bg-cyan-500/20', badgeColor: 'bg-cyan-500/20 text-cyan-400' };
+    }
+    return { label: 'ONLINE', color: 'gray', borderColor: 'border-l-gray-500', iconColor: 'text-gray-400 bg-gray-500/20', badgeColor: 'bg-gray-500/20 text-gray-400' };
+  };
+  
+  const statusInfo = getStatusInfo();
+  const borderColor = statusInfo.borderColor;
+  const iconColor = statusInfo.iconColor;
+  const badgeColor = statusInfo.badgeColor;
+  const badgeText = statusInfo.label;
   
   return (
     <div className={`bg-[#1a1a2e] rounded-lg border-l-4 flex flex-col ${borderColor} ${isLocked ? 'opacity-60' : ''} hover:brightness-110 transition-all`}>
@@ -245,11 +349,16 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
           {billingConfig.enabled && roomBilling.isConnected && (
             <button 
               onClick={handleToggleActive} 
-              disabled={isLoading}
-              className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={isLoading || (!roomBilling.isActive && (hasUnpaid || paidStatus === 'BERSIHKAN'))}
+              className={`w-6 h-6 flex items-center justify-center rounded ${roomBilling.isActive ? 'bg-red-500/20 text-red-400' : hasUnpaid ? 'bg-orange-500/20 text-orange-400' : paidStatus === 'BERSIHKAN' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'} ${isLoading || (!roomBilling.isActive && (hasUnpaid || paidStatus === 'BERSIHKAN')) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={!roomBilling.isActive && hasUnpaid ? 'Ada transaksi belum lunas' : !roomBilling.isActive && paidStatus === 'BERSIHKAN' ? 'Ruangan dalam proses pembersihan' : roomBilling.isActive ? 'Matikan' : 'Nyalakan'}
             >
               {roomBilling.isActive ? (
                 <PowerOff className="w-3.5 h-3.5" />
+              ) : hasUnpaid ? (
+                <span className="text-xs">!</span>
+              ) : paidStatus === 'BERSIHKAN' ? (
+                <span className="text-xs">🧹</span>
               ) : (
                 <Power className="w-3.5 h-3.5" />
               )}
@@ -268,6 +377,22 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             <p className="text-[9px] text-gray-500 uppercase">Tagihan</p>
             <p className="text-sm font-bold text-yellow-400">{formatPrice(currentPrice)}</p>
           </div>
+        )}
+        {!isTimerBased && !roomBilling.isActive && hasUnpaid && latestTransaction && (
+          <div className="text-right">
+            <p className="text-[9px] text-gray-500 uppercase">Tertunda</p>
+            <p className="text-sm font-bold text-orange-400">{formatPrice(latestTransaction.totalPrice)}</p>
+          </div>
+        )}
+        {/* Manual cleaning button - only show for BERSIHKAN status */}
+        {!roomBilling.isActive && paidStatus === 'BERSIHKAN' && (
+          <button
+            onClick={handleMarkCleaned}
+            className="text-[9px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded hover:bg-yellow-500/30"
+            title="Tandai ruangan sudah dibersihkan"
+          >
+            ✓ Sudah Bersih
+          </button>
         )}
       </div>
       

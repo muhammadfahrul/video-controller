@@ -6,9 +6,11 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 
 - **Monitoring Ruangan**: Menampilkan semua ruangan karaoke yang terhubung
 - **Billing Otomatis**: Menghitung biaya berdasarkan durasi penggunaan dan harga per jam per ruangan
+- **Status Ruangan**: Menampilkan status real-time ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Status Real-time**: Menampilkan status pemutaran video (playing/paused/idle)
 - **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
 - **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`)
+- **Full Page Loading**: Setiap proses menampilkan loading screen dengan estimasi waktu
 
 ## Cara Menjalankan
 
@@ -56,6 +58,13 @@ VITE_ROOMS=[{"name":"Room 1","ip":"192.168.1.10","port":53331,"pricePerHour":500
 
 Aplikasi ini terhubung ke server yang berjalan di port `53331` secara default.
 
+## Dashboard Statistik
+
+Halaman utama menampilkan statistik:
+- **Ruangan**: Total ruangan yang dikonfigurasi
+- **Aktif**: Jumlah ruangan yang sedang digunakan
+- **Online**: Jumlah ruangan yang terhubung ke server
+
 ## Struktur Project
 
 ```
@@ -93,3 +102,24 @@ python -m http.server 8080
 - Cashier connect ke server di `localhost:53331` (development) atau IP server (production)
 - Server broadcast `agents:update` ke semua client yang terhubung
 - Setiap ruangan menampilkan status: Aktif/Non-aktif, Sedang Memutar/Jeda/Idle, dan biaya
+
+## Status Ruangan
+
+| Status | Deskripsi |
+|--------|-----------|
+| OFFLINE | Ruangan tidak terhubung ke server |
+| AKTIF | Ruangan sedang digunakan |
+| UNPAID | Transaksi belum lunas (belum dibayar) |
+| PAID | Transaksi sudah lunas, belum memasuki fase pembersihan |
+| BERSIHKAN | Transaksi sudah lunas, memasuki fase pembersihan (3 menit) |
+| SUDAH DIBERSIHKAN | Fase pembersihan selesai, ruangan siap digunakan |
+| ONLINE | Ruangan terhubung tapi tidak aktif |
+
+### Transisi Status Otomatis
+- **PAID → BERSIHKAN**: Secara otomatis setelah 3 menit
+- **BERSIHKAN → SUDAH DIBERSIHKAN**: Secara otomatis setelah 1 menit
+- **SUDAH DIBERSIHKAN → ONLINE**: Ruangan siap diaktifkan kembali
+
+### Fitur Cleaning Manual
+- Tombol "Sudah Bersih" untuk mempercepat transisi dari BERSIHKAN ke SUDAH DIBERSIHKAN
+- Ruangan dengan status BERSIHKAN tidak bisa diaktifkan
