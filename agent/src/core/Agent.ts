@@ -48,6 +48,7 @@ import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandle
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { SkipAdHandler } from "../commands/handlers/SkipAdHandler";
+import { AtmosphereHandler } from "../commands/handlers/AtmosphereHandler";
 import { RepeatMode } from "../playlist/RepeatMode";
 import { PlaylistRepository } from "../repositories/PlaylistRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
@@ -310,8 +311,7 @@ export class Agent {
 
         this.registerCommands();
 
-        this.socketClient!.connect();
-
+        // NOTE: connect() already called at the top of start() — do NOT call again
         this.heartbeat =
             new HeartbeatService(
                 this.socketClient!
@@ -320,10 +320,6 @@ export class Agent {
         this.heartbeat.start();
 
         this.startPlayerStateSync();
-
-        this.sendCurrentPlaylist();
-
-        this.startPlaylistSync();
 
         this.startAutoSkipAds();
 
@@ -391,11 +387,7 @@ export class Agent {
     private registerCommands() {
 
         if (!this.player) {
-
-            throw new Error(
-                "Player not initialized."
-            );
-
+            throw new Error("Player not initialized.");
         }
 
         this.commandDispatcher.register(
@@ -551,6 +543,13 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.SKIP_AD,
             new SkipAdHandler(
+                this.player!
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.ATMOSPHERE,
+            new AtmosphereHandler(
                 this.player!
             )
         );
@@ -762,47 +761,7 @@ export class Agent {
     }
 
 
-    private startPlaylistSync() {
-
-        this.playlistStateTimer =
-
-            setInterval(
-
-                () => {
-
-                    const snapshot =
-
-                        this.playlist.getSnapshot();
-
-                    this.socketClient
-
-                        ?.sendPlaylistState(
-
-                            snapshot
-
-                        );
-
-                },
-
-                1000
-
-            );
-
-    }
-
-    private sendCurrentPlaylist() {
-
-        if (!this.socketClient) {
-
-            return;
-
-        }
-
-        this.socketClient.sendPlaylistState(
-
-            this.playlist.getSnapshot()
-
-        );
-
-    }
+    // startPlaylistSync() and sendCurrentPlaylist() removed:
+    // Playlist snapshot is already sent every second inside startPlayerStateSync()
+    // via sendPlayerState({ player, playlist }). Sending it again here is redundant.
 }

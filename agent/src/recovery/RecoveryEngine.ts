@@ -93,70 +93,47 @@ export class RecoveryEngine {
 
             await this.captureSnapshot();
 
-            switch(action){
+            switch (action) {
 
-                        case RecoveryAction.RELOAD_PAGE:
+                case RecoveryAction.RELOAD_PAGE:
+                    await this.reloadPage();
+                    await this.restoreVideo();
+                    await this.restorePosition();
+                    await this.restoreSettings();
+                    await this.context.browser.getPage().waitForTimeout(300);
+                    await this.restorePlayback();
+                    break; // Fix #2: was missing break — caused fall-through to default every time
 
-                            await this.reloadPage();
+                default:
+                    LoggerService.warn("Unknown recovery action: " + action);
+                    break;
+            }
 
-                            await this.restoreVideo();
-
-                            await this.restorePosition();
-
-                            await this.restoreSettings();
-
-                            await this.context.browser.getPage().waitForTimeout(300);
-
-                            await this.restorePlayback();
-
-                        default:
-
-                            LoggerService.warn(
-
-                                "Unknown recovery"
-
-                            );
-
-                            break;
-
-                    }
-
-            LoggerService.info(
-
-                `[RECOVERY] Finished ${action}`
-
-            );
-
-            LoggerService.info(
-
-                `[RECOVERY] Finished in ${
-                    performance.now()-started
-                } ms`
-
-            );
+            LoggerService.info(`[RECOVERY] Finished ${action}`);
+            LoggerService.info(`[RECOVERY] Finished in ${performance.now() - started} ms`);
 
             return {
-
                 action,
-
                 success: true,
-
-                timestamp: Date.now()
-
+                timestamp: Date.now(),
             };
-        }
 
-        finally {
+        } catch (err) {
 
-            this.snapshot.state =
+            // Fix #4: error log belongs here in catch, not in finally (was always logged even on success)
+            LoggerService.error(`[RECOVERY] Failed ${action}: ${err}`);
 
-                RecoveryState.IDLE;
+            return {
+                action,
+                success: false,
+                timestamp: Date.now(),
+            };
 
-            LoggerService.error(
+        } finally {
 
-                `[RECOVERY] Failed ${action}`
-
-            );
+            // Fix #3: this.recovering was set to true but never reset, blocking future recoveries
+            this.recovering = false;
+            this.snapshot.state = RecoveryState.IDLE;
 
         }
 

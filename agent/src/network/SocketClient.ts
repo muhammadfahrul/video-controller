@@ -61,7 +61,7 @@ export class SocketClient {
 
 
 
-    connect(){
+    connect() {
 
         this.socket =
             io(
@@ -75,21 +75,13 @@ export class SocketClient {
                 }
             );
 
-        // Set up activation listener AFTER socket is created
+        // Set up activation & clear-data listeners AFTER socket is created
         this.setupActivationListener();
-
-
 
         this.socket.on(
             "connect",
-            ()=>{
-
-
-                console.log(
-                    "Connected to server"
-                );
-
-
+            () => {
+                console.log("[SOCKET] Connected to server");
                 // Register immediately after connection
                 this.register();
 
@@ -105,41 +97,36 @@ export class SocketClient {
                     }
                 });
 
-
             }
         );
 
-
+        // Fix #15: Re-register agent automatically on reconnect
+        this.socket.on(
+            "reconnect",
+            () => {
+                console.log("[SOCKET] Reconnected, re-registering agent...");
+                this.register();
+            }
+        );
 
         this.socket.on(
             "command",
             async (command) => {
 
-                console.log("Received command", command);
-
                 // Check if room is activated before processing any command
                 if (!this.identity.isActive) {
-                    console.log("Room is not active yet. Waiting for cashier activation.");
+                    console.log("[SOCKET] Room not active yet, ignoring command.");
                     return;
                 }
 
-                console.log("Router:", this.commandRouter);
-
                 try {
-
                     await this.commandRouter?.handle(command);
-
-                    console.log("Command finished");
-
                 } catch (err) {
-
-                    console.error("Command error", err);
-
+                    console.error("[SOCKET] Command error", err);
                 }
 
             }
         );
-
 
     }
 
@@ -161,17 +148,15 @@ export class SocketClient {
     private activationResolve?: (isActive: boolean) => void;
     // Track if activation was already handled by setupActivationListener
     private activationHandled = false;
-    
+
     // Promise that resolves when room is activated
     public waitForActivation(): Promise<boolean> {
         return new Promise((resolve) => {
-            // If already active, resolve immediately
             if (this.identity.isActive) {
-                console.log("[SOCKET] Already active, resolving immediately");
                 resolve(true);
                 return;
             }
-            
+
             // Check if setupActivationListener already handled activation
             // (handles race between register() and activation event)
             if (this.identity.isActive) {
@@ -179,25 +164,25 @@ export class SocketClient {
                 resolve(true);
                 return;
             }
-            
+
             // Store the resolve function
             this.activationResolve = resolve;
-            
+
             console.log("[SOCKET] Waiting for activation event...");
-            
+
             // Set up a one-time listener for the activation event
             const onActivation = (data: { isActive: boolean }) => {
                 console.log("[SOCKET] Received activation event:", data);
                 this.identity.isActive = data.isActive;
-                
+
                 // Clean up this listener
                 this.socket?.off("agent:activation", onActivation);
-                
+
                 resolve(data.isActive);
             };
-            
+
             this.socket?.on("agent:activation", onActivation);
-            
+
             // Double-check after a small delay in case event arrived while setting up
             setTimeout(() => {
                 if (this.identity.isActive && !this.activationHandled) {
@@ -466,23 +451,12 @@ export class SocketClient {
     public sendPlayerState(
         state: AgentSnapshot
     ): void {
-
-        console.log(
-
-            "[Agent Snapshot]",
-
-            state
-
-        );
-
+        // Fix #10: removed console.log here — this is called every 1 second
+        // and flooding the console with snapshot data severely hurts performance.
         this.socket?.emit(
-
             SocketEvents.PLAYER_STATE,
-
             state
-
         );
-
     }
 
 

@@ -47,3 +47,5 @@ export * from "./handlers/PlayPlaylistItemHandler";
 export * from "./handlers/ShufflePlaylistHandler";
 
 export * from "./handlers/RepeatModeHandler";
+
+export * from "./handlers/AtmosphereHandler";

@@ -638,7 +638,7 @@ export class PlayerService {
     public async showStartImage(): Promise<void> {
         const dataPath = path.join(process.cwd(), "data");
         const startImagePath = path.join(dataPath, "start_image.html");
-        
+
         await this.showImage(startImagePath);
     }
 
@@ -649,7 +649,7 @@ export class PlayerService {
     public async showExpiredImage(): Promise<void> {
         const dataPath = path.join(process.cwd(), "data");
         const expiredImagePath = path.join(dataPath, "expired_image.html");
-        
+
         await this.showImage(expiredImagePath);
     }
 
@@ -665,8 +665,12 @@ export class PlayerService {
 
         // Convert to file:// URL
         const fileUrl = `file://${imagePath}`;
-        
+
         await this.player.goto(fileUrl);
         console.log(`[PlayerService] Displayed image: ${imagePath}`);
+    }
+
+    public async triggerAtmosphere(): Promise<void> {
+        await this.player.triggerAtmosphere();
     }
 }
