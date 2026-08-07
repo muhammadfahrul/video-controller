@@ -135,6 +135,26 @@ apply_env_config() {
                     rooms_json="[$rooms_json]"
                     echo "[INFO] Rooms JSON dibungkus otomatis jadi array: $rooms_json"
                 fi
+                # Kadang orang paste beberapa array terpisah alih-alih satu array
+                # berisi banyak object (mis. "[{...}] [{...}]" bukan "[{...},{...}]")
+                # - hasilnya JSON invalid dan cashier diam-diam nampilin 0 room.
+                # Gabungin jadi satu array yang valid.
+                if [[ "$rooms_json" == *"]"*"["* ]]; then
+                    merged="${rooms_json//] [/,}"
+                    merged="${merged//][/,}"
+                    if [[ "$merged" != "$rooms_json" ]]; then
+                        echo "[INFO] Terdeteksi beberapa array terpisah, digabung otomatis jadi satu array valid"
+                        rooms_json="$merged"
+                    fi
+                fi
+                # Validasi JSON kalau node udah ada (best-effort - node mungkin belum
+                # terinstall di titik ini pas fresh install)
+                if command -v node &> /dev/null; then
+                    if ! node -e "JSON.parse(process.argv[1])" "$rooms_json" 2>/dev/null; then
+                        echo "[WARN] Rooms JSON kelihatannya tidak valid, tapi tetap ditulis apa adanya: $rooms_json"
+                        echo "[WARN] Cek ulang cashier/.env manual kalau room gak muncul di aplikasi."
+                    fi
+                fi
                 sed -i "s|VITE_ROOMS=.*|VITE_ROOMS=$rooms_json|" "$cashier_env"
             fi
             if [[ -n "$billing_enabled" ]]; then
@@ -429,6 +449,59 @@ fi
 if [ "$HAS_PROJECT_FILES" = false ]; then
     echo "❌ Cannot get project files!"
     exit 1
+fi
+
+# ============================================
+# Ensure .env exists for every relevant app (copy from .env.example if missing)
+# ============================================
+# Without this, a fresh checkout with no pre-existing .env files silently gets
+# NO configuration at all (ROOM_ID, SERVER_IP, VC_SHARED_SECRET etc. all fall back
+# to code defaults / empty string) - the server fails closed on an empty shared
+# secret, so every socket connection gets refused with no obvious reason why.
+ensure_env_file() {
+    local dir="$1"
+    local env_file="$dir/.env"
+    local example_file="$dir/.env.example"
+
+    if [[ -f "$env_file" ]]; then
+        return
+    fi
+
+    if [[ -f "$example_file" ]]; then
+        cp "$example_file" "$env_file"
+        echo "[INFO] Dibuat $env_file dari .env.example (belum ada sebelumnya)"
+    else
+        echo "[WARN] $example_file tidak ditemukan, tidak bisa buat $env_file"
+    fi
+}
+
+if [[ "$INSTALL_MODE" == "room" || "$INSTALL_MODE" == "all" || "$INSTALL_MODE" == autostart-room || "$INSTALL_MODE" == autostart-all ]]; then
+    ensure_env_file "$PROJECT_ROOT/agent"
+    ensure_env_file "$PROJECT_ROOT/server"
+    ensure_env_file "$PROJECT_ROOT/web"
+fi
+if [[ "$INSTALL_MODE" == "kasir" || "$INSTALL_MODE" == "all" || "$INSTALL_MODE" == autostart-kasir || "$INSTALL_MODE" == autostart-all ]]; then
+    ensure_env_file "$PROJECT_ROOT/cashier"
+fi
+
+# Warn (once, clearly) if the shared secret is still the placeholder or missing -
+# sockets will silently fail to connect otherwise. Real generation/distribution of
+# a matching secret across all apps is build.sh/build-release.sh's job (VC-5); this
+# is just making the gap visible instead of a confusing silent connection failure.
+PLACEHOLDER_SECRET="REPLACE_WITH_GENERATED_SECRET"
+NEEDS_SECRET_WARNING=false
+for f in "$PROJECT_ROOT/agent/.env" "$PROJECT_ROOT/server/.env" "$PROJECT_ROOT/web/.env" "$PROJECT_ROOT/cashier/.env"; do
+    if [[ -f "$f" ]] && grep -qE "SHARED_SECRET=($PLACEHOLDER_SECRET)?$" "$f"; then
+        NEEDS_SECRET_WARNING=true
+    fi
+done
+if [[ "$NEEDS_SECRET_WARNING" == true ]]; then
+    echo ""
+    echo "⚠️  VC_SHARED_SECRET/VITE_SHARED_SECRET belum diisi (masih placeholder/kosong) di satu atau lebih .env."
+    echo "   Semua koneksi socket akan DITOLAK server sampai ini diisi dengan nilai yang SAMA PERSIS"
+    echo "   di agent/.env, server/.env, web/.env, dan cashier/.env."
+    echo "   Jalankan ./build.sh (generate otomatis) atau isi manual dengan nilai acak yang sama di semua file."
+    echo ""
 fi
 
 # Prompt for .env configuration AFTER PROJECT_ROOT is set correctly
