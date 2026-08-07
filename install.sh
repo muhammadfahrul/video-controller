@@ -48,7 +48,7 @@ prompt_env_config() {
     
     # Kasir mode - only needs Rooms JSON
     if [[ "$mode" == "kasir" ]]; then
-        echo "Rooms JSON contoh: [{\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
         
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
@@ -56,7 +56,7 @@ prompt_env_config() {
     
     # All mode - needs everything
     if [[ "$mode" == "all" ]]; then
-        echo "Rooms JSON contoh: [{\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
         
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
