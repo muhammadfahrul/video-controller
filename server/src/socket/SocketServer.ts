@@ -23,6 +23,19 @@ import {
 } from "../services/DatabaseService";
 
 
+// RFC1918 private ranges + localhost + ZeroTier's default 172.2x/28.x/29.x-ish CGNAT-style
+// range (100.64.0.0/10, used by ZeroTier's "moon"/planet assigned addresses) - covers the
+// realistic LAN/VPN topologies this app is deployed on (see docs/02-TDD.md 5.2).
+const LOCAL_NETWORK_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+function isAllowedOrigin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    // Allow requests with no origin (e.g. server-to-server, some native socket.io clients)
+    if (!origin || LOCAL_NETWORK_ORIGIN_PATTERN.test(origin)) {
+        callback(null, true);
+        return;
+    }
+    callback(new Error(`[SOCKET SERVER] CORS: origin not allowed: ${origin}`));
+}
 
 export class SocketServer {
 
@@ -38,6 +51,9 @@ export class SocketServer {
 
 
     private readonly database: DatabaseService;
+
+
+    private readonly sharedSecret: string | undefined;
 
 
     // Track activated rooms - persists even after agent disconnects
@@ -66,17 +82,44 @@ export class SocketServer {
         // Initialize database if not provided
         this.database = database || new DatabaseService();
 
+        this.sharedSecret = process.env.VC_SHARED_SECRET || undefined;
+
+        if (!this.sharedSecret) {
+            console.warn(
+                "[SOCKET SERVER] VC_SHARED_SECRET is not set - refusing ALL socket connections until it is configured. " +
+                "See .env.example."
+            );
+        }
+
         this.io =
             new Server(
                 server,
                 {
 
                     cors:{
-                        origin:"*"
+                        origin: isAllowedOrigin
                     }
 
                 }
             );
+
+        // Reject the connection handshake itself if the token is missing/wrong -
+        // this runs before "connection" fires, so it protects every event
+        // (agent:register, player:command, cashier events, etc) uniformly instead
+        // of having to gate each event handler individually.
+        this.io.use((socket, next) => {
+            const token = socket.handshake.auth?.token;
+
+            if (!this.sharedSecret || token !== this.sharedSecret) {
+                console.warn(
+                    `[SOCKET SERVER] Rejected connection from ${socket.handshake.address}: invalid or missing token`
+                );
+                next(new Error("Unauthorized: invalid or missing token"));
+                return;
+            }
+
+            next();
+        });
 
         this.setup();
 

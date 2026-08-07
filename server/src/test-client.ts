@@ -3,7 +3,12 @@ import { io } from "socket.io-client";
 
 const socket =
     io(
-        `http://localhost:${process.env.PORT || 3000}`
+        `http://localhost:${process.env.PORT || 3000}`,
+        {
+            auth: {
+                token: process.env.VC_SHARED_SECRET
+            }
+        }
     );
 
 
