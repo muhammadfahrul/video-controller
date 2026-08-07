@@ -5,9 +5,13 @@ node_modules/
 dist/
 
 # Environment files
-# .env
-# .env.local
-# .env.*.local
+.env
+.env.local
+.env.*.local
+
+# Release build output - contains a generated VC_SHARED_SECRET, never commit
+release-package/
+RELEASE_SECRET.txt
 
 # Logs
 *.log
