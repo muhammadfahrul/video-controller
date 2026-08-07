@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import { getServerUrl } from '../utils/getServerUrl';
 import type { AgentInfo, PlayerState } from '../types';
+import { securityConfig } from '../config/security';
 
 type AgentUpdateCallback = (agents: AgentInfo[]) => void;
 
@@ -24,6 +25,9 @@ class SocketService {
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
       timeout: 10000,
+      auth: {
+        token: securityConfig.sharedSecret,
+      },
     });
 
     this.socket.on('connect', () => {

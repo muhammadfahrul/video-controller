@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
 import { useTransactionStore } from '../store/useTransactionStore';
+import { securityConfig } from '../config/security';
 
 // Helper to format duration in seconds to human readable
 function formatDuration(seconds: number): string {
@@ -48,6 +49,13 @@ class MultiSocketService {
       reconnectionAttempts: this.maxReconnectAttempts,
       reconnectionDelay: 1000,
       timeout: 10000,
+      auth: {
+        token: securityConfig.sharedSecret,
+      },
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('[MultiSocket] Connection to', config.name, 'rejected:', err.message);
     });
 
     const connection: RoomConnection = {
