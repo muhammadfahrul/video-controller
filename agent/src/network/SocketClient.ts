@@ -48,7 +48,8 @@ export class SocketClient {
         private readonly identity: AgentIdentity,
         commandRouter: CommandRouter,
         playerRepository?: PlayerRepository,
-        playlistRepository?: PlaylistRepository
+        playlistRepository?: PlaylistRepository,
+        private readonly sharedSecret?: string
     ) {
 
         this.commandRouter = commandRouter;
@@ -71,12 +72,25 @@ export class SocketClient {
                     reconnection: true,
                     reconnectionAttempts: 10,
                     reconnectionDelay: 1000,
-                    timeout: 10000
+                    timeout: 10000,
+                    auth: {
+                        token: this.sharedSecret
+                    }
                 }
             );
 
         // Set up activation & clear-data listeners AFTER socket is created
         this.setupActivationListener();
+
+        this.socket.on(
+            "connect_error",
+            (err) => {
+                console.error(
+                    "[SOCKET] Connection rejected by server:",
+                    err.message
+                );
+            }
+        );
 
         this.socket.on(
             "connect",

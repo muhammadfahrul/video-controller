@@ -149,7 +149,8 @@ export class Agent {
                 this.identity,
                 this.commandRouter,
                 this.playerRepository,
-                this.playlist.getRepository()
+                this.playlist.getRepository(),
+                config.security.sharedSecret
             );
 
         // Set agent reference in socket client for sync control

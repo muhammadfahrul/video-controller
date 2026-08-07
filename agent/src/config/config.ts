@@ -54,6 +54,12 @@ export interface AppConfig {
 
     };
 
+    security: {
+
+        sharedSecret: string;
+
+    };
+
 }
 
 // Helper to parse || delimiter-separated string to array
@@ -88,5 +94,8 @@ export const config: AppConfig = {
     },
     logging: {
         level: process.env.LOG_LEVEL || 'info'
+    },
+    security: {
+        sharedSecret: process.env.VC_SHARED_SECRET || ''
     }
 };

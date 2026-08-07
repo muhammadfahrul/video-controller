@@ -8,6 +8,24 @@ export class ConfigValidator {
 
         this.validateBrowser(config as any);
 
+        this.validateSecurity(config as any);
+
+    }
+
+    private static validateSecurity(
+
+        config: { security: { sharedSecret: string } }
+
+    ) {
+
+        if (!config.security.sharedSecret) {
+
+            throw new Error(
+                "VC_SHARED_SECRET is not set in agent/.env - the agent cannot register with the server without it. See .env.example."
+            );
+
+        }
+
     }
 
     private static validateBrowser(

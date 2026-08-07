@@ -58,6 +58,12 @@ export interface AppConfig {
 
     };
 
+    security: {
+
+        sharedSecret: string;
+
+    };
+
 }
 
 export class ConfigService {
