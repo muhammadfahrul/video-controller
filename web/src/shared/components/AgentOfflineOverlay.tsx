@@ -1,5 +1,5 @@
-import { WifiOff, Lock, Settings } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { WifiOff, Lock } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { useAppStore } from "../../store/appStore";
 
 export default function AgentOfflineOverlay() {
@@ -46,14 +46,6 @@ export default function AgentOfflineOverlay() {
           Ruangan: <span className="text-white">{agent.name || 'Belum tersedia'}</span>
         </p>
       </div>
-
-      <Link
-        to="/settings"
-        className="mt-4 flex items-center gap-2 rounded-xl bg-teal-300 px-5 py-2.5 text-sm font-semibold text-slate-950 shadow-lg shadow-teal-400/20 hover:bg-teal-200 active:scale-95 transition"
-      >
-        <Settings size={17} />
-        Buka Info Perangkat
-      </Link>
     </div>
   );
 }
