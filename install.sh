@@ -129,6 +129,12 @@ apply_env_config() {
         local cashier_env="$PROJECT_ROOT/cashier/.env"
         if [[ -f "$cashier_env" ]]; then
             if [[ -n "$rooms_json" ]]; then
+                # VITE_ROOMS harus array (dibungkus []), tapi orang sering ngetik objeknya
+                # doang - auto-wrap biar gak silently jadi "0 room" pas dibuka.
+                if [[ "$rooms_json" != \[* ]]; then
+                    rooms_json="[$rooms_json]"
+                    echo "[INFO] Rooms JSON dibungkus otomatis jadi array: $rooms_json"
+                fi
                 sed -i "s|VITE_ROOMS=.*|VITE_ROOMS=$rooms_json|" "$cashier_env"
             fi
             if [[ -n "$billing_enabled" ]]; then
