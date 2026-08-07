@@ -35,8 +35,16 @@ export class SocketService {
 
         this.socket = io(env.apiUrl, {
 
-            transports: ["websocket"]
+            transports: ["websocket"],
 
+            auth: {
+                token: env.sharedSecret
+            }
+
+        });
+
+        this.socket.on("connect_error", (err) => {
+            console.error("[Socket] Connection rejected by server:", err.message);
         });
 
         this.socket.on("connect", () => {
