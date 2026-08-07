@@ -42,7 +42,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     setHasNavigated(true);
     setTransactionLoading(true, 'loading');
-    setRoomLoading(true, 'loading');
+  setRoomLoading(true, 'loading')
   }, [setTransactionLoading, setRoomLoading]);
   
   // Clear global loading when transactions are loaded from server
@@ -88,7 +88,7 @@ export default function TransactionsPage() {
     setRoomLoading(true, 'clearing' as const);
     try {
       clearTransactions();
-      multiSocketService.clearTransactions(() => {
+      multiSocketService.clearTransactions(undefined, () => {
         setTransactionLoading(false);
         setRoomLoading(false);
       });

@@ -40,10 +40,10 @@ function formatDuration(seconds: number): string {
 }
 
 export function TransactionModal({ roomId, roomName, onClose }: TransactionModalProps) {
-  const { 
+  const {
     transactions: allTransactions,
-    removeTransaction, 
-    clearTransactions
+    removeTransaction,
+    clearTransactionsForRoom
   } = useTransactionStore();
   
   const setGlobalLoading = useRoomStore((state) => state.setLoading);
@@ -131,6 +131,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
           paidAt: Date.now()
         };
         // Update local store
+        //useTransactionStore.getState().updateTransaction(currentUnpaid.id);
         useTransactionStore.getState().updateTransaction(currentUnpaid.id, updatedData);
         // Send to server to persist
         multiSocketService.updateTransaction(updatedData);
@@ -153,8 +154,8 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   const handleClearTransactions = () => {
     if (!confirm('Hapus semua riwayat transaksi?')) return;
     setGlobalLoading(true, 'clearing');
-    clearTransactions();
-    multiSocketService.clearTransactions();
+    clearTransactionsForRoom(roomId, roomName);
+    multiSocketService.clearTransactions(roomId);
     setTimeout(() => setGlobalLoading(false), 500);
   };
   

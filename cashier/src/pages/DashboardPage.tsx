@@ -5,7 +5,7 @@ import { RoomCard } from '../components/RoomCard';
 import { Tv, TrendingUp, Wifi, WifiOff, Server, CircleDot } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { roomConfigs, connectionStatus, setRoomConnected, setLoading: setRoomLoading } = useRoomStore();
+  const { roomConfigs, connectionStatus, isLoading: roomIsLoading, setRoomConnected, setLoading: setRoomLoading } = useRoomStore();
   const [roomBillings, setRoomBillings] = useState<Map<string, any>>(new Map());
   const [hasNavigated, setHasNavigated] = useState(false);
   
@@ -65,8 +65,9 @@ export default function DashboardPage() {
   const connectedCount = Array.from(statusMap.values()).filter(Boolean).length;
   const totalCount = roomConfigs.length;
   
-  // Check if any connection is currently in progress
-  const isAnyConnecting = Array.from(statusMap.values()).some(v => v === null);
+  // Check if any connection is currently in progress (statusMap only ever holds
+  // true/false, so use the store's initial-connect loading flag as the "connecting" signal)
+  const isAnyConnecting = roomIsLoading;
   const connectionStatusDisplay = totalCount === 0 
     ? 'disconnected' 
     : connectedCount === totalCount 

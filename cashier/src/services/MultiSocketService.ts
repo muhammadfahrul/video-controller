@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
+import type { AgentInfo, PlayerState, RoomConfig, RoomBilling, Transaction } from '../types';
 import { useTransactionStore } from '../store/useTransactionStore';
 import { securityConfig } from '../config/security';
 
@@ -142,7 +142,7 @@ class MultiSocketService {
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
-    
+
     let connection: RoomConnection | undefined;
     
     // Find connection by matching roomId (from agent) or config.id
@@ -156,11 +156,13 @@ class MultiSocketService {
     
     if (!connection) {
       console.error('[MultiSocket] Cannot find connection for room:', roomId);
+      onComplete?.();
       return;
     }
-    
+
     if (!connection.socket.connected) {
       console.error('[MultiSocket] Cannot activate room - not connected:', roomId);
+      onComplete?.();
       return;
     }
 
@@ -220,11 +222,13 @@ class MultiSocketService {
     
     if (!connection) {
       console.error('[MultiSocket] Cannot find connection for room:', roomId);
+      onComplete?.();
       return;
     }
-    
+
     if (!connection.socket.connected) {
       console.error('[MultiSocket] Cannot deactivate room - not connected:', roomId);
+      onComplete?.();
       return;
     }
 
@@ -258,65 +262,100 @@ class MultiSocketService {
   }
 
   // Save transaction to server
-  private saveTransactionToServer(socket: Socket, transaction: any): void {
-    const transactionWithId = {
-      ...transaction,
-      id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
-    };
-    socket.emit('transaction:save', transactionWithId);
+  private saveTransactionToServer(socket: Socket, transaction: Transaction): void {
+    socket.emit('transaction:save', transaction);
   }
 
   // Load transactions from server for a specific room
   loadTransactions(roomId: string): void {
-    const connection = this.connections.get(roomId);
+    let connection: RoomConnection | undefined;
+    for (const conn of this.connections.values()) {
+      if (conn.agents[0]?.roomId === roomId || conn.config.id === roomId) {
+        connection = conn;
+        break;
+      }
+    }
+
     if (connection && connection.socket.connected) {
       console.log('[MultiSocket] Requesting transactions for room:', roomId);
       connection.socket.emit('transaction:get');
     }
   }
 
-  // Update transaction on server (e.g., mark as paid)
-  updateTransaction(transaction: any): void {
-    // Send update to server - saveTransaction handles both insert and update
+  // Find the connection that owns a given roomId (matches agent.roomId or config.id)
+  private findConnectionForRoom(roomId: string | undefined): RoomConnection | undefined {
+    if (!roomId) return undefined;
     for (const conn of this.connections.values()) {
-      if (conn.socket.connected) {
-        conn.socket.emit('transaction:save', transaction);
+      if (conn.agents[0]?.roomId === roomId || conn.config.id === roomId) {
+        return conn;
       }
     }
+    return undefined;
   }
-  
-  // Delete transaction on server
-  deleteTransaction(transactionId: string, onComplete?: () => void): void {
-    const timeoutMs = 3000;
-    const timeoutId = setTimeout(() => {
-      onComplete?.();
-    }, timeoutMs);
-    
-    // Listen for transaction update from server
-    const handleTransactionUpdate = () => {
-      clearTimeout(timeoutId);
-      for (const conn of this.connections.values()) {
-        conn.socket.off('transaction:get', handleTransactionUpdate);
-      }
-      onComplete?.();
-    };
-    
-    for (const conn of this.connections.values()) {
-      if (conn.socket.connected) {
-        conn.socket.on('transaction:get', handleTransactionUpdate);
-        conn.socket.emit('transaction:delete', transactionId);
-      }
+
+  // Update transaction on server (e.g., mark as paid) - only the owning room's server, each room has its own DB
+  updateTransaction(transaction: any): void {
+    const connection = this.findConnectionForRoom(transaction?.roomId);
+    if (connection?.socket.connected) {
+      connection.socket.emit('transaction:save', transaction);
+    } else {
+      console.error('[MultiSocket] Cannot update transaction - room not connected:', transaction?.roomId);
     }
   }
 
-  // Clear all transactions on server
-  clearTransactions(onComplete?: () => void): void {
+  // Delete transaction on server - only from the owning room's server
+  deleteTransaction(transactionId: string, onComplete?: () => void): void {
+    const transaction = useTransactionStore.getState().transactions.find(t => t.id === transactionId);
+    const connection = this.findConnectionForRoom(transaction?.roomId);
+
+    if (!connection?.socket.connected) {
+      console.error('[MultiSocket] Cannot delete transaction - room not connected:', transaction?.roomId);
+      onComplete?.();
+      return;
+    }
+
     const timeoutMs = 3000;
     const timeoutId = setTimeout(() => {
       onComplete?.();
     }, timeoutMs);
-    
-    // Listen for transaction update from server
+
+    const handleTransactionUpdate = () => {
+      clearTimeout(timeoutId);
+      connection.socket.off('transaction:get', handleTransactionUpdate);
+      onComplete?.();
+    };
+
+    connection.socket.on('transaction:get', handleTransactionUpdate);
+    connection.socket.emit('transaction:delete', transactionId);
+  }
+
+  // Clear transactions on server. Pass roomId to clear only that room's history;
+  // omit it to clear every connected room's server (legacy "clear everything" behavior).
+  clearTransactions(roomId?: string, onComplete?: () => void): void {
+    const timeoutMs = 3000;
+    const timeoutId = setTimeout(() => {
+      onComplete?.();
+    }, timeoutMs);
+
+    if (roomId) {
+      const connection = this.findConnectionForRoom(roomId);
+      if (!connection?.socket.connected) {
+        clearTimeout(timeoutId);
+        console.error('[MultiSocket] Cannot clear transactions - room not connected:', roomId);
+        onComplete?.();
+        return;
+      }
+      const handleTransactionUpdate = () => {
+        clearTimeout(timeoutId);
+        connection.socket.off('transaction:get', handleTransactionUpdate);
+        onComplete?.();
+      };
+      connection.socket.on('transaction:get', handleTransactionUpdate);
+      connection.socket.emit('transaction:clear');
+      return;
+    }
+
+    // No roomId given: clear on every connected room server
     const handleTransactionUpdate = () => {
       clearTimeout(timeoutId);
       for (const conn of this.connections.values()) {
@@ -324,7 +363,7 @@ class MultiSocketService {
       }
       onComplete?.();
     };
-    
+
     for (const conn of this.connections.values()) {
       if (conn.socket.connected) {
         conn.socket.on('transaction:get', handleTransactionUpdate);
@@ -348,11 +387,13 @@ class MultiSocketService {
     
     if (!connection) {
       console.error('[MultiSocket] Cannot find connection for room:', roomId);
+      onComplete?.();
       return;
     }
-    
+
     if (!connection.socket.connected) {
       console.error('[MultiSocket] Cannot extend time - not connected:', roomId);
+      onComplete?.();
       return;
     }
 
@@ -388,7 +429,7 @@ class MultiSocketService {
       const agent = connection.agents[0]; // One agent per room server
       const roomId = agent?.roomId || connection.config.id;
       const billing = agent
-        ? this.agentToBilling(agent, connection.config)
+        ? this.agentToBilling(agent, connection.config, connection.socket.connected)
         : {
             roomId: connection.config.id,
             roomName: connection.config.name,
@@ -422,10 +463,17 @@ class MultiSocketService {
       socket.emit('transaction:get');
     });
 
-    // Listen for transactions from server
+// Listen for transactions from server. Each room has its own server/DB, so this
+// payload is only ever that one room's transactions - merge it into just that
+// room's slice of the store instead of replacing the whole store (which would
+// wipe out every other room's already-loaded transactions).
     socket.on('transaction:get', (transactions: any[]) => {
       console.log('[MultiSocket] Received transactions from server:', transactions.length);
-      useTransactionStore.getState().setTransactions(transactions);
+      // effectiveRoomId sekarang deterministik — ga lagi gantung ke transactions[0]?.roomId
+      // (yang bisa undefined pas array kosong, bikin key filter/replace di setTransactionsForRoom
+      // meleset dari key yang dipake pas nulis data pertama kali -> data numpuk ga pernah ke-replace)
+      const effectiveRoomId = connection.agents[0]?.roomId || config.id;
+      useTransactionStore.getState().setTransactionsForRoom(effectiveRoomId, transactions);
     });
 
     socket.on('disconnect', (reason) => {
@@ -678,21 +726,18 @@ class MultiSocketService {
         nowFormatted: new Date().toISOString(),
         timeDiff: data.expiresAt ? data.expiresAt - Date.now() : null
       });
-      
-      // Capture state BEFORE queuing for transaction recording
+
       const existingAgent = connection.agents[0];
       const wasActive = existingAgent?.isActive === true;
       const isNowInactive = data.isActive === false;
-      
-      // Record transaction BEFORE queue (to capture current state)
+
       if (existingAgent && wasActive && isNowInactive) {
         const agent = existingAgent as any;
         const pricePerHour = config.pricePerHour || 50000;
         const startTime = agent.startTime || 0;
-        // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
         const endTime = data.expiresAt || agent.expiresAt || Date.now();
         const durationSeconds = Math.floor((endTime - startTime) / 1000);
-        
+
         console.log('[MultiSocket] Transaction calculation:', {
           startTime,
           startTimeFormatted: startTime ? new Date(startTime).toISOString() : 'null',
@@ -704,9 +749,8 @@ class MultiSocketService {
           durationSeconds,
           durationFormatted: formatDuration(durationSeconds),
         });
-        // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
         const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
-        
+
         console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
           roomId: data.roomId,
           roomName: data.roomName || config.name,
@@ -721,9 +765,14 @@ class MultiSocketService {
           agentStartTime: agent.startTime,
           agentExpiresAt: agent.expiresAt,
         });
-        
+
         if (startTime > 0 && durationSeconds > 0) {
-          useTransactionStore.getState().addTransaction({
+          // Id di-generate SEKALI di sini, dipake bareng buat local optimistic add & server save.
+          // Match persis by id -> pas transaction:get balikin data dari server, setTransactionsForRoom
+          // replace row yang SAMA (bukan nambah row baru dengan id beda kayak sebelumnya).
+          const transactionId = crypto.randomUUID();
+          const transactionPayload = {
+            id: transactionId,
             roomId: data.roomId,
             roomName: data.roomName || config.name,
             customerName: agent.customerName,
@@ -736,73 +785,53 @@ class MultiSocketService {
             pricePerHour,
             totalPrice,
             paidAt: 0, // unpaid
-          });
-          
-          // Send transaction to server
-          this.saveTransactionToServer(socket, {
-            roomId: data.roomId,
-            roomName: data.roomName || config.name,
-            customerName: agent.customerName,
-            customerPhone: agent.customerPhone,
-            customerEmail: agent.customerEmail,
-            customerNote: agent.customerNote,
-            startTime,
-            endTime,
-            duration: durationSeconds,
-            pricePerHour,
-            totalPrice,
-            paidAt: 0, // unpaid
-          });
+          };
+
+          // Optimistic local add - langsung nongol di UI, realtime, ga nunggu round-trip
+          useTransactionStore.getState().addTransaction(transactionPayload);
+
+          // Persist ke server - id SAMA PERSIS sama yang barusan di-add lokal
+          this.saveTransactionToServer(socket, transactionPayload as Transaction);
         }
       }
-      
-      // Use queue for state update
+
       this.queueAgentUpdate(connection, (agent, existing) => {
         const merged = { ...agent, isActive: data.isActive };
         const existingData = existing as any;
-        
-        // Use later expiresAt (more time remaining) - authoritative source from server
+
         const currentExpiresAt = merged.expiresAt;
         const newExpiresAt = data.expiresAt ?? null;
         if (!currentExpiresAt || (newExpiresAt && newExpiresAt > currentExpiresAt)) {
           merged.expiresAt = newExpiresAt;
         }
-        
-        // Use the LATEST startTime when reactivating (new activation = new startTime)
-        // Only preserve old startTime if the room is still active (extending time scenario)
+
         if (data.isActive) {
           const existingIsActive = existingData?.isActive;
           if (existingIsActive) {
-            // Room was active before and still active - use earlier startTime (extending time)
             if (data.startTime && data.isActive) {
               if (!merged.startTime || data.startTime < merged.startTime) {
                 merged.startTime = data.startTime;
               }
             }
           } else {
-            // Room was inactive and now active - use NEW startTime from server (reactivation)
             if (data.startTime) {
               merged.startTime = data.startTime;
             }
           }
         }
-        
-        // Preserve existing customer info ONLY if room is still active (reactivation should clear old customer info)
+
         if (existingData && existingData.isActive) {
-          // Room was active before - preserve customer info for extending time scenario
           if (!data.customerName && existingData.customerName) merged.customerName = existingData.customerName;
           if (!data.customerPhone && existingData.customerPhone) merged.customerPhone = existingData.customerPhone;
           if (!data.customerEmail && existingData.customerEmail) merged.customerEmail = existingData.customerEmail;
           if (!data.customerNote && existingData.customerNote) merged.customerNote = existingData.customerNote;
         }
-        // If room was inactive and now active (reactivation), don't preserve old customer info
-        
-        // Override with new customer info if provided
+
         if (data.customerName) (merged as any).customerName = data.customerName;
         if (data.customerPhone) (merged as any).customerPhone = data.customerPhone;
         if (data.customerEmail) (merged as any).customerEmail = data.customerEmail;
         if (data.customerNote) (merged as any).customerNote = data.customerNote;
-        
+
         return merged;
       });
     });
@@ -822,7 +851,7 @@ class MultiSocketService {
     });
   }
 
-  private agentToBilling(agent: AgentInfo, config: RoomConfig): RoomBilling {
+  private agentToBilling(agent: AgentInfo, config: RoomConfig, isConnected: boolean): RoomBilling {
     const roomId = agent.roomId || config.id;
     const roomName = agent.roomName || config.name;
 
@@ -866,7 +895,7 @@ class MultiSocketService {
       pricePerHour,
       isActive: agent.isActive ?? false,
       expiresAt: agent.expiresAt ?? null,
-      isConnected: true, // Agent exists = connected
+      isConnected, // Reflects the actual current socket connection, not just "agent seen before"
       needsCleaning: agentAny.needsCleaning ?? false,
       lastTransactionEndTime: agentAny.lastTransactionEndTime,
       customerName: agentAny.customerName,
