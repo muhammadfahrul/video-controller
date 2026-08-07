@@ -34,9 +34,9 @@ export class BrowserManager {
 
     public async start(): Promise<void> {
 
-        if (this.isRunning()) {
+        if (this.state === BrowserState.RUNNING || this.state === BrowserState.STARTING) {
 
-            LoggerService.warn("Browser already running.");
+            LoggerService.warn("Browser already running or starting.");
 
             return;
 
@@ -86,6 +86,13 @@ export class BrowserManager {
 
         const browser =
             this.context.browser();
+
+        // `this.browser` was previously never assigned (the old `chromium.launch()`
+        // path that set it is commented out above in favor of launchWithStealth()),
+        // which made stop()'s `if (!this.browser) return` guard always true - stop()
+        // was silently a no-op, leaking the browser process/profile lock on every
+        // restart. getBrowser() throws when null, so keep this in sync.
+        this.browser = browser ?? null;
 
         if (browser) {
 
@@ -213,7 +220,7 @@ export class BrowserManager {
 
     public async stop(): Promise<void> {
 
-        if (!this.browser) {
+        if (!this.context) {
 
             return;
 
@@ -348,6 +355,13 @@ export class BrowserManager {
                     );
                     this.state =
                         BrowserState.ERROR;
+
+                    // Clear stale references so hasBrowser()/hasPage()/getPage() (used
+                    // by health checks) correctly report the crash instead of
+                    // continuing to point at a dead browser process.
+                    this.browser = null;
+                    this.context = null;
+                    this.page = null;
                 }
             );
         }

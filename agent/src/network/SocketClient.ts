@@ -96,6 +96,14 @@ export class SocketClient {
             "connect",
             () => {
                 console.log("[SOCKET] Connected to server");
+                // Reset local activation state on every (re)connect. The server only
+                // pushes a corrective "agent:activation" event when the room IS active
+                // (see server's AGENT_REGISTER handler) - if the room was deactivated
+                // while this agent was offline, no event arrives to correct a stale
+                // `true` left over from before the disconnect. Resetting to false here
+                // means we only trust activation once the server actually confirms it.
+                this.identity.isActive = false;
+
                 // Register immediately after connection
                 this.register();
 
@@ -114,14 +122,10 @@ export class SocketClient {
             }
         );
 
-        // Fix #15: Re-register agent automatically on reconnect
-        this.socket.on(
-            "reconnect",
-            () => {
-                console.log("[SOCKET] Reconnected, re-registering agent...");
-                this.register();
-            }
-        );
+        // NOTE: socket.io-client emits "reconnect" on the Manager (this.socket.io),
+        // not on the Socket instance - a handler registered here via this.socket.on(...)
+        // never fires. Re-registration on reconnect is already handled by the "connect"
+        // listener above, which socket.io-client fires on every reconnect too.
 
         this.socket.on(
             SocketEvents.COMMAND,
@@ -160,29 +164,27 @@ export class SocketClient {
 
 
     private activationResolve?: (isActive: boolean) => void;
-    // Track if activation was already handled by setupActivationListener
-    private activationHandled = false;
+    // Shared in-flight wait so repeated calls (Agent.start()'s single await, plus one
+    // fire-and-forget call per "connect"/reconnect for logging) reuse the same pending
+    // promise/listener instead of each registering its own "agent:activation" listener
+    // that's never cleaned up - that stacked up one extra listener per reconnect.
+    private activationWait?: Promise<boolean>;
 
     // Promise that resolves when room is activated
     public waitForActivation(): Promise<boolean> {
-        return new Promise((resolve) => {
-            if (this.identity.isActive) {
-                resolve(true);
-                return;
-            }
+        if (this.identity.isActive) {
+            return Promise.resolve(true);
+        }
 
-            // Check if setupActivationListener already handled activation
-            // (handles race between register() and activation event)
-            if (this.identity.isActive) {
-                console.log("[SOCKET] Activation already handled, resolving immediately");
-                resolve(true);
-                return;
-            }
+        if (this.activationWait) {
+            return this.activationWait;
+        }
 
+        console.log("[SOCKET] Waiting for activation event...");
+
+        this.activationWait = new Promise((resolve) => {
             // Store the resolve function
             this.activationResolve = resolve;
-
-            console.log("[SOCKET] Waiting for activation event...");
 
             // Set up a one-time listener for the activation event
             const onActivation = (data: { isActive: boolean }) => {
@@ -191,6 +193,7 @@ export class SocketClient {
 
                 // Clean up this listener
                 this.socket?.off("agent:activation", onActivation);
+                this.activationWait = undefined;
 
                 resolve(data.isActive);
             };
@@ -199,13 +202,15 @@ export class SocketClient {
 
             // Double-check after a small delay in case event arrived while setting up
             setTimeout(() => {
-                if (this.identity.isActive && !this.activationHandled) {
-                    this.activationHandled = true;
-                    resolve(true);
+                if (this.identity.isActive) {
                     this.socket?.off("agent:activation", onActivation);
+                    this.activationWait = undefined;
+                    resolve(true);
                 }
             }, 100);
         });
+
+        return this.activationWait;
     }
 
     private setupActivationListener() {
@@ -519,16 +524,27 @@ export class SocketClient {
         this.identity.isActive = active;
     }
 
-    // Wait for socket to be connected
-    public waitForConnection(): Promise<void> {
+    // Wait for socket to be connected. Falls back after a timeout instead of
+    // hanging Agent.start() forever if the server is unreachable or auth fails
+    // on every reconnection attempt (e.g. wrong VC_SHARED_SECRET).
+    public waitForConnection(timeoutMs = 30000): Promise<void> {
         return new Promise((resolve) => {
             if (this.socket?.connected) {
                 resolve();
-            } else {
-                this.socket?.once('connect', () => {
-                    resolve();
-                });
+                return;
             }
+
+            const timeoutId = setTimeout(() => {
+                console.error(
+                    `[SOCKET] Still not connected after ${timeoutMs}ms - proceeding anyway`
+                );
+                resolve();
+            }, timeoutMs);
+
+            this.socket?.once('connect', () => {
+                clearTimeout(timeoutId);
+                resolve();
+            });
         });
     }
 

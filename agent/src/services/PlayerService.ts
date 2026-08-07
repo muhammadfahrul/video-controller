@@ -387,6 +387,11 @@ export class PlayerService {
 
     }
 
+    // NOTE: does not manage `this.restoring` itself - it's only ever called from
+    // restore(), which already wraps the whole restore sequence in that flag. Setting
+    // restoring=false here (before restore()'s later steps run) let each of
+    // restorePosition()/restoreVolume()/restoreMute()/restorePlaybackState() persist()
+    // a partial snapshot mid-restore instead of only the final, fully-restored one.
     public async restoreLastVideo() {
 
         const snapshot =
@@ -405,23 +410,11 @@ export class PlayerService {
 
         }
 
-        this.restoring = true;
+        await this.open(
 
-        try {
+            snapshot.videoId
 
-            await this.open(
-
-                snapshot.videoId
-
-            );
-
-        }
-
-        finally {
-
-            this.restoring = false;
-
-        }
+        );
 
         return true;
 

@@ -75,7 +75,11 @@ export class YouTubeDOM {
                     ) as HTMLVideoElement | null;
 
 
-                video?.play();
+                if (!video) {
+                    throw new Error("Video element not found");
+                }
+
+                video.play();
 
 
             },
@@ -101,7 +105,11 @@ export class YouTubeDOM {
                     ) as HTMLVideoElement | null;
 
 
-                video?.pause();
+                if (!video) {
+                    throw new Error("Video element not found");
+                }
+
+                video.pause();
 
 
             },
@@ -158,18 +166,18 @@ export class YouTubeDOM {
                     ) as HTMLVideoElement | null;
 
 
-                if(video){
-
-                    video.volume =
-                        Math.max(
-                            0,
-                            Math.min(
-                                1,
-                                volume / 100
-                            )
-                        );
-
+                if (!video) {
+                    throw new Error("Video element not found");
                 }
+
+                video.volume =
+                    Math.max(
+                        0,
+                        Math.min(
+                            1,
+                            volume / 100
+                        )
+                    );
 
 
             },

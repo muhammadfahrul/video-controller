@@ -172,10 +172,9 @@ export class BrowserLauncher {
 
         const context = await this.launchPersistent(options);
 
-        // Add stealth script to all existing pages
-        for (const page of context.pages()) {
-            await page.addInitScript(this.getStealthScript());
-        }
+        // Apply to the context so pages/popups created after launch (not just the
+        // ones already open) get the stealth script too.
+        await context.addInitScript(this.getStealthScript());
 
         return context;
     }

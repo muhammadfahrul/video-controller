@@ -248,12 +248,28 @@ export class PlaylistService {
                 }));
             }
             
-            // Restore current index
-            this.currentIndex = playlistState.currentIndex ?? -1;
-            
-            // Restore repeat mode
+            // Restore current index, clamped into valid bounds (same rule as restore())
+            // instead of trusting the server's index blindly - an out-of-range index
+            // here leaves current()/next()/shuffle() reading `this.items[badIndex]`
+            // (undefined), which crashes shuffle() downstream.
+            const requestedIndex = playlistState.currentIndex ?? -1;
+            if (requestedIndex >= 0 && requestedIndex < this.items.length) {
+                this.currentIndex = requestedIndex;
+            } else {
+                this.currentIndex = this.items.length > 0 ? 0 : -1;
+            }
+
+            // Restore repeat mode, validated against known values instead of an
+            // unchecked cast - a malformed value would otherwise silently fail every
+            // `=== RepeatMode.ONE/ALL` comparison in next()/previous() with no error.
             if (playlistState.repeat) {
-                this.repeatMode = playlistState.repeat.toUpperCase() as any;
+                const normalized = playlistState.repeat.toUpperCase();
+                if (normalized === RepeatMode.OFF || normalized === RepeatMode.ONE || normalized === RepeatMode.ALL) {
+                    this.repeatMode = normalized;
+                } else {
+                    console.warn("[PlaylistService] Unknown repeat mode from server, defaulting to OFF:", playlistState.repeat);
+                    this.repeatMode = RepeatMode.OFF;
+                }
             }
             
             // Restore shuffle
