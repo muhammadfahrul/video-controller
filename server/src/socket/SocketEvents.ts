@@ -48,6 +48,10 @@ export enum SocketEvents {
 
 
 
+    CASHIER_MARK_ROOM_CLEANED = "cashier:mark-room-cleaned",
+
+
+
     AGENT_CLEAR_DATA = "agent:clear-data",
 
 

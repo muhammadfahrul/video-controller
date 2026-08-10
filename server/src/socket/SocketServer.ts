@@ -445,29 +445,35 @@ export class SocketServer {
                 // Cashier room activation/deactivation
                 socket.on(
                     SocketEvents.CASHIER_ACTIVATE_ROOM,
-                    (data: { 
-                        roomId: string; 
-                        roomName: string; 
-                        durationMinutes?: number; 
+                    (data: {
+                        roomId: string;
+                        roomName: string;
+                        durationMinutes?: number;
                         customerName?: string;
                         customerPhone?: string;
                         customerEmail?: string;
                         customerNote?: string;
+                        originalStartTime?: number; // carried over from the source room on a Move Room
                     }) => {
                         console.log("[SERVER] Cashier activates room:", data);
-                        
+
                         // Store activation state - persists across reconnections
                         this.activatedRooms.set(data.roomId, true);
-                        
+
                         const registry = this.manager.getRegistry();
                         // Use ref method for mutation
                         const agent = registry.getByRoomIdRef(data.roomId);
-                        
+
                         // Calculate expiry time if duration is provided
-                        const expiresAt = data.durationMinutes 
-                            ? Date.now() + (data.durationMinutes * 60 * 1000) 
+                        const expiresAt = data.durationMinutes
+                            ? Date.now() + (data.durationMinutes * 60 * 1000)
                             : null;
-                        
+
+                        // On a Move Room, keep the original session's start time so the
+                        // eventual transaction bills the full session once (at this room's
+                        // price) instead of double-billing across source + target rooms.
+                        const startTime = data.originalStartTime ?? Date.now();
+
                         // Prepare customer info object
                         const customerInfo = {
                             customerName: data.customerName,
@@ -475,20 +481,22 @@ export class SocketServer {
                             customerEmail: data.customerEmail,
                             customerNote: data.customerNote,
                         };
-                        
+
                         if (agent) {
                             agent.isActive = true;
                             agent.expiresAt = expiresAt;
-                            agent.startTime = Date.now(); // Store start time
+                            agent.startTime = startTime;
+                            agent.needsCleaning = false;
+                            agent.lastTransactionEndTime = null;
                             // Store customer info
                             Object.assign(agent, customerInfo);
-                            
+
                             // Change status from WAITING to ONLINE when activated
                             if (agent.status === "WAITING") {
                                 agent.status = "ONLINE";
                             }
                             // Notify the specific agent with expiry info
-                            this.io.to(agent.socketId).emit("agent:activation", { 
+                            this.io.to(agent.socketId).emit("agent:activation", {
                                 isActive: true,
                                 expiresAt: expiresAt,
                                 ...customerInfo
@@ -497,14 +505,13 @@ export class SocketServer {
                         } else {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
-                        
+
                         // Set up auto-expiry timer if duration is provided
                         if (data.durationMinutes && data.durationMinutes > 0) {
                             this.setupRoomTimer(data.roomId, data.durationMinutes, agent?.socketId);
                         }
-                        
+
                         // Broadcast activation to all clients
-                        const startTime = Date.now();
                         this.io.emit("room:activation", {
                             roomId: data.roomId,
                             roomName: data.roomName,
@@ -518,7 +525,7 @@ export class SocketServer {
 
                 socket.on(
                     SocketEvents.CASHIER_DEACTIVATE_ROOM,
-                    async (data: { roomId: string }) => {
+                    async (data: { roomId: string; reason?: "manual" | "move" }) => {
                         console.log("[SERVER] Cashier deactivates room:", data);
                         
                         // Clear any existing timer
@@ -587,21 +594,52 @@ export class SocketServer {
                             (agent as any).customerPhone = undefined;
                             (agent as any).customerEmail = undefined;
                             (agent as any).customerNote = undefined;
-                            
+
+                            // Room moved out: no transaction is recorded for this room (it's
+                            // recorded at the target room instead), so mark it as needing a
+                            // physical cleaning check independent of the transaction/payment flow.
+                            if (data.reason === "move") {
+                                agent.needsCleaning = true;
+                                agent.lastTransactionEndTime = Date.now();
+                            }
+
                             // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
                             this.io.emit("room:activation", {
                                 roomId: data.roomId,
                                 roomName: agent.roomName,
                                 isActive: false,
-                                reason: "deactivated",
+                                reason: data.reason === "move" ? "move" : "deactivated",
                                 expiresAt: agent.expiresAt,
-                                startTime: agent.startTime
+                                startTime: agent.startTime,
+                                needsCleaning: agent.needsCleaning,
+                                lastTransactionEndTime: agent.lastTransactionEndTime
                             });
-                            
+
                             this.broadcastAgents(registry.getAll());
                         } else {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
+                    }
+                );
+
+                // Mark a moved-out room as cleaned (room-level, no transaction involved)
+                socket.on(
+                    SocketEvents.CASHIER_MARK_ROOM_CLEANED,
+                    (data: { roomId: string }) => {
+                        console.log("[SERVER] Cashier marks room cleaned:", data);
+
+                        const registry = this.manager.getRegistry();
+                        const agent = registry.getByRoomIdRef(data.roomId);
+
+                        if (!agent) {
+                            console.log("[SERVER] Agent not found for room:", data.roomId);
+                            return;
+                        }
+
+                        agent.needsCleaning = false;
+                        agent.lastTransactionEndTime = null;
+
+                        this.broadcastAgents(registry.getAll());
                     }
                 );
 

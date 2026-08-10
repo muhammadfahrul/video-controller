@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRoomStore } from '../store/useRoomStore';
+import { useTransactionStore } from '../store/useTransactionStore';
 import { multiSocketService } from '../services/MultiSocketService';
+import { getRoomStatus, type RoomStatusLabel } from '../utils/roomStatus';
 import { Disc3, ArrowRightLeft, X, Timer, User } from 'lucide-react';
 import type { RoomBilling } from '../types';
+
+// Only these statuses mean the room is physically ready for a new customer
+const VALID_TARGET_STATUSES: RoomStatusLabel[] = ['ONLINE', 'SUDAH DIBERSIHKAN'];
 
 interface MoveRoomModalProps {
   roomBilling: RoomBilling;
@@ -21,43 +26,68 @@ function formatCountdown(seconds: number): string {
 
 export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoomModalProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
+  const [roomBillings, setRoomBillings] = useState<Map<string, RoomBilling>>(() => multiSocketService.getRoomBillings());
   const setGlobalLoading = useRoomStore((state) => state.setLoading);
-  
+  const transactions = useTransactionStore((state) => state.transactions);
+
+  // Keep target room statuses live while the modal is open
+  useEffect(() => {
+    const unsubscribe = multiSocketService.onUpdate((billings) => setRoomBillings(billings));
+    return unsubscribe;
+  }, []);
+
+  const findTargetBilling = (roomName: string): RoomBilling | undefined => {
+    const nameKey = roomName.toLowerCase();
+    return Array.from(roomBillings.values()).find(b => b.roomName.toLowerCase() === nameKey);
+  };
+
   const handleMove = async () => {
     if (!selectedTarget) return;
-    
+
     // Calculate remaining time in minutes
     let remainingMinutes: number | undefined;
     if (roomBilling.expiresAt && roomBilling.expiresAt > Date.now()) {
       remainingMinutes = Math.ceil((roomBilling.expiresAt - Date.now()) / 60000);
     }
-    
+
     setGlobalLoading(true, 'moving');
     try {
       const roomConfigs = useRoomStore.getState().roomConfigs;
       const targetConfig = roomConfigs.find(c => c.id === selectedTarget || c.name.toLowerCase() === selectedTarget.toLowerCase());
-      
+
       if (!targetConfig) {
         alert('Ruangan tujuan tidak ditemukan');
         setGlobalLoading(false);
         return;
       }
-      
+
       const isTargetConnected = multiSocketService.isConnected(targetConfig.id || targetConfig.name) ||
         multiSocketService.isConnected(targetConfig.id?.replace('env-', '') || targetConfig.name.toLowerCase().replace(/\s+/g, '-'));
-      
+
       if (!isTargetConnected) {
         alert('Ruangan tujuan sedang offline. Silakan pilih ruangan lain yang sedang online.');
         setGlobalLoading(false);
         return;
       }
-      
-      // Deactivate current room
+
+      // Re-validate target status at submit time too, in case it changed
+      // (e.g. activated by another cashier) since the modal was opened.
+      const targetBilling = findTargetBilling(targetConfig.name);
+      const targetStatus = targetBilling ? getRoomStatus(targetBilling, transactions).label : null;
+      if (!targetStatus || !VALID_TARGET_STATUSES.includes(targetStatus)) {
+        alert('Ruangan tujuan tidak lagi siap dipakai (sudah aktif/belum bersih). Silakan pilih ruangan lain.');
+        setGlobalLoading(false);
+        return;
+      }
+
+      // Deactivate current room (reason 'move': no transaction is recorded here,
+      // it's recorded at the target room instead once the session actually ends)
       await multiSocketService.deactivateRoom(roomBilling.roomId, undefined, 'move', () => {});
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Activate target room
+
+      // Activate target room, carrying over the original session's startTime so
+      // the eventual transaction bills the full session once (at the target's price)
       const billing = roomBilling;
       if (billing.customerName || billing.customerPhone || billing.customerEmail || billing.customerNote) {
         await multiSocketService.activateRoom(
@@ -68,7 +98,8 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
           billing.customerPhone,
           billing.customerEmail,
           billing.customerNote ? `${billing.customerNote} (Pindahan dari ${roomBilling.roomName})` : `Pindahan dari ${roomBilling.roomName}`,
-          () => {}
+          () => {},
+          billing.startTime ?? undefined
         );
       } else {
         await multiSocketService.activateRoom(
@@ -79,10 +110,11 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
           undefined,
           undefined,
           `Pindahan dari ${roomBilling.roomName}`,
-          () => {}
+          () => {},
+          billing.startTime ?? undefined
         );
       }
-      
+
       onMoveComplete();
       onClose();
     } catch (error) {
@@ -92,9 +124,9 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
       setGlobalLoading(false);
     }
   };
-  
+
   const roomConfigs = useRoomStore.getState().roomConfigs;
-  const availableRooms = roomConfigs.filter(c => 
+  const availableRooms = roomConfigs.filter(c =>
     c.id !== roomBilling.roomId && c.name.toLowerCase() !== roomBilling.roomName.toLowerCase()
   );
   
@@ -167,30 +199,35 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
           ) : (
             availableRooms.map(config => {
               const isSelected = selectedTarget === config.id || selectedTarget === config.name;
-              const isConnected = multiSocketService.isConnected(config.id || config.name) || 
+              const isConnected = multiSocketService.isConnected(config.id || config.name) ||
                 multiSocketService.isConnected(config.id?.replace('env-', '') || config.name.toLowerCase().replace(/\s+/g, '-'));
-              const isDisabled = !isConnected;
-              
+              const targetBilling = findTargetBilling(config.name);
+              const targetStatus = isConnected && targetBilling ? getRoomStatus(targetBilling, transactions).label : null;
+              const isReady = !!targetStatus && VALID_TARGET_STATUSES.includes(targetStatus);
+              const isDisabled = !isConnected || !isReady;
+              const statusLabel = !isConnected ? 'Offline' : (targetStatus ?? '-');
+
               return (
                 <button
                   key={config.id}
                   onClick={() => !isDisabled && setSelectedTarget(config.id || config.name)}
                   disabled={isDisabled}
+                  title={isDisabled && isConnected ? 'Ruangan hanya bisa jadi tujuan jika berstatus ONLINE atau SUDAH DIBERSIHKAN' : undefined}
                   className={`w-full p-3 rounded-lg border text-left transition-all ${
-                    isDisabled 
+                    isDisabled
                       ? 'border-white/5 bg-[#0f0f1a] text-gray-600 cursor-not-allowed'
-                      : isSelected 
-                        ? 'border-cyan-500 bg-cyan-500/10 text-white' 
+                      : isSelected
+                        ? 'border-cyan-500 bg-cyan-500/10 text-white'
                         : 'border-white/5 bg-[#0f0f1a] text-gray-300 hover:border-white/10'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Disc3 className={`w-4 h-4 ${isConnected ? 'text-green-400' : 'text-gray-600'}`} />
+                      <Disc3 className={`w-4 h-4 ${isReady ? 'text-green-400' : 'text-gray-600'}`} />
                       <span className="font-medium">{config.name}</span>
                     </div>
-                    <span className={`text-xs ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
-                      {isConnected ? 'Online' : 'Offline'}
+                    <span className={`text-xs ${isReady ? 'text-green-400' : 'text-red-400'}`}>
+                      {statusLabel}
                     </span>
                   </div>
                 </button>

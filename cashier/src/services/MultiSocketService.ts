@@ -172,7 +172,8 @@ class MultiSocketService {
     customerPhone?: string,
     customerEmail?: string,
     customerNote?: string,
-    onComplete?: () => void
+    onComplete?: () => void,
+    originalStartTime?: number
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
@@ -210,20 +211,21 @@ class MultiSocketService {
     };
     connection.socket.on('room:activation', handleActivation);
     
-    connection.socket.emit('cashier:activate-room', { 
-      roomId: agentRoomId, 
+    connection.socket.emit('cashier:activate-room', {
+      roomId: agentRoomId,
       roomName,
       durationMinutes: durationMinutes ?? undefined,
       customerName: customerName ?? undefined,
       customerPhone: customerPhone ?? undefined,
       customerEmail: customerEmail ?? undefined,
       customerNote: customerNote ?? undefined,
+      originalStartTime: originalStartTime ?? undefined,
     });
     console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId, 'duration:', durationMinutes, 'customerName:', customerName);
   }
 
   // Deactivate a specific room - finds connection by roomId (from agent)
-  async deactivateRoom(roomId: string, _paymentMethod?: 'cash' | 'transfer' | 'other', _notes?: string, onComplete?: () => void): Promise<void> {
+  async deactivateRoom(roomId: string, _paymentMethod?: 'cash' | 'transfer' | 'other', reason?: 'manual' | 'move', onComplete?: () => void): Promise<void> {
     console.log('[MultiSocket] deactivateRoom called with roomId:', roomId);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({
       key: k,
@@ -267,8 +269,8 @@ class MultiSocketService {
     };
     connection.socket.on('room:activation', handleDeactivation);
     
-    console.log('[MultiSocket] Emitting deactivate-room with roomId:', agentRoomId);
-    connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId });
+    console.log('[MultiSocket] Emitting deactivate-room with roomId:', agentRoomId, 'reason:', reason);
+    connection.socket.emit('cashier:deactivate-room', { roomId: agentRoomId, reason });
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
     
     // Transaction will be recorded by room:activation event listener (single source)
@@ -291,6 +293,17 @@ class MultiSocketService {
       console.log('[MultiSocket] Requesting transactions for room:', roomId);
       connection.socket.emit('transaction:get');
     }
+  }
+
+  // Mark a room (vacated via Move Room) as cleaned - room-level, no transaction involved
+  markRoomCleaned(roomId: string): void {
+    const connection = this.findConnectionForRoom(roomId);
+    if (!connection || !connection.socket.connected) {
+      console.error('[MultiSocket] Cannot mark room cleaned - not connected:', roomId);
+      return;
+    }
+    const agentRoomId = connection.agents[0]?.roomId || roomId;
+    connection.socket.emit('cashier:mark-room-cleaned', { roomId: agentRoomId });
   }
 
   // Update transaction on server (e.g., mark as paid)
@@ -702,7 +715,7 @@ class MultiSocketService {
     });
 
     // Listen for room activation updates (includes expiry info)
-    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string }) => {
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string; needsCleaning?: boolean; lastTransactionEndTime?: number | null }) => {
       console.log('[MultiSocket] Room activation update:', config.name, {
         ...data,
         expiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
@@ -715,8 +728,11 @@ class MultiSocketService {
       const wasActive = existingAgent?.isActive === true;
       const isNowInactive = data.isActive === false;
       
-      // Record transaction BEFORE queue (to capture current state)
-      if (existingAgent && wasActive && isNowInactive) {
+      // Record transaction BEFORE queue (to capture current state).
+      // Skip on 'move': the source room isn't billed on its own - the session
+      // continues (with its original startTime) at the target room instead,
+      // which records the transaction once the session actually ends.
+      if (existingAgent && wasActive && isNowInactive && data.reason !== 'move') {
         const agent = existingAgent as any;
         const pricePerHour = config.pricePerHour ?? 50000;
         const startTime = agent.startTime || 0;
@@ -833,7 +849,17 @@ class MultiSocketService {
         if (data.customerPhone) (merged as any).customerPhone = data.customerPhone;
         if (data.customerEmail) (merged as any).customerEmail = data.customerEmail;
         if (data.customerNote) (merged as any).customerNote = data.customerNote;
-        
+
+        // Room-level cleaning flag (set by the server on a Move Room deactivate,
+        // cleared on the next activation) - independent of the transaction/payment flow.
+        if (data.isActive) {
+          (merged as any).needsCleaning = false;
+          (merged as any).lastTransactionEndTime = null;
+        } else if (data.needsCleaning !== undefined) {
+          (merged as any).needsCleaning = data.needsCleaning;
+          (merged as any).lastTransactionEndTime = data.lastTransactionEndTime ?? null;
+        }
+
         return merged;
       });
     });

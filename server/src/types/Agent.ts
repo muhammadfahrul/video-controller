@@ -41,4 +41,8 @@ export interface AgentInfo {
 
     expiresAt: number | null; // Timestamp when room expires (null if no duration set)
 
+    needsCleaning?: boolean; // Room was vacated (e.g. via move) and hasn't been marked cleaned yet
+
+    lastTransactionEndTime?: number | null; // Timestamp when the room was last vacated, used for cleaning status thresholds
+
 }
