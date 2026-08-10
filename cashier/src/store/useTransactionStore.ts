@@ -12,7 +12,8 @@ interface TransactionStore {
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  clearTransactions: () => void;
+  /** Clears transactions for the given room (matched by roomId or roomName). Clears everything if both are omitted. */
+  clearTransactions: (roomId?: string, roomName?: string) => void;
   /**
    * Merge transactions from one server into the store.
    *
@@ -73,8 +74,21 @@ export const useTransactionStore = create<TransactionStore>()(
       }));
     },
     
-    clearTransactions: () => {
-      set({ transactions: [] });
+    clearTransactions: (roomId, roomName) => {
+      if (!roomId && !roomName) {
+        set({ transactions: [] });
+        return;
+      }
+      const roomKey = roomId?.toLowerCase();
+      const roomNameKey = roomName?.toLowerCase();
+      set((state) => ({
+        transactions: state.transactions.filter(t => {
+          const matchesRoom =
+            (!!roomKey && t.roomId.toLowerCase() === roomKey) ||
+            (!!roomNameKey && t.roomName.toLowerCase() === roomNameKey);
+          return !matchesRoom;
+        }),
+      }));
     },
     
     // Set transactions from server - merge with existing local state.

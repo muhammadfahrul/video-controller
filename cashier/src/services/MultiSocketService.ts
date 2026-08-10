@@ -332,23 +332,29 @@ class MultiSocketService {
     }
   }
 
-  // Clear all transactions on server
-  clearTransactions(onComplete?: () => void): void {
+  // Clear transactions on server. If roomId is given, only that room's
+  // connection is targeted; otherwise transactions are cleared on every
+  // connected room (used by the all-rooms transactions page).
+  clearTransactions(onComplete?: () => void, roomId?: string): void {
     const timeoutMs = 3000;
     const timeoutId = setTimeout(() => {
       onComplete?.();
     }, timeoutMs);
-    
+
+    const targets = roomId
+      ? [this.findConnectionForRoom(roomId)].filter((c): c is RoomConnection => !!c)
+      : Array.from(this.connections.values());
+
     // Listen for transaction update from server
     const handleTransactionUpdate = () => {
       clearTimeout(timeoutId);
-      for (const conn of this.connections.values()) {
+      for (const conn of targets) {
         conn.socket.off('transaction:get', handleTransactionUpdate);
       }
       onComplete?.();
     };
-    
-    for (const conn of this.connections.values()) {
+
+    for (const conn of targets) {
       if (conn.socket.connected) {
         conn.socket.on('transaction:get', handleTransactionUpdate);
         conn.socket.emit('transaction:clear');

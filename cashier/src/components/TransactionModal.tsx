@@ -151,11 +151,10 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   };
   
   const handleClearTransactions = () => {
-    if (!confirm('Hapus semua riwayat transaksi?')) return;
+    if (!confirm(`Hapus semua riwayat transaksi ${roomName}?`)) return;
     setGlobalLoading(true, 'clearing');
-    clearTransactions();
-    multiSocketService.clearTransactions();
-    setTimeout(() => setGlobalLoading(false), 500);
+    clearTransactions(roomId, roomName);
+    multiSocketService.clearTransactions(() => setGlobalLoading(false), roomId);
   };
 
   // Handle mark as cleaned - update transaction with cleanedAt timestamp
