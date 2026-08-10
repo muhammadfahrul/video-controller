@@ -1,14 +1,12 @@
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useState, useEffect } from 'react';
-import { Mic, LayoutGrid, Receipt } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import { useRoomStore } from '../store/useRoomStore';
 import { FullPageLoading, loadingDurations } from '../components/FullPageLoading';
-import { MenuLink } from '../components/MenuLink';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const location = useLocation();
-  
+
   const roomLoading = useRoomStore((state) => state.isLoading);
   const roomLoadingType = useRoomStore((state) => state.loadingType);
   const roomLoadingMessage = useRoomStore((state) => state.loadingMessage);
@@ -66,26 +64,6 @@ export default function CashierLayout() {
               <p className="text-[10px] text-gray-500">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</p>
             </div>
           </div>
-          <nav className="flex items-center gap-2">
-            <MenuLink
-              to="/"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                location.pathname === '/' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Dashboard
-            </MenuLink>
-            <MenuLink
-              to="/transactions"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                location.pathname === '/transactions' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Receipt className="w-3.5 h-3.5" />
-              Riwayat Transaksi
-            </MenuLink>
-          </nav>
           <div className="hidden sm:block text-right">
             <p className="text-sm font-semibold text-white">{currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
             <p className="text-[10px] text-gray-500">{currentTime.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>

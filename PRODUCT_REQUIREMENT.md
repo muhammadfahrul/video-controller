@@ -515,7 +515,7 @@ Stack: React + Vite + Zustand + socket.io-client.
 
 #### 4.4.1 Struktur & Routing
 
-Dua route terdaftar: `/` → `DashboardPage` (grid kartu ruangan) dan `/transactions` → `TransactionsPage` (riwayat transaksi global, fixed §9.2 #8 — sebelumnya dibangun lengkap tapi tidak pernah di-route). Nav link di header `CashierLayout` (pakai `MenuLink.tsx`) menghubungkan keduanya. Riwayat per-ruangan tetap bisa diakses lewat `TransactionModal` (tombol Receipt di `RoomCard`).
+Single page: hanya route `/` → `DashboardPage` (grid kartu ruangan). Route `/transactions` beserta `TransactionsPage` dan nav link di header `CashierLayout` (`MenuLink.tsx`) sudah dihapus agar aplikasi tetap single page. Riwayat transaksi tetap bisa diakses per-ruangan lewat `TransactionModal` (tombol Receipt di `RoomCard`).
 
 #### 4.4.2 MultiSocketService — Multi Koneksi
 
@@ -606,7 +606,7 @@ Murni client-side (`window.open` + `document.write` + `window.print()`), tidak a
 #### 4.4.11 Transaction History Pages
 
 - **Per-ruangan** (`TransactionModal`, satu-satunya yang bisa diakses user): filter roomId/roomName, search nama/HP, filter tanggal (`all`/`today`), sort unpaid dulu lalu `paidAt` descending.
-- **Global** (`TransactionsPage`, dapat diakses via `/transactions`): search, hapus, clear-all, kartu revenue total/hari-ini (fixed §9.2 #8).
+- **Global** (`TransactionsPage` via `/transactions`) sudah dihapus agar cashier tetap single page.
 
 #### 4.4.12 Config Env
 
@@ -754,7 +754,7 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 - [ ] Auto-expiry bekerja (kalau `durationMinutes` diset) → deactivate + clear player di agent.
 - [ ] Timer countdown di Cashier sinkron dengan `expiresAt` server.
 - [ ] Perpanjangan waktu dari Kasir → `expiresAt` update di server + agent.
-- [x] Transaksi dari tiap ruangan muncul di Transaction page per-ruangan (Fix A terverifikasi) maupun global (`TransactionsPage` sudah ke-route, lihat §9.2 #8).
+- [x] Transaksi dari tiap ruangan muncul di Transaction page per-ruangan (Fix A terverifikasi); halaman global `TransactionsPage`/`/transactions` sudah dihapus agar cashier tetap single page.
 - [ ] Status ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE) tampil sesuai kondisi — perhatikan "PAID" bukan status UI terpisah (§7).
 - [ ] Move Room (pindah ruangan) preserve customer info + sisa waktu **aktual** (bukan durasi asli).
 - [ ] `BILLING_ENABLED=false` → agent auto-aktif tanpa tunggu kasir.
@@ -809,4 +809,3 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 - Socket: `cashier/src/services/MultiSocketService.ts` (aktif, satu-satunya — `SocketService.ts` legacy sudah dihapus, lihat §9.2 #10)
 - Store: `cashier/src/store/useTransactionStore.ts`, `useRoomStore.ts`
 - UI: `cashier/src/components/RoomCard.tsx`, `MoveRoomModal.tsx`, `TransactionModal.tsx`, `PaymentConfirmModal.tsx`, `PrintReceipt.tsx`
-- Orphan (belum di-route): `cashier/src/pages/TransactionsPage.tsx`, `components/MenuLink.tsx`
