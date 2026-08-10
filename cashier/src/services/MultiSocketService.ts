@@ -410,7 +410,7 @@ class MultiSocketService {
       const agent = connection.agents[0]; // One agent per room server
       const roomId = agent?.roomId || connection.config.id;
       const billing = agent
-        ? this.agentToBilling(agent, connection.config)
+        ? this.agentToBilling(agent, connection.config, connection.socket.connected)
         : {
             roomId: connection.config.id,
             roomName: connection.config.name,
@@ -438,6 +438,7 @@ class MultiSocketService {
     socket.on('connect', () => {
       console.log('[MultiSocket] Connected to room:', config.name);
       this.notifyStatus(config.id, true);
+      this.notifyUpdate();
       // Request agent list
       socket.emit('cashier:request-agents');
       // Request transactions from server
@@ -460,6 +461,7 @@ class MultiSocketService {
     socket.on('disconnect', (reason) => {
       console.log('[MultiSocket] Disconnected from room:', config.name, reason);
       this.notifyStatus(config.id, false);
+      this.notifyUpdate();
     });
 
     socket.on('connect_error', (error) => {
@@ -851,7 +853,7 @@ class MultiSocketService {
     });
   }
 
-  private agentToBilling(agent: AgentInfo, config: RoomConfig): RoomBilling {
+  private agentToBilling(agent: AgentInfo, config: RoomConfig, isConnected: boolean): RoomBilling {
     const roomId = agent.roomId || config.id;
     const roomName = agent.roomName || config.name;
 
@@ -895,7 +897,7 @@ class MultiSocketService {
       pricePerHour,
       isActive: agent.isActive ?? false,
       expiresAt: agent.expiresAt ?? null,
-      isConnected: true, // Agent exists = connected
+      isConnected,
       needsCleaning: agentAny.needsCleaning ?? false,
       lastTransactionEndTime: agentAny.lastTransactionEndTime,
       customerName: agentAny.customerName,
