@@ -1,0 +1,132 @@
+import { useState, useEffect } from "react";
+import SearchBar from "../features/search/components/SearchBar";
+import SearchResultCard from "../features/search/components/SearchResultCard";
+import Pagination from "../shared/components/Pagination";
+import { useAppStore } from "../store/appStore";
+import { usePlaylist } from "../hooks/usePlaylist";
+import { agentService } from "../services";
+import { searchService } from "../services/search";
+import type { SearchResult } from "../features/search/types/SearchResult";
+
+export default function SearchPage(){
+
+    usePlaylist();
+
+    const [keyword, setKeyword] = useState("");
+    const [results, setResults] = useState<SearchResult[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+    
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 5;
+    
+    const { loadAgent, setProcessing, setGlobalLoading, agent } = useAppStore();
+
+    const search = async () => {
+        if (!keyword.trim()) {
+            setResults([]);
+            return;
+        }
+
+        // Don't search if agent is offline
+        if (!agent.online) {
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setProcessing("search", true);
+            setGlobalLoading(true);
+            setError("");
+            const response = await searchService.search(keyword);
+            setResults(response);
+        } catch (error) {
+            console.error("Search error:", error);
+            setError("Search failed");
+        } finally {
+            setLoading(false);
+            setProcessing("search", false);
+            setGlobalLoading(false);
+        }
+    };
+
+    // Reset to page 1 when search results change
+    const handleSearch = async () => {
+        setCurrentPage(1);
+        await search();
+    };
+    
+    // Calculate pagination
+    const totalResults = results.length;
+    const totalPages = Math.ceil(totalResults / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedResults = results.slice(startIndex, endIndex);
+
+    useEffect(() => {
+        async function load() {
+            try {
+                const agents = await agentService.list();
+                if (agents.length === 0) return;
+                const agent = agents[0];
+                loadAgent({
+                    id: agent.id,
+                    name: agent.name,
+                    // Agent is online if status is ONLINE/PLAYING AND isActive is true
+                    online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
+                    lastHeartbeat: agent.lastHeartbeat
+                });
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        load();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div className="space-y-5 landscape:space-y-6">
+
+            <SearchBar
+                value={keyword}
+                onChange={setKeyword}
+                onSearch={handleSearch}
+                loading={loading}
+            />
+
+            {loading && (
+                <div className="rounded-xl bg-[#12121f] border border-[#2a2a4a] p-4 text-center text-[#ff2d95]">
+                    Searching...
+                </div>
+            )}
+
+            {!loading && results.length === 0 && keyword && (
+                <div className="rounded-xl border border-[#2a2a4a] bg-[#12121f] p-6 text-center text-[#b8b8d0]">
+                    No videos found
+                </div>
+            )}
+
+            {error && (
+                <div className="rounded-xl bg-[#1a1a2e] border border-red-500 p-4 text-red-400">
+                    {error}
+                </div>
+            )}
+
+            {paginatedResults.map(result => (
+                <SearchResultCard key={result.videoId} result={result} />
+            ))}
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                totalItems={totalResults}
+            />
+
+        </div>
+    );
+
+}

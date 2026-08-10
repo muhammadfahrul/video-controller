@@ -1,0 +1,165 @@
+import { useEffect, useMemo, useState } from "react";
+import { useAppStore } from "../../../store/appStore";
+import {
+
+    playerCommandService
+
+} from "../../../services";
+
+export default function PlayerProgress() {
+
+    const {
+
+        player,
+
+        agent,
+        setProcessing
+
+    } = useAppStore();
+
+    const progress = useMemo(() => {
+
+        if (player.duration <= 0) {
+
+            return 0;
+
+        }
+
+        const progress =
+
+            player.duration > 0
+
+                ? (player.currentTime / player.duration) * 100
+
+                : 0;
+
+        return progress;
+
+    }, [
+
+        player.currentTime,
+
+        player.duration
+
+    ]);
+
+    const handleSeek = async () => {
+
+        if (
+
+            player.duration <= 0 ||
+
+            !agent.id ||
+            !agent.online
+
+        ) {
+
+            return;
+
+        }
+
+        const seconds =
+
+            player.duration *
+
+            value /
+
+            100;
+
+        try {
+
+            setProcessing("seek", true);
+            
+            await playerCommandService.seek(
+                agent.id,
+                seconds
+            );
+
+            setTimeout(() => setProcessing("seek", false), 300);
+
+        }
+
+        catch (err) {
+
+            console.error(err);
+            setProcessing("seek", false);
+
+        }
+
+    };
+
+    const [value, setValue] = useState(progress);
+
+    useEffect(() => {
+
+        setValue(progress);
+
+    }, [progress]);
+
+    return (
+
+        <section
+            className="
+                rounded-xl
+                bg-[#12121f]
+                p-4
+                shadow-[0_0_15px_rgba(255,45,149,0.1)]
+                space-y-2
+                border border-[#2a2a4a]
+            "
+        >
+
+            <input
+
+                type="range"
+
+                min={0}
+
+                max={100}
+
+                value={value}
+
+                onChange={(e) =>
+
+                    setValue(
+
+                        Number(e.target.value)
+
+                    )
+
+                }
+
+                onMouseUp={handleSeek}
+
+                onTouchEnd={handleSeek}
+
+            />
+
+            <div
+                className="
+                    flex
+                    justify-between
+                    text-xs
+                    text-[#b8b8d0]
+                "
+            >
+
+                <span>
+
+                    {(player.currentTime ?? 0).toFixed(1)} s
+
+                </span>
+
+                <span>
+
+                    {(player.duration ?? 0).toFixed(1)} s
+
+                </span>
+
+            </div>
+
+        </section>
+
+    );
+
+}
