@@ -412,7 +412,7 @@ class MultiSocketService {
             currentDuration: 0,
             totalPrice: 0,
             status: 'idle' as const,
-            pricePerHour: 50000,
+            pricePerHour: connection.config.pricePerHour || 50000,
             isActive: false,
             expiresAt: null,
             isConnected: connection.socket.connected,
