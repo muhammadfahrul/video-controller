@@ -69,7 +69,17 @@ export function getRoomStatus(roomBilling: RoomBilling, transactions: Transactio
   const hasUnpaid = roomTransactions.some(t => t.paidAt === 0);
   if (hasUnpaid) return withStyle('UNPAID');
 
-  const cleaningStatus = getPaidCleaningStatus(roomTransactions) ?? getMovedOutCleaningStatus(roomBilling);
+  // getMovedOutCleaningStatus must be checked first: roomBilling.needsCleaning is
+  // only ever true right after a Move Room deactivation (server sets it in that
+  // one path and clears it on activation/mark-cleaned - see server's
+  // CASHIER_DEACTIVATE_ROOM/CASHIER_ACTIVATE_ROOM/CASHIER_MARK_ROOM_CLEANED
+  // handlers), so it's authoritative whenever set. A Move Room deactivation
+  // deliberately records no transaction for the source room (the transaction is
+  // recorded once, later, at the target room), so getPaidCleaningStatus would
+  // otherwise be evaluated against a stale, unrelated PREVIOUS transaction (e.g.
+  // an earlier customer's payment) and could wrongly short-circuit straight to
+  // 'SUDAH DIBERSIHKAN' instead of 'BERSIHKAN' immediately after a move.
+  const cleaningStatus = getMovedOutCleaningStatus(roomBilling) ?? getPaidCleaningStatus(roomTransactions);
   if (cleaningStatus) return withStyle(cleaningStatus);
 
   return withStyle('ONLINE');
