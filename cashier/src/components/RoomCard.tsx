@@ -212,7 +212,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   // Get price from room config store
   const roomConfigs = useRoomStore((state) => state.roomConfigs);
   const roomConfig = roomConfigs.find(r => r.name === roomBilling.roomName);
-  const pricePerHour = roomConfig?.pricePerHour || roomBilling.pricePerHour || 50000;
+  const pricePerHour = roomConfig?.pricePerHour ?? roomBilling.pricePerHour ?? 50000;
   // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
   const currentPrice = Math.ceil(totalSeconds / 3600) * pricePerHour;
   

@@ -418,7 +418,7 @@ class MultiSocketService {
             currentDuration: 0,
             totalPrice: 0,
             status: 'idle' as const,
-            pricePerHour: connection.config.pricePerHour || 50000,
+            pricePerHour: connection.config.pricePerHour ?? 50000,
             isActive: false,
             expiresAt: null,
             isConnected: connection.socket.connected,
@@ -716,7 +716,7 @@ class MultiSocketService {
       // Record transaction BEFORE queue (to capture current state)
       if (existingAgent && wasActive && isNowInactive) {
         const agent = existingAgent as any;
-        const pricePerHour = config.pricePerHour || 50000;
+        const pricePerHour = config.pricePerHour ?? 50000;
         const startTime = agent.startTime || 0;
         // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
         const endTime = data.expiresAt || agent.expiresAt || Date.now();
@@ -881,7 +881,7 @@ class MultiSocketService {
     }
 
     // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas)
-    const pricePerHour = config.pricePerHour || 50000;
+    const pricePerHour = config.pricePerHour ?? 50000;
     const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
 
     const agentAny = agent as any;

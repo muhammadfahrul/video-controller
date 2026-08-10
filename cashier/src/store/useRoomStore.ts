@@ -102,7 +102,7 @@ function loadRoomsFromEnv(): RoomConfig[] {
         roomId: room.roomId,
         ip,
         port,
-        pricePerHour: room.pricePerHour || 50000,
+        pricePerHour: room.pricePerHour ?? 50000,
       };
     });
   } catch (e) {
