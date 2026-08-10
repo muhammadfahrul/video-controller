@@ -214,5 +214,12 @@ export class SocketService {
 
 }
 
+// This is the ONLY place the singleton is constructed. ./index.ts used to
+// separately do `new SocketService()` too, silently creating a second,
+// independent instance - anything importing straight from "./SocketService"
+// (like this file re-exports) got a socket that main.tsx never called
+// .connect() on, so it would never connect at all. Do not re-add a second
+// `new SocketService()` anywhere else - always import `socketService` from
+// here (directly, or via the "./index" barrel, which now just re-exports it).
 export const socketService =
     new SocketService();
