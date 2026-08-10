@@ -169,9 +169,18 @@ export class SocketService {
 
     // Subscribe to the socket's 'connect' event (fires on every connect,
     // including reconnects - same as the raw socket.io 'connect' event).
+    // If the socket is already connected at subscribe time (very likely,
+    // since main.tsx calls connect() before React ever mounts), fire
+    // immediately - otherwise a subscriber that shows up after the initial
+    // 'connect' already happened would wait forever for a reconnect that
+    // may never come.
     onConnect(callback: ConnectCallback): () => void {
 
         this.connectCallbacks.push(callback);
+
+        if (this.socket?.connected) {
+            callback();
+        }
 
         return () => {
             this.connectCallbacks = this.connectCallbacks.filter((cb) => cb !== callback);

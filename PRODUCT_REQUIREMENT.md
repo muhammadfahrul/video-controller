@@ -1,6 +1,6 @@
 # Video Controller — Product Requirement Document (PRD) v3
 
-> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`).
+> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`); migrasi itu sempat menimbulkan regresi (`web/` stuck di layar "Loading..." selamanya) yang ketahuan begitu user coba pakai aplikasinya langsung — sudah diperbaiki, lihat §9.5.
 
 ---
 
@@ -808,6 +808,18 @@ Audit konsumen (17 file yang import `useAppStore`) sebelum migrasi menyimpulkan 
 **Catatan environment (bukan bagian dari perubahan kode)**: saat verifikasi, `web/node_modules` dan `package-lock.json` ternyata kosong/hilang (bukan akibat perubahan sesi ini — tidak ada operasi yang menyentuh `node_modules` sebelum ditemukan kosong). Dijalankan `npm install` ulang untuk memulihkan sebelum build/lint bisa diverifikasi.
 
 **Verifikasi**: `tsc -b && vite build` bersih (PWA generation OK), `npm run lint` — 5 error tersisa, semua dikonfirmasi pre-existing dan tidak berkaitan dengan file yang diubah (`public/sw.js` parsing error, `PlayerControls.tsx` unused assignment, `ProgressBar.tsx`/`VolumeSlider.tsx` set-state-in-effect, `useAgent.ts` implicit any) — 1 error baru yang sempat muncul dari file baru `LoadingContext.tsx` (`react-refresh/only-export-components`, karena file itu export Provider component + hook `useLoading` sekaligus — pola standar React Context, sama seperti punya cashier tapi cashier tidak punya eslint jadi tidak pernah ketahuan) sudah di-suppress dengan komentar inline. `web/` tidak dites end-to-end di browser sungguhan dengan agent/server aktif (butuh koneksi socket nyata, tidak tersedia di environment ini) — cakupan sejauh ini dari typecheck + build + review kode manual terhadap pola yang sudah tervalidasi di `cashier/`.
+
+### 9.5 Regresi ditemukan user: `web/` stuck di "Loading..." (2026-08-11)
+
+Persis celah yang sudah diperingatkan di catatan verifikasi §9.4 ("tidak dites end-to-end di browser sungguhan") — begitu user coba pakai aplikasinya beneran, layar loading tidak pernah hilang.
+
+**Root cause**: `SocketService.onConnect(cb)` (baru, dibuat di §9.4 sebagai pengganti jalur tulis imperatif `useAppStore.getState().setInitialLoading()`) cuma push `cb` ke antrian `connectCallbacks`, **tanpa** cek apakah socket sudah connect duluan. Karena `main.tsx` memanggil `socketService.connect()` **sebelum** React sempat mount, socket hampir selalu sudah `connected` di saat `LoadingProvider`'s effect baru jalan dan sempat subscribe — event `'connect'` sudah lewat, `connectCallbacks` masih kosong waktu itu, jadi callback yang mestinya mematikan `initialLoading` setelah 1 detik **tidak pernah terpanggil sama sekali** (bukan cuma telat). `initialLoading` nyangkut `true` selamanya → `MainLayout`'s `showLoading = globalLoading || initialLoading || isProcessing` selalu true.
+
+Ini persis kelas bug yang sama dengan yang sudah diperbaiki di `on()` (§9.3-C1) — `on()` sudah benar dari awal karena cek `this.socket?.connected` sebelum decide "daftar langsung" vs "antri sampai connect" — tapi waktu menulis `onConnect()` di §9.4, pengecekan yang sama tidak ikut disalin.
+
+**Fix**: `onConnect()` (`web/src/services/socket/SocketService.ts`) sekarang cek `this.socket?.connected` dan langsung panggil `callback()` di tempat kalau memang sudah connect, selain tetap push ke `connectCallbacks` untuk connect/reconnect berikutnya — pola yang sama persis dengan `on()`.
+
+**Verifikasi**: `tsc -b && vite build` bersih, dev server jalan dan merespons normal. `web/node_modules`/`package-lock.json` sempat kosong lagi saat verifikasi (kedua kalinya dalam sesi ini) — kemungkinan environment ini me-reset `node_modules` antar pemanggilan; bukan efek dari perubahan kode manapun, `npm install` ulang memulihkannya.
 
 ---
 
