@@ -24,8 +24,8 @@ import {
 registerPlaylistListener();
 
 // Start player state listener
-const playerListener = new PlayerStateListener();
-playerListener.start();
+const playerStateListener = new PlayerStateListener();
+playerStateListener.start();
 
 
 
@@ -44,16 +44,6 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
-
-
-
-// Start Player State Listener
-
-const playerStateListener =
-    new PlayerStateListener();
-
-
-playerStateListener.start();
 
 
 

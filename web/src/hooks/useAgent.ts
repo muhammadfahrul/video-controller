@@ -63,7 +63,7 @@ export function useAgent() {
 
         socketService.connect();
 
-        socketService.on<any[]>(
+        const unsubscribe = socketService.on<any[]>(
 
             "agents:update",
 
@@ -120,9 +120,7 @@ export function useAgent() {
                 "useAgent unmounted"
             );
 
-            socketService.off(
-                "agents:update"
-            );
+            unsubscribe();
 
         };
 

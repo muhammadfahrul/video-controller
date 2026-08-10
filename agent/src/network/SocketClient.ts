@@ -42,6 +42,13 @@ export class SocketClient {
     private playlistService?: PlaylistService;
     private agent?: Agent;
 
+    // Restore payloads received before playerService/playlistService are
+    // ready (they're set later in Agent.start(), after browser.start()) are
+    // buffered here and flushed once the corresponding service is set -
+    // otherwise a restore push that races boot is silently dropped forever.
+    private pendingPlayerRestore?: { agentId?: string; player?: any };
+    private pendingPlaylistRestore?: any;
+
 
     constructor(
         private readonly serverUrl: string,
@@ -134,6 +141,13 @@ export class SocketClient {
                 } catch (err) {
 
                     console.error("Command error", err);
+
+                    this.sendError({
+                        type: "COMMAND_ERROR",
+                        message: err instanceof Error ? err.message : String(err),
+                        stack: err instanceof Error ? err.stack : undefined,
+                        context: { command }
+                    });
 
                 }
 
@@ -337,29 +351,35 @@ export class SocketClient {
                 // Check if this is a restore response (no video playing)
                 if (payload.player && payload.player.videoId && payload.player.videoId !== "") {
                     console.log("[SOCKET] Received player state from server (restore):", payload.player);
-                    
+
                     // Restore player state using PlayerService
                     if (this.playerService) {
                         await this.playerService.restoreState(payload.player);
                         console.log("[SOCKET] Player state restored from server");
+                    } else {
+                        console.log("[SOCKET] playerService not ready yet, buffering restore payload");
+                        this.pendingPlayerRestore = payload;
                     }
                 }
             }
         );
 
         this.socket?.off(SocketEvents.PLAYLIST_STATE);
-        
+
         this.socket?.on(
             SocketEvents.PLAYLIST_STATE,
             async (payload: any) => {
                 // Only handle if we receive playlist data (not when we send)
                 if (payload && payload.items && payload.items.length > 0) {
                     console.log("[SOCKET] Received playlist state from server (restore):", payload);
-                    
+
                     // Restore playlist state using PlaylistService
                     if (this.playlistService) {
                         await this.playlistService.restoreState(payload);
                         console.log("[SOCKET] Playlist state restored from server");
+                    } else {
+                        console.log("[SOCKET] playlistService not ready yet, buffering restore payload");
+                        this.pendingPlaylistRestore = payload;
                     }
                 }
             }
@@ -547,11 +567,27 @@ export class SocketClient {
     // Set player service for clear data functionality
     public setPlayerService(playerService: PlayerService): void {
         this.playerService = playerService;
+
+        // Flush any restore payload that arrived before this service was ready
+        if (this.pendingPlayerRestore) {
+            const payload = this.pendingPlayerRestore;
+            this.pendingPlayerRestore = undefined;
+            console.log("[SOCKET] Flushing buffered player restore payload");
+            void this.playerService.restoreState(payload.player);
+        }
     }
 
     // Set playlist service for clear data functionality
     public setPlaylistService(playlistService: PlaylistService): void {
         this.playlistService = playlistService;
+
+        // Flush any restore payload that arrived before this service was ready
+        if (this.pendingPlaylistRestore) {
+            const payload = this.pendingPlaylistRestore;
+            this.pendingPlaylistRestore = undefined;
+            console.log("[SOCKET] Flushing buffered playlist restore payload");
+            void this.playlistService.restoreState(payload);
+        }
     }
 
     // Set agent reference for sync control

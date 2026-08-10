@@ -5,11 +5,8 @@ import CurrentVideo from "../features/player/components/CurrentVideo";
 import BillingStatus from "../features/player/components/BillingStatus";
 import { useAppStore } from "../store/appStore";
 import { playerCommandService } from "../services";
-import { usePlayer } from "../hooks/usePlayer";
 
 export default function HomePage(){
-
-    usePlayer();
 
     const { agent, player, setProcessing } = useAppStore();
 

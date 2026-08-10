@@ -1,10 +1,6 @@
 import PlaylistPanel from "../features/playlist/components/PlaylistPanel";
-import { usePlaylist } from "../hooks/usePlaylist";
 
 export default function PlaylistPage() {
-
-    // Initialize playlist listener to receive playlist state updates
-    usePlaylist();
 
     return (
 

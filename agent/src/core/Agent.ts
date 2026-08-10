@@ -98,6 +98,16 @@ export class Agent {
     // Flag to pause state sync during data clearing
     private isSyncingPaused = false;
 
+    // Timestamp when sync was paused - used by the safety-timeout watchdog in
+    // startPlayerStateSync() to auto-resume if the expected reactivation
+    // event (which normally calls resumeStateSync()) is ever missed.
+    private syncPausedAt?: number;
+
+    // Safety margin for the pause watchdog. The real clear-data sequence only
+    // needs ~100-500ms; this is a generous bound so a missed reactivation
+    // event can't wedge sync off forever.
+    private static readonly SYNC_PAUSE_SAFETY_TIMEOUT_MS = 15000;
+
     private identity:
         AgentIdentity;
 
@@ -574,12 +584,14 @@ export class Agent {
     // Pause state sync during data clearing
     public pauseStateSync(): void {
         this.isSyncingPaused = true;
+        this.syncPausedAt = Date.now();
         console.log("[AGENT] State sync paused, isSyncingPaused:", this.isSyncingPaused);
     }
 
     // Resume state sync when data is cleared or room is reactivated
     public resumeStateSync(): void {
         this.isSyncingPaused = false;
+        this.syncPausedAt = undefined;
         console.log("[AGENT] State sync resumed, isSyncingPaused:", this.isSyncingPaused);
     }
 
@@ -625,6 +637,61 @@ export class Agent {
     }
 
 
+    // Local safety net: if expiresAt has passed but the room is still marked
+    // active locally, self-deactivate instead of relying solely on an
+    // explicit deactivation push (agent:activation / cashier:deactivate-room)
+    // arriving. Mirrors the stop+expired-image sequence SocketClient already
+    // runs for those two events.
+    private async checkExpiryWatchdog(): Promise<void> {
+        if (!this.identity.isActive || !this.identity.expiresAt) {
+            return;
+        }
+
+        if (Date.now() < this.identity.expiresAt) {
+            return;
+        }
+
+        console.warn(
+            "[AGENT] Expiry watchdog: expiresAt has passed but room still marked active locally - self-deactivating"
+        );
+
+        this.identity.isActive = false;
+
+        try {
+            await this.player?.stop();
+        } catch (err) {
+            console.error("[AGENT] Error stopping playback (expiry watchdog):", err);
+        }
+
+        try {
+            await this.player?.showExpiredImage();
+        } catch (err) {
+            console.error("[AGENT] Error showing expired image (expiry watchdog):", err);
+        }
+    }
+
+    // Safety net for pauseStateSync(): if sync has been paused for longer
+    // than SYNC_PAUSE_SAFETY_TIMEOUT_MS with no reactivation event arriving
+    // to resume it, auto-resume so a single missed event can't permanently
+    // stop the agent from ever reporting state again.
+    private checkPauseWatchdog(): void {
+        if (
+            !this.isSyncingPaused ||
+            !this.syncPausedAt ||
+            Date.now() - this.syncPausedAt <= Agent.SYNC_PAUSE_SAFETY_TIMEOUT_MS
+        ) {
+            return;
+        }
+
+        console.warn(
+            "[AGENT] State sync watchdog: paused for over",
+            Agent.SYNC_PAUSE_SAFETY_TIMEOUT_MS,
+            "ms with no reactivation event - auto-resuming"
+        );
+
+        this.resumeStateSync();
+    }
+
     private startPlayerStateSync() {
 
         this.playerStateTimer = setInterval(
@@ -632,6 +699,10 @@ export class Agent {
             async () => {
 
                 try {
+
+                    await this.checkExpiryWatchdog();
+
+                    this.checkPauseWatchdog();
 
                     // Skip sending state if sync is paused (during data clearing)
                     if (this.isSyncingPaused) {

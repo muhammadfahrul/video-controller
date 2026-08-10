@@ -23,6 +23,14 @@ export class PlayerService {
     private restoredSnapshot?: PlayerSnapshot;
 
     private lastHealthySnapshot?: PlayerSnapshot;
+    private lastHealthySnapshotAt?: number;
+
+    // Max age the last-healthy fallback may be served for. Long enough to
+    // smooth a real transient glitch (e.g. duration briefly reporting 0
+    // during an ad transition), short enough that a persistently stuck
+    // player doesn't silently feed indefinitely stale data into the 1s
+    // server-facing state-sync stream.
+    private static readonly HEALTHY_SNAPSHOT_MAX_AGE_MS = 5000;
 
     private restoring = false;
 
@@ -64,6 +72,7 @@ export class PlayerService {
         // Clear in-memory state
         this.restoredSnapshot = undefined;
         this.lastHealthySnapshot = undefined;
+        this.lastHealthySnapshotAt = undefined;
         
         console.log("[PlayerService] All player state cleared");
         
@@ -334,20 +343,34 @@ export class PlayerService {
         if (this.isHealthySnapshot(snapshot)) {
 
             this.lastHealthySnapshot = snapshot;
+            this.lastHealthySnapshotAt = Date.now();
 
             return snapshot;
 
         }
 
-        console.warn(
-            "[PLAYER] Invalid snapshot, using last healthy snapshot."
-        );
+        const fallbackAge =
+            this.lastHealthySnapshotAt
+                ? Date.now() - this.lastHealthySnapshotAt
+                : undefined;
 
-        if (this.lastHealthySnapshot) {
+        if (
+            this.lastHealthySnapshot &&
+            fallbackAge !== undefined &&
+            fallbackAge <= PlayerService.HEALTHY_SNAPSHOT_MAX_AGE_MS
+        ) {
+
+            console.warn(
+                `[PLAYER] Invalid snapshot, using last healthy snapshot (age ${fallbackAge}ms).`
+            );
 
             return this.lastHealthySnapshot;
 
         }
+
+        console.warn(
+            "[PLAYER] Invalid snapshot and no recent healthy snapshot to fall back to; returning raw snapshot."
+        );
 
         return snapshot;
 

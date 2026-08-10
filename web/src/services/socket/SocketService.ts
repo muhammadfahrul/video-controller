@@ -87,27 +87,19 @@ export class SocketService {
     private registerPendingHandlers() {
 
         for (const handler of this.pendingHandlers) {
-            
+
             console.log(
                 "[Socket] Register pending handler:",
                 handler.event
             );
 
-            const originalCallback = handler.callback;
-            
+            // Register the already-wrapped callback directly (it was wrapped
+            // once in on()) - wrapping it again here would create a second
+            // function reference that on()'s returned unsubscribe could never
+            // find/remove via socket.off(event, wrapped).
             this.socket?.on(
                 handler.event,
-                (payload: unknown) => {
-
-                    console.log(
-                        "[Socket] Receive",
-                        handler.event,
-                        payload
-                    );
-
-                    originalCallback(payload);
-
-                }
+                handler.callback
             );
 
         }
@@ -123,54 +115,58 @@ export class SocketService {
         this.socket = undefined;
     }
 
+    // Returns an unsubscribe function that removes only this specific
+    // listener - never use socket.off(event) directly, since that would
+    // remove every listener registered for that event name, including ones
+    // owned by other, unrelated subscribers.
     on<T>(
         event: string,
         callback: (payload: T) => void
-    ) {
+    ): () => void {
 
         console.log(
             "[Socket] Register",
             event
         );
 
+        const wrapped = (payload: T) => {
+
+            console.log(
+                "[Socket] Receive",
+                event,
+                payload
+            );
+            callback(payload);
+
+        };
+
         // If socket is already connected, register immediately
         if (this.socket?.connected) {
-            
+
             this.socket.on(
                 event,
-                (payload: T) => {
-
-                    console.log(
-                        "[Socket] Receive",
-                        event,
-                        payload
-                    );
-                    // Debug: Log ALL events
-                    console.log("[Socket] All events - event:", event, "payload:", payload);
-                    callback(payload);
-
-                }
+                wrapped as EventCallback
             );
 
         } else {
-            
+
             // Store handler to register after connection
             this.pendingHandlers.push({
                 event,
-                callback: callback as EventCallback
+                callback: wrapped as EventCallback
             });
-            
+
         }
 
-    }
+        return () => {
 
-    off(
+            this.socket?.off(event, wrapped as EventCallback);
 
-        event: string
+            this.pendingHandlers = this.pendingHandlers.filter(
+                (h) => !(h.event === event && h.callback === wrapped)
+            );
 
-    ) {
-
-        this.socket?.off(event);
+        };
 
     }
 
