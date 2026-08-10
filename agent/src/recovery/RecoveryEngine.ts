@@ -109,6 +109,8 @@ export class RecoveryEngine {
 
                             await this.restorePlayback();
 
+                            break;
+
                         default:
 
                             LoggerService.warn(
@@ -146,17 +148,33 @@ export class RecoveryEngine {
             };
         }
 
+        catch (error) {
+
+            LoggerService.error(
+
+                `[RECOVERY] Failed ${action}: ${error}`
+
+            );
+
+            return {
+
+                action,
+
+                success: false,
+
+                timestamp: Date.now()
+
+            };
+
+        }
+
         finally {
 
             this.snapshot.state =
 
                 RecoveryState.IDLE;
 
-            LoggerService.error(
-
-                `[RECOVERY] Failed ${action}`
-
-            );
+            this.recovering = false;
 
         }
 

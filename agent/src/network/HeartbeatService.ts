@@ -16,7 +16,7 @@ export class HeartbeatService {
             SocketClient,
 
         private readonly interval =
-            10000
+            5000
     ){}
 
 

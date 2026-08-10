@@ -8,11 +8,15 @@ import { PageHealthCheck } from "./PageHealthCheck";
 import { VideoHealthCheck } from "./VideoHealthCheck";
 import { PlayerService } from "../services/PlayerService";
 import { PlayerHealthCheck } from "./PlayerHealthCheck";
+import { RecoveryEngine } from "../recovery/RecoveryEngine";
+import { RecoveryAction } from "../recovery/RecoveryAction";
 
 export class HealthService {
 
     private readonly scheduler =
         new HealthScheduler();
+
+    private readonly recovery: RecoveryEngine;
 
     private readonly browserCheck:
         BrowserHealthCheck;
@@ -87,6 +91,12 @@ export class HealthService {
             new PlayerHealthCheck(
                 player
             );
+
+        this.recovery =
+            new RecoveryEngine({
+                browser,
+                player
+            });
 
     }
 
@@ -193,6 +203,41 @@ export class HealthService {
                 `[HEALTH] Consecutive failures: ${this.consecutiveFailures}`
 
             );
+
+            if (
+
+                this.shouldRecover() &&
+                !this.recovery.isRecovering()
+
+            ) {
+
+                if (!browserHealthy) {
+
+                    LoggerService.error(
+
+                        "[HEALTH] Browser unrecoverable in-process, exiting so the process manager can relaunch it."
+
+                    );
+
+                    process.exit(1);
+
+                } else {
+
+                    this.recovery.recover(
+                        RecoveryAction.RELOAD_PAGE
+                    ).catch((error) => {
+
+                        LoggerService.error(
+                            `[HEALTH] Recovery attempt failed: ${error}`
+                        );
+
+                    });
+
+                }
+
+                this.consecutiveFailures = 0;
+
+            }
 
         }
 

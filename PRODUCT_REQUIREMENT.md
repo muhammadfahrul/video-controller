@@ -30,7 +30,7 @@
 │   │ + SQLite lokal        │  │   │   │ + SQLite lokal        │  │   │   │ + SQLite lokal        │  │
 │   └───────────────────────┘  │   │   └───────────────────────┘  │   │   └───────────────────────┘  │
 │   ┌───────────────────────┐  │   │   ┌───────────────────────┐  │   │   ┌───────────────────────┐  │
-│   │ Web PWA :53332        │  │   │   │ Web PWA :53332        │  │   │   │ Web PWA :53332        │  │
+│   │ Web PWA :53333        │  │   │   │ Web PWA :53333        │  │   │   │ Web PWA :53333        │  │
 │   │ (opsional, kontrol)   │  │   │   │ (opsional, kontrol)   │  │   │   │ (opsional, kontrol)   │  │
 │   └───────────────────────┘  │   │   └───────────────────────┘  │   │   └───────────────────────┘  │
 └──────────────┬───────────────┘   └──────────────┬───────────────┘   └──────────────┬───────────────┘
@@ -63,8 +63,8 @@
 | Komponen | Port Default | Catatan |
 |----------|-------------|---------|
 | Server (Socket.IO + Express) | `53331` | tiap PC ruangan, hardcoded |
-| Web Vite dev | `5173` | tiap PC ruangan saat dev |
-| Web Vite preview | `53332` | production preview di tiap PC ruangan |
+| Web Vite dev | `53332` | tiap PC ruangan saat dev |
+| Web Vite preview | `53333` | production preview di tiap PC ruangan |
 | Cashier Vite dev | `53334` | PC Kasir |
 | Cashier Vite preview | `53335` | production preview di PC Kasir |
 
@@ -247,10 +247,11 @@ VITE_ROOMS=[
 | **AKTIF** | Ruangan aktif, timer berjalan | Deactivate, Extend, Move |
 | **UNPAID** | Ada transaksi `paidAt=0` | Activate diblokir, harus bayar dulu |
 | **PAID** | Transaksi `paidAt>0`, masih dalam window BERSIHKAN | Mark as Cleaned (manual) atau tunggu auto |
-| **BERSIHKAN** | 0–30 menit setelah paid | Activate diblokir, harus tunggu SUDAH DIBERSIHKAN |
-| **SUDAH DIBERSIHKAN** | `cleanedAt>0` atau >30 menit setelah paid | Activate bisa dilakukan lagi |
+| **BERSIHKAN** | 0–30 menit setelah paid, `cleanedAt` belum diisi | Activate diblokir, harus tunggu SUDAH DIBERSIHKAN |
+| **SUDAH DIBERSIHKAN** | `cleanedAt>0`, atau 30–60 menit setelah paid (auto tanpa mark manual) | Activate bisa dilakukan lagi |
+| **ONLINE (auto-revert)** | >60 menit setelah paid dan belum di-mark cleaned manual | Status kembali ke ONLINE otomatis, Activate bisa dilakukan lagi |
 
-> Detail timing & threshold lihat `RoomCard.tsx → getPaidStatus()`.
+> Detail timing & threshold lihat `cashier/src/components/RoomCard.tsx → getPaidStatus()` (`CLEANING_THRESHOLD=30menit`, `CLEANED_THRESHOLD=60menit`).
 
 ---
 
