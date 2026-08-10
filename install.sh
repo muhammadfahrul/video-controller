@@ -399,12 +399,12 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
 
     echo "⬇️ Downloading repository archive..."
 
-    # Create video-controller subfolder in current directory
-    DEST_DIR="$PROJECT_ROOT/video-controller"
+    # Create video-controller-final subfolder in current directory
+    DEST_DIR="$PROJECT_ROOT/video-controller-final"
     
-    REPO_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
-    ARCHIVE_NAME="video-controller-main.zip"
-    EXTRACT_DIR="$DEST_DIR/video-controller-main"
+    REPO_URL="https://github.com/muhammadfahrul/video-controller-final/archive/refs/heads/main.zip"
+    ARCHIVE_NAME="video-controller-final-main.zip"
+    EXTRACT_DIR="$DEST_DIR/video-controller-final-main"
 
     cd /tmp
     rm -f "$ARCHIVE_NAME"
@@ -418,7 +418,7 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
     mkdir -p "$DEST_DIR"
     unzip -q "$ARCHIVE_NAME" -d "$DEST_DIR"
     
-    # Move contents from video-controller-main to DEST_DIR
+    # Move contents from video-controller-final-main to DEST_DIR
     if [ -d "$EXTRACT_DIR" ]; then
         mv "$EXTRACT_DIR/"* "$DEST_DIR/"
         rm -rf "$EXTRACT_DIR"
@@ -718,7 +718,7 @@ setup_autostart() {
     # Setup based on mode
     if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
         # Server service
-        cat > "$SYSTEMD_USER_DIR/video-controller-server.service" << EOF
+        cat > "$SYSTEMD_USER_DIR/video-controller-final-server.service" << EOF
 [Unit]
 Description=Video Controller Server
 After=network.target
@@ -734,14 +734,14 @@ Environment=NODE_ENV=production
 [Install]
 WantedBy=default.target
 EOF
-        echo "   ✅ video-controller-server.service"
+        echo "   ✅ video-controller-final-server.service"
         
         # Agent service (visible browser with DISPLAY access)
-        cat > "$SYSTEMD_USER_DIR/video-controller-agent.service" << EOF
+        cat > "$SYSTEMD_USER_DIR/video-controller-final-agent.service" << EOF
 [Unit]
 Description=Video Controller Agent
-After=network.target video-controller-server.service
-Wants=video-controller-server.service
+After=network.target video-controller-final-server.service
+Wants=video-controller-final-server.service
 
 [Service]
 Type=simple
@@ -756,10 +756,10 @@ RestartSec=10
 [Install]
 WantedBy=default.target
 EOF
-        echo "   ✅ video-controller-agent.service"
+        echo "   ✅ video-controller-final-agent.service"
         
         # Web service
-        cat > "$SYSTEMD_USER_DIR/video-controller-web.service" << EOF
+        cat > "$SYSTEMD_USER_DIR/video-controller-final-web.service" << EOF
 [Unit]
 Description=Video Controller Web
 After=network.target
@@ -774,12 +774,12 @@ RestartSec=10
 [Install]
 WantedBy=default.target
 EOF
-        echo "   ✅ video-controller-web.service"
+        echo "   ✅ video-controller-final-web.service"
     fi
     
     if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
         # Cashier service
-        cat > "$SYSTEMD_USER_DIR/video-controller-cashier.service" << EOF
+        cat > "$SYSTEMD_USER_DIR/video-controller-final-cashier.service" << EOF
 [Unit]
 Description=Video Controller Cashier
 After=network.target
@@ -794,7 +794,7 @@ RestartSec=10
 [Install]
 WantedBy=default.target
 EOF
-        echo "   ✅ video-controller-cashier.service"
+        echo "   ✅ video-controller-final-cashier.service"
     fi
     
     # Reload systemd
@@ -811,23 +811,23 @@ EOF
     # Show enable commands based on mode
     if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
         echo "Untuk mengaktifkan Room App auto-start:"
-        echo "  systemctl --user enable video-controller-server.service"
-        echo "  systemctl --user enable video-controller-agent.service"
-        echo "  systemctl --user enable video-controller-web.service"
+        echo "  systemctl --user enable video-controller-final-server.service"
+        echo "  systemctl --user enable video-controller-final-agent.service"
+        echo "  systemctl --user enable video-controller-final-web.service"
         echo ""
         echo "Untuk memulai sekarang:"
-        echo "  systemctl --user start video-controller-server.service"
-        echo "  systemctl --user start video-controller-agent.service"
-        echo "  systemctl --user start video-controller-web.service"
+        echo "  systemctl --user start video-controller-final-server.service"
+        echo "  systemctl --user start video-controller-final-agent.service"
+        echo "  systemctl --user start video-controller-final-web.service"
         echo ""
     fi
     
     if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
         echo "Untuk mengaktifkan Kasir auto-start:"
-        echo "  systemctl --user enable video-controller-cashier.service"
+        echo "  systemctl --user enable video-controller-final-cashier.service"
         echo ""
         echo "Untuk memulai sekarang:"
-        echo "  systemctl --user start video-controller-cashier.service"
+        echo "  systemctl --user start video-controller-final-cashier.service"
         echo ""
     fi
     
@@ -840,25 +840,25 @@ EOF
         echo "🔄 Mengaktifkan services..."
         
         if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
-            systemctl --user enable video-controller-server.service
-            systemctl --user enable video-controller-agent.service
-            systemctl --user enable video-controller-web.service
+            systemctl --user enable video-controller-final-server.service
+            systemctl --user enable video-controller-final-agent.service
+            systemctl --user enable video-controller-final-web.service
             
             echo ""
             echo "▶️ Memulai Room App services..."
-            systemctl --user start video-controller-server.service
+            systemctl --user start video-controller-final-server.service
             sleep 2
-            systemctl --user start video-controller-agent.service
+            systemctl --user start video-controller-final-agent.service
             sleep 1
-            systemctl --user start video-controller-web.service
+            systemctl --user start video-controller-final-web.service
         fi
         
         if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
-            systemctl --user enable video-controller-cashier.service
+            systemctl --user enable video-controller-final-cashier.service
             
             echo ""
             echo "▶️ Memulai Kasir service..."
-            systemctl --user start video-controller-cashier.service
+            systemctl --user start video-controller-final-cashier.service
         fi
         
         echo ""
@@ -876,32 +876,32 @@ remove_autostart() {
     
     if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
         # Stop Room App services
-        systemctl --user stop video-controller-server.service 2>/dev/null || true
-        systemctl --user stop video-controller-agent.service 2>/dev/null || true
-        systemctl --user stop video-controller-web.service 2>/dev/null || true
+        systemctl --user stop video-controller-final-server.service 2>/dev/null || true
+        systemctl --user stop video-controller-final-agent.service 2>/dev/null || true
+        systemctl --user stop video-controller-final-web.service 2>/dev/null || true
         
         # Disable Room App services
-        systemctl --user disable video-controller-server.service 2>/dev/null || true
-        systemctl --user disable video-controller-agent.service 2>/dev/null || true
-        systemctl --user disable video-controller-web.service 2>/dev/null || true
+        systemctl --user disable video-controller-final-server.service 2>/dev/null || true
+        systemctl --user disable video-controller-final-agent.service 2>/dev/null || true
+        systemctl --user disable video-controller-final-web.service 2>/dev/null || true
         
         # Remove Room App service files
-        rm -f "$SYSTEMD_USER_DIR/video-controller-server.service"
-        rm -f "$SYSTEMD_USER_DIR/video-controller-agent.service"
-        rm -f "$SYSTEMD_USER_DIR/video-controller-web.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-final-server.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-final-agent.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-final-web.service"
         
         echo "   ✅ Room App services removed"
     fi
     
     if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
         # Stop Kasir service
-        systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+        systemctl --user stop video-controller-final-cashier.service 2>/dev/null || true
         
         # Disable Kasir service
-        systemctl --user disable video-controller-cashier.service 2>/dev/null || true
+        systemctl --user disable video-controller-final-cashier.service 2>/dev/null || true
         
         # Remove Kasir service file
-        rm -f "$SYSTEMD_USER_DIR/video-controller-cashier.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-final-cashier.service"
         
         echo "   ✅ Kasir service removed"
     fi
