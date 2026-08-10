@@ -2,9 +2,8 @@ import { io, Socket } from "socket.io-client";
 
 import { env } from "../../config/env";
 
-import { useAppStore } from "../../store/appStore";
-
 type EventCallback = (payload: unknown) => void;
+type ConnectCallback = () => void;
 
 interface PendingHandler {
     event: string;
@@ -15,6 +14,7 @@ export class SocketService {
 
     private socket?: Socket;
     private pendingHandlers: PendingHandler[] = [];
+    private connectCallbacks: ConnectCallback[] = [];
 
     connect() {
 
@@ -56,10 +56,7 @@ export class SocketService {
             // Request current state from server to ensure we have latest data
             this.socket?.emit("client:request-state");
 
-            // Disable initial loading after data is received
-            setTimeout(() => {
-                useAppStore.getState().setInitialLoading(false);
-            }, 1000);
+            this.connectCallbacks.forEach((cb) => cb());
 
         });
 
@@ -166,6 +163,18 @@ export class SocketService {
                 (h) => !(h.event === event && h.callback === wrapped)
             );
 
+        };
+
+    }
+
+    // Subscribe to the socket's 'connect' event (fires on every connect,
+    // including reconnects - same as the raw socket.io 'connect' event).
+    onConnect(callback: ConnectCallback): () => void {
+
+        this.connectCallbacks.push(callback);
+
+        return () => {
+            this.connectCallbacks = this.connectCallbacks.filter((cb) => cb !== callback);
         };
 
     }

@@ -1,5 +1,5 @@
 import { socketService } from "../socket";
-import { useAppStore } from "../../store/appStore";
+import { appStateService } from "../AppStateService";
 import type { PlayerState } from "../../types/app/PlayerState";
 
 export class PlayerStateListener {
@@ -16,7 +16,7 @@ export class PlayerStateListener {
                     return;
                 }
 
-                useAppStore.getState().setPlayer({
+                appStateService.setPlayer({
                     playing: player.playing,
                     currentTime: player.currentTime,
                     duration: player.duration,
@@ -45,7 +45,7 @@ export class PlayerStateListener {
                     return;
                 }
 
-                useAppStore.getState().setPlayer({
+                appStateService.setPlayer({
                     playing: player.playing,
                     currentTime: player.currentTime,
                     duration: player.duration,

@@ -32,23 +32,22 @@ import {
 
 import {
 
-    useAppStore
+    useAgentState,
+    usePlayerState
 
-} from "../../../store/appStore";
+} from "../../../hooks/useAppState";
+
+import {
+
+    useLoading
+
+} from "../../../context/LoadingContext";
 
 export default function PlayerControls() {
 
-    const {
-
-        player,
-
-        agent,
-
-        processing,
-
-        setProcessing
-
-    } = useAppStore();
+    const player = usePlayerState();
+    const agent = useAgentState();
+    const { processing, setProcessing } = useLoading();
 
     let statusText = "Offline";
 

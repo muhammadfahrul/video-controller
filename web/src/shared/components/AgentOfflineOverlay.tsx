@@ -1,8 +1,8 @@
 import { WifiOff, Lock } from "lucide-react";
-import { useAppStore } from "../../store/appStore";
+import { useAgentState } from "../../hooks/useAppState";
 
 export default function AgentOfflineOverlay() {
-  const { agent } = useAppStore();
+  const agent = useAgentState();
 
   if (agent.online) {
     return null;

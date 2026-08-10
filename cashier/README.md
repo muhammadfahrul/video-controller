@@ -93,10 +93,10 @@ cashier/
 ├── src/
 │   ├── components/     # UI components (Button, Card, dll)
 │   ├── config/        # Konfigurasi aplikasi
+│   ├── context/       # React Context (room config, loading state)
 │   ├── layouts/       # Layout components
 │   ├── pages/         # Halaman (Home, RoomDetail, dll)
-│   ├── services/      # Socket service
-│   ├── store/        # Zustand state management
+│   ├── services/      # Socket service (juga pemilik data transaksi)
 │   ├── types/         # TypeScript types
 │   └── utils/         # Utility functions
 ├── dist/              # Build output

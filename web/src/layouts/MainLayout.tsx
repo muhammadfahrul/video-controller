@@ -4,7 +4,7 @@ import Footer from "./Footer";
 
 import FullPageLoading from "../shared/components/FullPageLoading";
 
-import { useAppStore } from "../store/appStore";
+import { useLoading } from "../context/LoadingContext";
 import { useAgent } from "../hooks/useAgent";
 
 export default function MainLayout() {
@@ -13,9 +13,7 @@ export default function MainLayout() {
     // so socket listener is always active across all pages
     useAgent();
 
-    const globalLoading = useAppStore((state)=>state.globalLoading);
-    const initialLoading = useAppStore((state)=>state.initialLoading);
-    const processing = useAppStore((state)=>state.processing);
+    const { globalLoading, initialLoading, processing } = useLoading();
 
     // Check if any processing action is active
     const isProcessing = Object.values(processing).some(Boolean);

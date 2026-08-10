@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, Infinity as InfinityIcon } from "lucide-react";
-import { useAppStore } from "../../../store/appStore";
+import { useAgentState } from "../../../hooks/useAppState";
 import { env } from "../../../config/env";
 
 function formatRemaining(ms: number): string {
@@ -17,7 +17,7 @@ function formatRemaining(ms: number): string {
 
 export default function BillingStatus() {
 
-    const { agent } = useAppStore();
+    const agent = useAgentState();
     const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {

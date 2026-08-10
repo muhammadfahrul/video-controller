@@ -4,19 +4,21 @@ import {
 
 
 import {
-    useAppStore
-} from "../../../store/appStore";
+    useAgentState,
+    usePlaylistState
+} from "../../../hooks/useAppState";
+
+import {
+    useLoading
+} from "../../../context/LoadingContext";
 
 
 export default function PlaylistToolbar(){
 
 
-const {
-    agent,
-    playlist,
-    processing,
-    setProcessing
-}=useAppStore();
+const agent = useAgentState();
+const playlist = usePlaylistState();
+const { processing, setProcessing } = useLoading();
 
 
 const handleClearPlaylist = () => {

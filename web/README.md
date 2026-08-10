@@ -66,14 +66,14 @@ web/
 │   ├── api/            # API calls
 │   ├── assets/         # Static assets
 │   ├── config/         # Configuration
+│   ├── context/        # React Context (loading state)
 │   ├── features/       # Feature modules
 │   ├── hooks/         # Custom React hooks
 │   ├── layouts/       # Layout components
 │   ├── pages/         # Page components
 │   ├── routes/        # Routing
-│   ├── services/      # Services (socket, dll)
+│   ├── services/      # Services (socket, dll - juga pemilik agent/player/playlist state)
 │   ├── shared/        # Shared components
-│   ├── store/         # Zustand state management
 │   ├── types/         # TypeScript types
 │   ├── utils/         # Utilities
 │   ├── App.tsx        # Main app component
@@ -169,7 +169,7 @@ npm run build
 - **Vite** - Build tool
 - **Tailwind CSS** - Styling
 - **Socket.io Client** - Real-time communication
-- **Zustand** - State management
+- **React Context + service singleton** - State management (tidak pakai Zustand, lihat PRD §9.4)
 - **React Query** - Data fetching
 - **React Router** - Routing
 - **PWA** - Progressive Web App

@@ -4,8 +4,8 @@ import {
 
 
 import {
-    useAppStore
-} from "../../store/appStore";
+    appStateService
+} from "../AppStateService";
 
 import type { PlaylistState } from "../../types/app/PlaylistState";
 
@@ -29,13 +29,11 @@ export function registerPlaylistListener(){
             );
 
 
-            useAppStore
-                .getState()
-                .setPlaylist(
+            appStateService.setPlaylist(
 
-                    snapshot
+                snapshot
 
-                );
+            );
 
             console.log(
                 "[PlaylistListener] Updated playlist state:",
@@ -66,13 +64,11 @@ export function registerPlaylistListener(){
             );
 
 
-            useAppStore
-                .getState()
-                .setPlaylist(
+            appStateService.setPlaylist(
 
-                    snapshot
+                snapshot
 
-                );
+            );
 
             console.log(
                 "[PlaylistListener] Updated playlist from update:",

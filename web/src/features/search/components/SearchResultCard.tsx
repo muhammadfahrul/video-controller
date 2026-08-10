@@ -5,7 +5,8 @@ import type {
 
 } from "../types/SearchResult";
 
-import { useAppStore } from "../../../store/appStore";
+import { useAgentState } from "../../../hooks/useAppState";
+import { useLoading } from "../../../context/LoadingContext";
 
 import {
 
@@ -34,15 +35,13 @@ export default function SearchResultCard({
 
 }:Props){
 
+    const agent = useAgentState();
     const {
-
-        agent,
         addingToPlaylist,
         setAddingToPlaylist,
         setProcessing,
         processing
-
-    } = useAppStore();
+    } = useLoading();
 
     const play = () => {
 

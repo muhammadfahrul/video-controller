@@ -1,6 +1,6 @@
-# Video Controller — Product Requirement Document (PRD) v2
+# Video Controller — Product Requirement Document (PRD) v3
 
-> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user).
+> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`).
 
 ---
 
@@ -65,9 +65,9 @@
 | Komponen | Port Default | Stack | Catatan |
 |----------|-------------|-------|---------|
 | Server (Socket.IO + Express) | `53331` | Express 5 + Socket.IO 4 + sql.js (WASM SQLite) + googleapis | tiap PC ruangan, hardcoded |
-| Web Vite dev | `53332` | React 19 + Vite + Tailwind v4 + Zustand | tiap PC ruangan saat dev |
+| Web Vite dev | `53332` | React 19 + Vite + Tailwind v4 (Zustand dihapus, lihat §9.4) | tiap PC ruangan saat dev |
 | Web Vite preview | `53333` | — | production preview di tiap PC ruangan |
-| Cashier Vite dev | `53334` | React + Vite + Zustand + socket.io-client | PC Kasir |
+| Cashier Vite dev | `53334` | React + Vite + Context API + socket.io-client (Zustand dihapus, lihat §9.3) | PC Kasir |
 | Cashier Vite preview | `53335` | — | production preview di PC Kasir |
 | Agent | (tidak ada port sendiri) | Node + Playwright/Chromium (persistent context) | menghubungi server via `SERVER_IP:PORT` |
 
@@ -134,7 +134,7 @@ VITE_ROOMS=[
   {"roomId":"room-003","name":"Room 3","ip":"192.168.1.12", "port":53331,"pricePerHour":45000}
 ]
 ```
-`config.id` di-set ke `room.roomId` (bukan id acak terpisah) — lihat `useRoomStore.ts:48-112`. `pricePerHour` default `50000` kalau tidak diisi (`?? 50000`), tapi angka default ini **terduplikasi di 4 lokasi kode berbeda** (`useRoomStore.ts:105`, `MultiSocketService.ts:421,886`, `RoomCard.tsx:215`) — bukan konstanta tersentralisasi.
+`config.id` di-set ke `room.roomId` (bukan id acak terpisah) — lihat `context/RoomConfigContext.tsx` (`loadRoomsFromEnv()`, pindahan dari `useRoomStore.ts` lama pasca penghapusan Zustand, §9.3). `pricePerHour` default `50000` kalau tidak diisi (`?? 50000`), tapi angka default ini **terduplikasi di beberapa lokasi kode berbeda** (`RoomConfigContext.tsx`, `MultiSocketService.ts`, `RoomCard.tsx`) — bukan konstanta tersentralisasi.
 
 `VITE_SERVER_PORT` dideklarasikan di `cashier/src/vite-env.d.ts:3-7` tapi **tidak pernah dibaca** — dead env var.
 
@@ -387,6 +387,12 @@ Selama menunggu, agent kirim heartbeat manual tiap 5 detik (terpisah dari `Heart
 
 Event `cashier:deactivate-room` juga punya listener terpisah (`setupDeactivationListener`) yang melakukan hal sama — dua jalur independen menuju efek yang sama.
 
+**Fix sesi ini (§9.3) — restore payload race saat boot**: `setupDatabaseRestoreListener()` (menangani push balik `PLAYER_STATE`/`PLAYLIST_STATE` dari server untuk restore state lama) didaftarkan segera setelah `connect`, tapi `playerService`/`playlistService` baru di-set jauh belakangan (setelah `browser.start()`, dan setelah `waitForActivation()` yang bisa lama kalau menunggu kasir). Kalau payload restore tiba di jendela waktu itu, dulu **hilang diam-diam** (`if (this.playerService) {...}` tanpa `else`). Sekarang di-buffer (`pendingPlayerRestore`/`pendingPlaylistRestore`) dan di-flush otomatis begitu `setPlayerService()`/`setPlaylistService()` dipanggil.
+
+**Fix sesi ini (§9.3) — `pauseStateSync` bisa macet permanen**: `agent:clear-data` memanggil `pauseStateSync()`, dan **satu-satunya** tempat yang meng-resume adalah event `agent:activation{isActive:true}`. Kalau event reaktivasi itu pernah hilang/tidak sampai, sync state ke server berhenti **selamanya** sampai proses agent di-restart. Sekarang ada watchdog: kalau sudah paused >15 detik (jendela clear-data asli cuma butuh ~100-500ms) tanpa reaktivasi, `Agent.ts` auto-resume sendiri (dicek tiap tick 1 detik `startPlayerStateSync`, lewat `checkPauseWatchdog()`).
+
+**Fix sesi ini (§9.3) — `expiresAt` tidak pernah ditegakkan lokal**: `identity.expiresAt` disimpan tapi sebelumnya tidak pernah dibandingkan ke `Date.now()` di mana pun — agent 100% bergantung pada event deactivate dari server sampai. Kalau event itu hilang, agent bisa terus memutar video walau waktu sudah habis. Sekarang ada `checkExpiryWatchdog()` (dicek tiap tick 1 detik yang sama) yang self-deactivate (stop + tampilkan gambar expired + `identity.isActive=false`) begitu `Date.now() >= identity.expiresAt` walau tidak ada event yang masuk.
+
 **Tidak ada auto-navigasi ke video YouTube saat aktivasi** — agent tetap di `start_image.html` sampai perintah `PLAY`/`OPEN_VIDEO`/playlist datang, atau ada video snapshot lama untuk di-restore. Command masuk **diblok diam-diam** kalau `!identity.isActive` (`SocketClient.ts:120-124`).
 
 #### 4.2.3 Socket.IO Events (Agent)
@@ -423,7 +429,7 @@ Navigasi YouTube: `page.goto('${YOUTUBE_HOME}/watch?v=${videoId}', {waitUntil:"d
 
 `YouTubePlayer.getSnapshot()` (dipanggil tiap 1s): scraping DOM murni via `page.evaluate()` (bukan YouTube IFrame API — page memang berada di halaman watch YouTube asli). Title/channel diambil lewat `document.querySelector("#movie_player").getVideoData()` dulu (works saat fullscreen), fallback ke cascade selector CSS kalau API itu gagal. Thumbnail disintesis dari URL pattern `img.youtube.com/vi/{id}/mqdefault.jpg`, bukan hasil scrape.
 
-`PlayerService.getSnapshot()` membungkus dengan **fallback "last-healthy snapshot"** — kalau snapshot baru tidak sehat (videoId kosong / currentTime-duration-volume tidak finite / duration<=0), kembalikan snapshot sehat terakhir supaya tidak flicker state buruk ke server.
+`PlayerService.getSnapshot()` membungkus dengan **fallback "last-healthy snapshot"** — kalau snapshot baru tidak sehat (videoId kosong / currentTime-duration-volume tidak finite / duration<=0), kembalikan snapshot sehat terakhir supaya tidak flicker state buruk ke server. ⚠️→✅ **Fix sesi ini (§9.3)**: fallback ini dulu **tidak dibatasi waktu** — kalau player benar-benar macet berkepanjangan (bukan sekadar glitch sesaat saat transisi iklan), agent bisa terus mengirim snapshot yang sama (makin lama makin basi) ke server tiap detik tanpa batas, tanpa ada tanda itu bukan data live. Sekarang dibatasi maksimal 5 detik (`HEALTHY_SNAPSHOT_MAX_AGE_MS`) — cukup untuk meredam glitch transisi iklan yang wajar, tapi setelah itu kembali mengirim snapshot mentah (meski "tidak sehat") daripada data basi tak terbatas.
 
 #### 4.2.7 Playlist Management
 
@@ -445,7 +451,7 @@ Dua `setInterval` independen, **fixed 1000ms**, tanpa debounce/diff (state dikir
 
 #### 4.2.10 Error Reporting
 
-Hanya `STARTUP_ERROR`, `UNCAUGHT_EXCEPTION`, `UNHANDLED_REJECTION` yang dikirim ke server via `agent:error`. Error command/recovery/snapshot sehari-hari hanya `console.error`/`LoggerService.error` lokal.
+`STARTUP_ERROR`, `UNCAUGHT_EXCEPTION`, `UNHANDLED_REJECTION`, dan **sejak sesi ini juga `COMMAND_ERROR`** (fix §9.3 — command handler yang gagal dulu cuma `console.error` lokal, sekarang juga dilaporkan ke server lewat `sendError()` yang sudah ada, dengan command yang gagal disertakan di `context`) dikirim ke server via `agent:error`. Error recovery/snapshot sehari-hari lainnya masih hanya `console.error`/`LoggerService.error` lokal.
 
 #### 4.2.11 Persistence — In-Memory Saja
 
@@ -459,13 +465,13 @@ Hanya `STARTUP_ERROR`, `UNCAUGHT_EXCEPTION`, `UNHANDLED_REJECTION` yang dikirim 
 
 ### 4.3 Web (`web/`)
 
-Stack: React 19 + Vite + Tailwind v4 + Zustand, PWA (`vite-plugin-pwa` + hand-rolled `sw.js`).
+Stack: React 19 + Vite + Tailwind v4, PWA (`vite-plugin-pwa` + hand-rolled `sw.js`). **Zustand sudah dihapus** (lihat §9.4, sama seperti `cashier/` di §9.3) — state sekarang berupa singleton service (`AppStateService`) untuk data yang didorong socket, plus satu React Context (`LoadingContext`) untuk state UI loading.
 
 #### 4.3.1 Struktur & Routing
 
 `AppRouter` — 4 route di bawah `MainLayout`: `/` (`HomePage`, kontrol player), `/playlist` (`PlaylistPage`), `/search` (`SearchPage`), `/settings` (`SettingsPage`). `App.tsx` selalu me-render `<AgentOfflineOverlay/>` global independen dari route — memblokir seluruh UI kalau `agent.online===false`.
 
-`MainLayout` memanggil `useAgent()` di level layout supaya listener/poll agent tetap hidup lintas halaman, dan menghitung state loading gabungan dari `globalLoading`/`initialLoading`/`processing` map dengan bucket durasi 300/500/1000ms tergantung jenis aksi.
+`MainLayout` memanggil `useAgent()` di level layout supaya listener/poll agent tetap hidup lintas halaman, dan membaca `globalLoading`/`initialLoading`/`processing` dari `useLoading()` (§4.3.7/§9.4) untuk menghitung state loading gabungan dengan bucket durasi 300/500/1000ms tergantung jenis aksi.
 
 #### 4.3.2 Koneksi Socket
 
@@ -477,7 +483,13 @@ Stack: React 19 + Vite + Tailwind v4 + Zustand, PWA (`vite-plugin-pwa` + hand-ro
 
 **Emit**: `client:request-state` (saat connect), `player:command` (`PlayerCommand` object — 21 helper method di `PlayerCommandService`: play/pause/stop/next/previous/fullscreen/volume/mute/seek/openVideo/addPlaylist/playlist ops/repeat/skipAd). Semua **fire-and-forget**, tanpa ack/korelasi respons dari server.
 
-**Listen**: `player:state`, `player:update`, `playlist:state`, `playlist:update`, `agents:update`. ⚠️ `player:update` dan `playlist:state/update` masing-masing didengarkan dari **2 tempat berbeda** (listener class terpisah + hook `usePlayer`/`usePlaylist`) — berpotensi handler terdaftar dobel.
+**Listen**: `player:state`, `player:update`, `playlist:state`, `playlist:update`, `agents:update`.
+
+⚠️→✅ **Bug ditemukan & diperbaiki sesi ini (§9.3)**: `player:update` dan `playlist:state/update` dulu didengarkan dari **2 tempat berbeda** — listener boot-time seumur-hidup-app (`PlayerStateListener`/`registerPlaylistListener` di `main.tsx`) **dan** hook per-halaman (`usePlayer()` di `HomePage`, `usePlaylist()` di `SearchPage`/`PlaylistPage`) yang subscribe lagi di tiap mount. Root cause sebenarnya lebih dalam: `SocketService.off(event)` menghapus **SEMUA** listener untuk event itu, bukan cuma milik pemanggil. Begitu user pindah dari halaman yang punya hook per-halaman (mis. dari `HomePage`), `useEffect` cleanup hook itu memanggil `off("player:update")` yang ikut menghapus listener boot-time global — dan listener itu **tidak pernah didaftarkan ulang**. Efeknya: update player/playlist dari server diam-diam diabaikan selama user berada di halaman lain, sampai balik ke halaman yang mendaftarkan listener lagi atau socket reconnect.
+
+Fix: `usePlayer.ts`/`usePlaylist.ts` **dihapus total** (ternyata 100% redundan — keduanya cuma subscribe untuk efek samping, event yang sama sudah di-handle boot-time listener yang saat itu menulis ke `useAppStore`, dan semua halaman sudah baca state itu langsung lewat hook store). `SocketService.on()` sekarang **mengembalikan fungsi unsubscribe per-listener** (`socket.off(event, specificHandler)`, bukan `off(event)` global) — dipakai `useAgent.ts` untuk `agents:update`. Juga ditemukan & diperbaiki: `registerPendingHandlers()` (flush listener yang di-queue sebelum socket pertama kali connect) dulu membungkus callback dengan closure baru lagi, yang akan membuat unsubscribe gagal menemukan listener aslinya — sekarang pakai reference yang sama. Duplikasi instansiasi `PlayerStateListener` di `main.tsx` (dibuat dan `.start()` 2x) juga dihapus.
+
+⚠️ Catatan pasca §9.4: `useAppStore` yang disebut di atas **sudah tidak ada lagi** — sesi berikutnya menghapus Zustand dari `web/` juga, jadi `PlayerStateListener`/`registerPlaylistListener` sekarang menulis ke `appStateService` (§4.3.7), bukan store manapun. Perbaikan `SocketService.on()`/`registerPendingHandlers()` di atas tetap berlaku persis sama, tidak terpengaruh oleh perubahan itu.
 
 #### 4.3.4 Player Controls UI
 
@@ -491,9 +503,17 @@ Stack: React 19 + Vite + Tailwind v4 + Zustand, PWA (`vite-plugin-pwa` + hand-ro
 
 `CurrentVideo.tsx` mencocokkan `player.videoId` ke item playlist untuk info lebih lengkap (title/channel/duration/thumbnail), fallback ke field yang menempel langsung di `player` state, fallback lagi ke thumbnail sintetis + placeholder title `Video {videoId}`.
 
-#### 4.3.7 State Management
+#### 4.3.7 State Management — Sekarang Tanpa Zustand (§9.4)
 
-Zustand store tunggal `useAppStore` — **tanpa persistence**, reset tiap reload. Slice: `agent`, `player`, `playlist`, `search` (⚠️ dideklarasikan tapi tidak dipakai — `SearchPage` punya `useState` lokal sendiri), `processing` (17 boolean per jenis command), flag UI lain.
+`useAppStore` (Zustand, store tunggal) **sudah dihapus total**. Audit konsumen (17 file) menemukan store itu sebenarnya menyimpan 3 jenis state berbeda yang butuh perlakuan berbeda, jadi migrasinya bukan "pindahkan semua ke Context" tapi mengikuti pola yang sama dengan `cashier/` (§9.3):
+
+- **`agent`, `player`, `playlist`** — data yang didorong socket. Dua dari tiga penulisnya (`PlayerStateListener`, `registerPlaylistListener`) adalah class/fungsi di level modul yang jalan di `main.tsx` **sebelum React render sama sekali** — Context tidak punya cara untuk ditulis secara imperatif dari luar komponen seperti itu. Solusinya sama seperti `transactions` di cashier: `services/AppStateService.ts` (singleton biasa, bukan React) menyimpan ketiganya, expose `getAgent()`/`getPlayer()`/`getPlaylist()` + `setAgent()`/`setPlayer()`/`setPlaylist()` + pub/sub `onAgentUpdate()`/`onPlayerUpdate()`/`onPlaylistUpdate()` (masing-masing return unsubscribe). Komponen baca lewat hook baru `hooks/useAppState.ts` (`useAgentState()`/`usePlayerState()`/`usePlaylistState()`) — `useState(() => appStateService.getX())` + `useEffect(() => appStateService.onXUpdate(setX), [])`, pola identik dengan `roomBillings`/`transactions` di cashier.
+- **`processing` (17 boolean per jenis command), `globalLoading`, `initialLoading`, `removingItemId`, `addingToPlaylist`** — state UI murni yang dibaca+ditulis ~10 komponen berbeda. `context/LoadingContext.tsx` (`LoadingProvider`/`useLoading()`), mirip `LoadingContext` di cashier. Coupling lama dipertahankan persis: `setProcessing` menurunkan `globalLoading` dari `Object.values(processing).some(Boolean)`, dan `setAddingToPlaylist` **juga** menulis `globalLoading` secara langsung (jalur kedua yang independen) — keduanya tetap satu file supaya coupling itu tidak hilang.
+- **`search`/`setSearch`** — dikonfirmasi dead code (tidak pernah dibaca/ditulis di manapun; `SearchPage` sudah punya `useState` lokal sendiri) — tidak diportir sama sekali.
+
+`SocketService.ts` yang tadinya menulis `initialLoading` secara imperatif (`useAppStore.getState().setInitialLoading(false)` di dalam `setTimeout` setelah event `'connect'`, dari singleton level-modul yang sama persis masalahnya dengan `PlayerStateListener`) sekarang expose `onConnect(cb)` (pub/sub) — `LoadingProvider` yang subscribe ke situ dan mengatur `initialLoading` sendiri. Arah dependency jadi benar: service expose pub/sub, React yang subscribe, bukan sebaliknya — berlaku juga untuk `AppStateService`.
+
+`App.tsx` membungkus `<AppRouter/>` **dan** `<AgentOfflineOverlay/>` (sibling dari router, bukan di dalam `MainLayout`/`Outlet`) dengan `<LoadingProvider>` — persis pola `cashier/src/App.tsx`. Tidak perlu Provider terpisah untuk `agent`/`player`/`playlist` karena `AppStateService` bukan React state sama sekali.
 
 #### 4.3.8 PWA
 
@@ -511,15 +531,17 @@ Hanya 2: `VITE_SERVER_IP`, `VITE_BILLING_ENABLED` (dideklarasikan, tidak dipakai
 
 ### 4.4 Cashier (`cashier/`)
 
-Stack: React + Vite + Zustand + socket.io-client.
+Stack: React + Vite + Context API + socket.io-client. **Zustand sudah dihapus total** (lihat §9.3) — tidak ada state library eksternal lagi, semua state cashier sekarang berupa React Context (`RoomConfigContext`, `LoadingContext`) atau state yang dimiliki langsung oleh `multiSocketService` (transaksi, agent/billing).
 
 #### 4.4.1 Struktur & Routing
 
 Single page: hanya route `/` → `DashboardPage` (grid kartu ruangan). Route `/transactions` beserta `TransactionsPage` dan nav link di header `CashierLayout` (`MenuLink.tsx`) sudah dihapus agar aplikasi tetap single page. Riwayat transaksi tetap bisa diakses per-ruangan lewat `TransactionModal` (tombol Receipt di `RoomCard`).
 
-#### 4.4.2 MultiSocketService — Multi Koneksi
+#### 4.4.2 MultiSocketService — Multi Koneksi & Pemilik State Transaksi
 
-Singleton `multiSocketService`. `VITE_ROOMS` di-parse jadi `RoomConfig[]` (`config.id = room.roomId`), tiap config dapat 1 `Socket` (`io(ip:port, {reconnection:true, reconnectionAttempts:10, reconnectionDelay:1000, timeout:10000})`), disimpan di `Map<config.id, RoomConnection>`.
+Singleton `multiSocketService`. `VITE_ROOMS` di-parse jadi `RoomConfig[]` (`config.id = room.roomId`, dilakukan di `context/RoomConfigContext.tsx`), tiap config dapat 1 `Socket` (`io(ip:port, {reconnection:true, reconnectionAttempts:10, reconnectionDelay:1000, timeout:10000})`), disimpan di `Map<config.id, RoomConnection>`.
+
+**Pasca penghapusan Zustand (§9.3)**: tiap `RoomConnection` sekarang juga menyimpan `transactions: Transaction[]` miliknya sendiri (persis seperti field `agents` yang sudah lebih dulu ada di sana), **di-replace penuh** (bukan di-merge) tiap kali event `transaction:get` diterima dari koneksi itu — karena tiap ruangan server independen (§1.1), broadcast dari satu server memang selalu daftar lengkap yang otoritatif untuk ruangan itu, jadi tidak perlu logic merge lokal-vs-server yang tadinya rawan bug. `getTransactions()` men-flatten seluruh koneksi jadi satu array, dan `onTransactionsUpdate(cb)` adalah pub/sub (pola sama seperti `onUpdate`/`onStatusChange` yang sudah ada). Komponen (`RoomCard`, `TransactionModal`, `MoveRoomModal`) membaca lewat `useState(() => multiSocketService.getTransactions())` + `useEffect(() => multiSocketService.onTransactionsUpdate(setState), [])`.
 
 **Lookup connection yang robust** (Fix B, sudah diterapkan & diverifikasi lewat test): `findConnectionForRoom(roomId)` dengan **5 fallback**: (1) `connections.get(roomId)` langsung, (2) `config.roomId===roomId`, (3) `agents[0]?.roomId===roomId`, (4) `config.name` case-insensitive, (5) `config.id` dinormalisasi (`replace(/[^a-z0-9]/g,'')`). Dipakai di **semua** method publik (`activateRoom`, `deactivateRoom`, `loadTransactions`, `extendTime`, dll).
 
@@ -531,30 +553,39 @@ Reconnect: full re-sync tiap `connect` (`cashier:request-agents` + `transaction:
 
 **Emit**: `cashier:request-agents`, `transaction:get`, `cashier:activate-room` `{roomId, roomName, durationMinutes?, customerName?, customerPhone?, customerEmail?, customerNote?}`, `cashier:deactivate-room` `{roomId}`, `cashier:extend-time` `{roomId, additionalMinutes}`, `transaction:save`, `transaction:delete`, `transaction:clear`.
 
-**Listen**: `connect`/`disconnect`/`connect_error`, `transaction:get` (→ `useTransactionStore.setTransactions(tx, sourceRoomId)`), `agent:register`/`agent:status`/`agent:heartbeat` (merge state agent, logic hampir duplikat 3x), `player:state`, `agents:update`/`agents:list` (juga hampir duplikat), `room:activation` (**trigger utama pembuatan transaksi**, lihat §4.4.6), `room:expiry-warning`.
+**Listen**: `connect`/`disconnect`/`connect_error`, `transaction:get` (→ **replace** slice transaksi koneksi itu di `multiSocketService`, lihat §4.4.2 — bukan lagi `useTransactionStore.setTransactions()`, store itu sudah dihapus), `agent:register`/`agent:status`/`agent:heartbeat` (merge state agent, logic hampir duplikat 3x), `player:state`, `agents:update`/`agents:list` (juga hampir duplikat), `room:activation` (**trigger utama pembuatan transaksi**, lihat §4.4.6), `room:expiry-warning`.
 
 Method `activateRoom`/`deactivateRoom`/`extendTime` mendaftarkan listener one-shot untuk resolve `onComplete()`, dengan **timeout fallback 3000ms** kalau server tidak pernah merespons — ini yang membuat loading spinner selalu ter-clear meski gagal diam-diam.
 
+⚠️→✅ **Bug ditemukan & diperbaiki sesi ini (§9.3)**: `updateTransaction()` dan `deleteTransaction()` dulu **broadcast ke SEMUA koneksi ruangan yang terhubung**, bukan hanya ke ruangan pemilik transaksi (`transaction.roomId`). Karena tiap ruangan punya server+SQLite independen, ini membuat server ruangan lain ikut meng-`INSERT` salinan transaksi yang sama (upsert by `id`, tapi ruangan lain belum pernah punya id itu) — transaksi jadi ada 2x secara fisik di dua database berbeda begitu ada yang klik "Bayar" saat lebih dari 1 ruangan online. Sekarang keduanya routing lewat `findConnectionForRoom(transaction.roomId)` (untuk `updateTransaction`) atau parameter `roomId` eksplisit (untuk `deleteTransaction`, dipanggil dari `TransactionModal` pakai `roomId` prop modal itu) — hanya mengirim ke satu server yang tepat.
+
 #### 4.4.4 Status Ruangan — State Machine Aktual
 
-**File**: `RoomCard.tsx:222-284`.
+**File**: `cashier/src/utils/roomStatus.ts` (fungsi `getRoomStatus()`, dipakai bersama oleh `RoomCard.tsx` dan `MoveRoomModal.tsx` — bukan logic inline terpisah di tiap komponen).
 ```ts
 const CLEANING_THRESHOLD = 30 * 60 * 1000; // 30 menit
 const CLEANED_THRESHOLD = 60 * 60 * 1000;  // 60 menit
 
-const getPaidStatus = () => {
-  if (hasUnpaid) return null;
-  if (!lastPaid || !latestTransaction) return null;
-  const allPaidCleaned = roomTransactions.filter(t => t.paidAt > 0).every(t => t.cleanedAt > 0);
-  if (allPaidCleaned) return 'SUDAH DIBERSIHKAN';
-  if (timeSincePaid < CLEANING_THRESHOLD) return 'BERSIHKAN';
-  if (timeSincePaid < CLEANED_THRESHOLD) return 'SUDAH DIBERSIHKAN';
-  return null; // >60 menit → revert ke ONLINE
-};
+// Alur normal: deactivate → transaksi unpaid → dibayar → dihitung dari paidAt
+function getPaidCleaningStatus(roomTransactions) { /* ... paidAt-based, seperti sebelumnya ... */ }
+
+// Alur Move Room: tidak ada transaksi baru di ruangan sumber, dihitung dari
+// roomBilling.needsCleaning/lastTransactionEndTime yang di-set server saat move
+function getMovedOutCleaningStatus(roomBilling) { /* ... lastTransactionEndTime-based ... */ }
+
+export function getRoomStatus(roomBilling, transactions) {
+  if (!roomBilling.isConnected) return 'OFFLINE';
+  if (roomBilling.isActive) return 'AKTIF';
+  if (hasUnpaid) return 'UNPAID';
+  // getMovedOutCleaningStatus dicek LEBIH DULU (fix §9.3) - lihat catatan di bawah
+  return getMovedOutCleaningStatus(roomBilling) ?? getPaidCleaningStatus(roomTransactions) ?? 'ONLINE';
+}
 ```
 Prioritas label final: **OFFLINE > AKTIF > UNPAID > BERSIHKAN > SUDAH DIBERSIHKAN > ONLINE**. Catatan: status **"PAID" tidak pernah tampil sebagai label terpisah** di badge — transaksi yang baru dibayar langsung jadi `BERSIHKAN` (kalau `<30 menit`) atau `SUDAH DIBERSIHKAN` (kalau `allPaidCleaned`); "PAID" cuma konsep sesaat di data, bukan status UI.
 
-Tombol Activate `disabled` kalau `hasUnpaid || paidStatus==='BERSIHKAN'` — dicek dua kali (disabled attribute + guard ulang di `handleToggleActive` langsung dari store, bukan hook, sebagai pertahanan terhadap stale state).
+Tombol Activate `disabled` kalau `hasUnpaid || roomStatus.label==='BERSIHKAN'`.
+
+⚠️→✅ **Bug ditemukan & diperbaiki sesi ini (§9.3)**: urutan pengecekan tadinya `getPaidCleaningStatus(roomTransactions) ?? getMovedOutCleaningStatus(roomBilling)` — **terbalik**. Move Room sengaja **tidak** mencatat transaksi baru di ruangan sumber (transaksi baru dicatat nanti di ruangan tujuan), jadi `getPaidCleaningStatus` yang jalan duluan malah menemukan transaksi **customer sebelumnya** yang tidak berhubungan. Kalau transaksi lama itu kebetulan dibayar 30-60 menit yang lalu, status langsung lompat ke `SUDAH DIBERSIHKAN` berdasarkan data basi itu, dan `getMovedOutCleaningStatus` (yang seharusnya benar, pakai `lastTransactionEndTime` fresh dari server) tidak pernah sempat dicek — ruangan sumber jadi bisa langsung diaktifkan lagi tanpa melalui `BERSIHKAN`. Server-nya sendiri **sudah benar** (`agent.needsCleaning=true; agent.lastTransactionEndTime=Date.now()` di `server/src/socket/SocketServer.ts` pada `reason==='move'`) — bug murni di urutan `??` sisi cashier. Fix: balik urutan jadi `getMovedOutCleaningStatus(roomBilling) ?? getPaidCleaningStatus(roomTransactions)`, karena `roomBilling.needsCleaning` cuma pernah `true` tepat setelah Move Room dan selalu di-reset server saat aktivasi/mark-cleaned — aman dijadikan prioritas tertinggi. Diverifikasi 5 test baru di `roomStatus.test.ts`.
 
 #### 4.4.5 Activate / Extend Room
 
@@ -579,25 +610,25 @@ Transaksi baru selalu `paidAt: 0` (unpaid), lalu dipush ke server lewat `transac
 
 #### 4.4.7 Move Room
 
-`MoveRoomModal`: hitung `remainingMinutes = ceil((expiresAt - now)/60000)` dari sisa waktu **aktual** (bukan durasi asli), lalu `deactivateRoom(sumber)` (ini **memicu pembuatan transaksi normal** di ruangan sumber untuk waktu yang sudah terpakai) → delay fixed 500ms → `activateRoom(target, remainingMinutes, ...)` dengan catatan otomatis "Pindahan dari {roomSumber}". Tidak ada penyesuaian harga — target room pakai `pricePerHour` miliknya sendiri, jadi pindah ke ruangan lebih mahal/murah akan mengubah tarif untuk sisa waktu.
+`MoveRoomModal`: hitung `remainingMinutes = ceil((expiresAt - now)/60000)` dari sisa waktu **aktual** (bukan durasi asli), lalu `deactivateRoom(sumber, undefined, 'move')` (reason `'move'` — **TIDAK** memicu pembuatan transaksi di ruangan sumber, beda dari deactivate manual biasa; transaksi baru dicatat sekali nanti di ruangan tujuan saat sesi itu benar-benar berakhir) → delay fixed 500ms → `activateRoom(target, remainingMinutes, ..., originalStartTime: billing.startTime)` dengan catatan otomatis "Pindahan dari {roomSumber}", membawa `startTime` sesi asli supaya transaksi akhirnya menghitung total durasi dari awal sesi (bukan dari saat pindah). Tidak ada penyesuaian harga — target room pakai `pricePerHour` miliknya sendiri, jadi pindah ke ruangan lebih mahal/murah akan mengubah tarif untuk sisa waktu.
 
-#### 4.4.8 Transaction Store — Status Bug Lama
+Status ruangan sumber pasca-move: lihat catatan bug di §4.4.4 — ruangan sumber harus melalui `BERSIHKAN` dulu (bukan langsung `SUDAH DIBERSIHKAN`), dan tombol Activate-nya harus tetap disabled selama itu.
 
-**Semua bug yang didokumentasikan di draf lama (§8.1 lama, Bug A.1, A.2) SUDAH DIPERBAIKI**, terverifikasi baca kode + `npm test` (18/18 lulus):
-- `setTransactions()` **memanggil `set()`** di akhir (Bug A.1 fixed).
-- Parameter `sourceRoomId` ada dan dipakai untuk melindungi transaksi "orphan" lintas-server dari ruangan lain supaya tidak ter-drop (Bug A.2 fixed).
+#### 4.4.8 Sumber Data Transaksi — Sekarang Server-Authoritative (Zustand Dihapus, §9.3)
 
-Algoritma merge: dedupe server list by id → untuk tiap transaksi lokal yang ada di server map, **server menang** kecuali `local.cleanedAt > server.cleanedAt` (lokal menang untuk field itu saja) → orphan lokal (tidak ada di server): drop kalau `cleanedAt` sudah terisi (anggap sudah sinkron), **simpan** kalau `roomId !== sourceRoomId` (proteksi cross-server), else pakai policy lama (`paidAt>0` → simpan, else drop).
+**`useTransactionStore.ts` (Zustand, beserta seluruh logic merge lokal-vs-server-nya) sudah dihapus total** di sesi ini. Transaksi sekarang dimiliki langsung oleh `multiSocketService` (§4.4.2): tiap koneksi ruangan simpan slice `transactions`-nya sendiri, **di-replace penuh** (bukan merge) tiap `transaction:get` diterima, lalu di-flatten lintas koneksi untuk tampilan.
 
-⚠️ **Bug baru ditemukan (belum dilaporkan sebelumnya)**: `getTotalRevenue()` menjumlahkan `totalPrice` dari **semua** transaksi tanpa filter `paidAt` — transaksi unpaid ikut dihitung sebagai "revenue". `getTodayRevenue()` justru filter `paidAt >= todayStart`, jadi undercount konsisten untuk transaksi unpaid hari ini. Dua fungsi ini **tidak konsisten** satu sama lain.
+Alasan penghapusan algoritma merge lama (dedupe by id, "server menang kecuali cleanedAt lokal lebih baru", proteksi orphan lewat `sourceRoomId`, dst): algoritma itu **hanya ada untuk menutupi desain lama** yang menyatukan data N server independen ke dalam **satu array flat**. Begitu tiap koneksi menyimpan slice-nya sendiri (desain baru), replace pada satu koneksi **tidak pernah** bisa menyentuh data koneksi lain — masalah yang dulu dikompensasi oleh merge jadi tidak relevan lagi secara struktural, bukan cuma "sudah tidak kejadian".
 
-`useRoomStore` dulu juga punya sistem transaksi paralel kedua (`transactions: Map<roomId, Transaction[]>` + method sendiri) yang tidak dipakai komponen manapun — sudah dihapus (fixed §9.2 #10), `useTransactionStore` sekarang satu-satunya sumber data transaksi.
+Efek samping bagus dari perubahan ini: bug id-mismatch pada pencatatan transaksi otomatis (`room:activation` auto-deactivate) ikut kebetulan diperbaiki — dulu ada **dua** `generateId()` terpisah untuk "salinan lokal" dan "payload ke server" pada transaksi yang sama; sekarang cuma satu id yang di-generate dan dipakai untuk satu-satunya payload yang dikirim ke server (state lokal tidak lagi ditulis optimistically, cukup menunggu broadcast `transaction:get` balik).
+
+⚠️ **Bug lama masih ada, belum diperbaiki** (lokasinya pindah, bukan hilang): dulu didokumentasikan sebagai `useTransactionStore.getTotalRevenue()`/`getTodayRevenue()` tidak konsisten filter `paidAt`. Store itu sudah dihapus, tapi logic yang **sama persis** (dan bug yang sama) sekarang ada di `cashier/src/components/TransactionModal.tsx` — `calculateTotalRevenue()` menjumlahkan `totalPrice` dari **semua** transaksi tanpa filter `paidAt > 0` (unpaid ikut dihitung sebagai "Total Pendapatan"), sedangkan `calculateTodayRevenue()` filter `t.paidAt >= todayStart` (jadi transaksi unpaid otomatis ter-exclude karena `paidAt===0`). Masih perlu di-fix: `calculateTotalRevenue()` harus filter `t.paidAt > 0` juga.
 
 #### 4.4.9 Payment Confirmation & Mark Cleaned
 
-Bayar: `PaymentConfirmModal` → `paidAt: Date.now()` (client-generated, **optimistic**, tidak menunggu ack server) → `updateTransaction()` lokal + `multiSocketService.updateTransaction()` (broadcast `transaction:save` ke **semua** koneksi, bukan hanya ruangan terkait — bergantung pada server tiap ruangan meng-upsert-atau-abaikan berdasar `id` yang cocok).
+Bayar: `PaymentConfirmModal` → `paidAt: Date.now()` (client-generated) → `multiSocketService.updateTransaction(updatedData)`. **Sejak §9.3**: tidak ada lagi tulis-optimistik ke state lokal — UI menunggu broadcast `transaction:get` balik dari server untuk update tampilan (dibantu indikator `pendingIds` per-baris di `TransactionModal` supaya baris yang sedang diproses terlihat redup/nonaktif sampai broadcast/timeout 5 detik selesai — murni presentasional, tidak pernah menulis data transaksi palsu ke state bersama). **Bug broadcast-ke-semua-koneksi yang menyebabkan transaksi duplikat sudah diperbaiki** — lihat catatan di §4.4.3.
 
-Mark cleaned: `cleanedAt: Date.now()` — begitu di-set, `getPaidStatus()` langsung `SUDAH DIBERSIHKAN` **melewati threshold waktu 30/60 menit** (override manual).
+Mark cleaned: `cleanedAt: Date.now()` — begitu di-set, `getPaidCleaningStatus()` langsung `SUDAH DIBERSIHKAN` **melewati threshold waktu 30/60 menit** (override manual).
 
 #### 4.4.10 Print Receipt
 
@@ -641,11 +672,17 @@ Agent    --agent:error-------------------------------------------> Server (persi
 ### 6.2 Agent — In-Memory Saja
 `PlayerRepository`/`PlaylistRepository` tidak lagi persist ke disk lokal (lihat §4.2.11) — restore sepenuhnya bergantung pada push balik dari server.
 
-### 6.3 Cashier Storage (in-memory + Zustand)
-`useRoomStore` (config ruangan dari `VITE_ROOMS` + sistem transaksi paralel yang tidak dipakai), `useTransactionStore` (transaksi ter-merge dari semua server). Tidak ada persistence — refresh browser = reset total, reload dari server via `transaction:get`.
+### 6.3 Cashier Storage (in-memory, tanpa Zustand — lihat §9.3)
+Tidak ada localStorage/sessionStorage/IndexedDB, dan sejak sesi ini juga **tidak ada Zustand**. State terbagi:
+- **`context/RoomConfigContext.tsx`** — `roomConfigs` (dari `VITE_ROOMS`, di-load sekali saat provider mount), `connectionStatus`. Plain React Context + `useState`.
+- **`context/LoadingContext.tsx`** — `isLoading`/`loadingType`/`loadingMessage` global.
+- **`multiSocketService`** (bukan React state sama sekali, singleton biasa) — pemilik data `agents`/billing (sudah dari awal) **dan sekarang juga `transactions`** (§4.4.2/§4.4.8), diekspos ke komponen lewat pola pub/sub (`onUpdate`/`onTransactionsUpdate`) + `useState` lokal di komponen pemanggil.
 
-### 6.4 Web — Zustand tanpa persistence
-Reset tiap reload, tidak ada localStorage/IndexedDB.
+Tidak ada persistence — refresh browser = reset total, reload dari server via `transaction:get` (dan `cashier:request-agents`). `roomConfigs` dari `.env` bukan pengecualian "data lokal yang menyebabkan drift" — itu memang harus lokal (cashier butuh tahu IP/port tiap server ruangan sebelum bisa connect sama sekali).
+
+### 6.4 Web — In-memory, tanpa Zustand (§9.4)
+
+Reset tiap reload, tidak ada localStorage/IndexedDB, dan sejak sesi ini juga **tidak ada Zustand**. `agent`/`player`/`playlist` dimiliki `services/AppStateService.ts` (singleton, bukan React state); `processing`/`globalLoading`/`initialLoading`/`removingItemId`/`addingToPlaylist` dimiliki `context/LoadingContext.tsx` (React Context). Lihat §4.3.7 untuk alasan pembagiannya.
 
 ---
 
@@ -666,7 +703,7 @@ Reset tiap reload, tidak ada localStorage/IndexedDB.
 
 ## 8. Known Issues — Status Terkini
 
-Semua 10 issue yang ditemukan dari audit kode (§8.1-8.10 versi sebelumnya) **sudah di-fix, di-typecheck, dan lulus test** — lihat §9.2 untuk detail perubahan tiap item. Yang tersisa hanya item known-by-design yang memang sengaja tidak di-fix:
+Semua 10 issue yang ditemukan dari audit kode (§8.1-8.10 versi sebelumnya) **sudah di-fix, di-typecheck, dan lulus test** — lihat §9.2 untuk detail perubahan tiap item. Sesi berikutnya (§9.3) menambahkan: penghapusan total Zustand di `cashier/` (audit atas permintaan user, memastikan semua state berbasis server), 2 bug produksi yang dilaporkan langsung oleh user (transaksi duplikat saat Bayar, status ruangan salah setelah Move Room), dan hasil audit lanjutan di `agent/`+`web/` yang menemukan 6 celah sinkronisasi tambahan. Semua sudah di-fix & terverifikasi. Yang tersisa hanya item known-by-design yang memang sengaja tidak di-fix, plus satu bug lama yang lokasinya pindah tapi belum sempat diperbaiki (`calculateTotalRevenue()` tidak filter `paidAt`, lihat §4.4.8):
 
 ### 8.1 [KNOWN, tidak akan di-fix — sesuai konfirmasi desain]
 - **Shared-IP Cashier conflict di AgentRegistry** — sudah tidak relevan pasca Fix C (key registry sekarang `roomId`, bukan `agent.id`).
@@ -707,6 +744,71 @@ Semua sudah diperbaiki bersamaan dengan Fix A/B di atas — lihat kode aktual di
 
 **Verifikasi menyeluruh setelah semua fix**: server (tsc clean, 20/20 test), agent (tsc clean), cashier (tsc -b clean, vite build OK, 18/18 test), web (tsc clean, vite build + PWA generation OK). E2E suite (`scripts/e2e/run-test.sh`) tidak bisa dijalankan karena binary `esbuild` di root `node_modules` rusak (isu environment pre-existing, tidak terkait perubahan ini) — cakupan sudah tervalidasi lewat unit test + typecheck + production build di semua 4 aplikasi.
 
+### 9.3 Fix batch ketiga (penghapusan Zustand + bug produksi + audit `agent/`/`web/`, 2026-08-11)
+
+Dipicu oleh permintaan user untuk memastikan `cashier/` tidak menyimpan data lokal yang bisa divergen dari server (audit menemukan tidak ada localStorage, tapi Zustand store-nya tetap dihapus atas permintaan eksplisit), lalu berlanjut ke audit yang sama untuk `agent/`+`web/`, dan dua laporan bug langsung dari user saat pemakaian nyata.
+
+**A. Cashier — penghapusan Zustand total (refactor arsitektur, bukan bug)**
+
+`useRoomStore.ts` dan `useTransactionStore.ts` (+ `useTransactionStore.test.ts`) **dihapus**. Diganti:
+- `context/RoomConfigContext.tsx` (baru) — `roomConfigs`/`connectionStatus`, plain `useState`.
+- `context/LoadingContext.tsx` (baru) — loading global, dipisah dari config supaya tidak saling memicu re-render.
+- Data transaksi pindah jadi state internal `multiSocketService` (§4.4.2/§4.4.8) — per-koneksi, **replace** bukan merge.
+
+Dependency `zustand` dihapus dari `cashier/package.json`. Method `addRoom`/`removeRoom`/`getRoomConfig`/`reconnectAll` di `useRoomStore` lama **tidak diportir** — dikonfirmasi tidak ada pemanggil sama sekali (tidak ada UI "tambah ruangan"), jadi dibuang sekalian sebagai dead code.
+
+| # | Perubahan | File | Verifikasi |
+|---|---|---|---|
+| A1 | Transaksi: per-koneksi replace, bukan flat-array merge | `cashier/src/services/MultiSocketService.ts` | 5 test baru (replace/flatten/unsubscribe/room-removed) |
+| A2 | Room config & loading: Context API | `cashier/src/context/RoomConfigContext.tsx`, `LoadingContext.tsx` (baru), `App.tsx`, `DashboardPage.tsx`, `CashierLayout.tsx`, `RoomCard.tsx`, `MoveRoomModal.tsx`, `TransactionModal.tsx` | tsc -b clean |
+| A3 | Fix id-mismatch di pencatatan transaksi otomatis (`room:activation`) — dulu 2 id terpisah untuk 1 transaksi | `MultiSocketService.ts` (`saveTransactionToServer`) | tsc -b clean |
+
+**B. Cashier — bug produksi dilaporkan user**
+
+| # | Severity | Issue | File | Verifikasi |
+|---|---|---|---|---|
+| B1 | 🔴 | Transaksi jadi 2x saat "Bayar"/hapus — `updateTransaction()`/`deleteTransaction()` broadcast `transaction:save`/`transaction:delete` ke **semua** koneksi ruangan (bukan cuma pemilik transaksi), server ruangan lain ikut `INSERT` salinannya | `MultiSocketService.ts` (route via `findConnectionForRoom(transaction.roomId)` / parameter `roomId` eksplisit), `TransactionModal.tsx` (kirim `roomId` ke `deleteTransaction`) | 2 test regresi baru — pastikan `emit` cuma 1x meski 2 ruangan connected |
+| B2 | 🟠 | Ruangan sumber Move Room langsung `SUDAH DIBERSIHKAN`, seharusnya `BERSIHKAN` dulu — urutan `getPaidCleaningStatus() ?? getMovedOutCleaningStatus()` terbalik (lihat §4.4.4) | `cashier/src/utils/roomStatus.ts` | 5 test baru di `roomStatus.test.ts` (baru dibuat) |
+
+**C. Web — audit sinkronisasi**
+
+| # | Severity | Issue | File | Verifikasi |
+|---|---|---|---|---|
+| C1 | 🟠 | `SocketService.off(event)` hapus SEMUA listener event itu → listener boot-time `player:update`/`playlist:state/update` ikut terhapus & tak pernah didaftar ulang begitu user pindah dari halaman yang punya hook per-halaman (lihat §4.3.3) | `web/src/services/socket/SocketService.ts` (`on()` kembalikan unsubscribe per-listener), `hooks/useAgent.ts`, `main.tsx` (hapus duplikasi `PlayerStateListener`) | tsc + vite build OK |
+| C2 | — | `usePlayer.ts`/`usePlaylist.ts` dihapus — 100% redundan dengan listener boot-time yang sudah menulis ke store yang sama | Dihapus: `hooks/usePlayer.ts`, `usePlaylist.ts`. Diubah: `pages/HomePage.tsx`, `SearchPage.tsx`, `PlaylistPage.tsx` | tsc + vite build OK |
+| C3 | — | Fix laten: `registerPendingHandlers()` bungkus callback 2x, bikin unsubscribe tidak bisa cocok ke listener asli | `SocketService.ts` | tsc + vite build OK |
+
+**D. Agent — audit sinkronisasi (5 celah independen, tidak perlu perubahan server)**
+
+| # | Severity | Issue | File | Verifikasi |
+|---|---|---|---|---|
+| D1 | 🟡 | Restore payload (`PLAYER_STATE`/`PLAYLIST_STATE`) bisa hilang diam-diam kalau tiba sebelum `playerService`/`playlistService` siap saat boot | `agent/src/network/SocketClient.ts` (buffer `pendingPlayerRestore`/`pendingPlaylistRestore`, flush di `setPlayerService`/`setPlaylistService`) | tsc clean |
+| D2 | 🟡 | `pauseStateSync` bisa macet permanen kalau event reaktivasi hilang | `agent/src/core/Agent.ts` (watchdog auto-resume 15 detik, `checkPauseWatchdog()`) | tsc clean |
+| D3 | 🟡 | `expiresAt` tidak pernah ditegakkan lokal — agent bisa terus main lewat waktu habis kalau event deactivate hilang | `agent/src/core/Agent.ts` (`checkExpiryWatchdog()`, self-deactivate) | tsc clean |
+| D4 | 🟢 | Command yang gagal cuma di-log lokal, tidak dilaporkan ke server | `agent/src/network/SocketClient.ts` (`sendError({type:"COMMAND_ERROR"})`) | tsc clean |
+| D5 | 🟢 | Fallback "last-healthy snapshot" tidak dibatasi waktu — bisa kirim data basi tak terbatas ke server saat player macet lama | `agent/src/services/PlayerService.ts` (`HEALTHY_SNAPSHOT_MAX_AGE_MS=5000`) | tsc clean |
+
+**Verifikasi menyeluruh batch ini**: cashier (`tsc -b` clean, `vite build` OK, **18/18 test** — komposisi berubah: `MultiSocketService.test.ts` 13 + `roomStatus.test.ts` 5, `useTransactionStore.test.ts` sudah tidak ada karena store-nya dihapus), web (`tsc` clean, `vite build` + PWA generation OK), agent (`tsc` clean). Tidak ada perubahan di `server/` pada batch ini — root cause B1/B2/C*/D* semua di sisi client, dikonfirmasi lewat pembacaan kode `server/src/socket/SocketServer.ts` sebelum menyimpulkan lokasi fix.
+
+### 9.4 Penghapusan Zustand di `web/` (konsistensi arsitektur dengan `cashier/`, 2026-08-11)
+
+Diminta eksplisit oleh user demi konsistensi antar frontend — bukan karena ditemukan bug (audit sebelum migrasi memang tidak menemukan bug data-divergence di store `web/`: tidak ada `persist`, tidak ada localStorage, tiap push server sudah meng-replace state dengan bersih). Rekomendasi awal adalah *tidak perlu*, tapi user tetap minta dikerjakan.
+
+Audit konsumen (17 file yang import `useAppStore`) sebelum migrasi menyimpulkan store itu sebenarnya menyimpan 3 jenis state berbeda yang butuh perlakuan arsitektur berbeda — desain akhirnya **meniru struktur akhir `cashier/` yang sebenarnya** (bukan "semua ke Context"): `multiSocketService` di cashier memiliki `agents`+`transactions` sebagai singleton biasa; `RoomConfigContext`/`LoadingContext` menangani state UI/config lokal. Di `web/`: `AppStateService` (baru) memiliki `agent`/`player`/`playlist`; `LoadingContext` (baru) menangani `processing`/`globalLoading`/`initialLoading`/`removingItemId`/`addingToPlaylist`. Detail lengkap di §4.3.7.
+
+| # | Perubahan | File | Verifikasi |
+|---|---|---|---|
+| 1 | `agent`/`player`/`playlist`: singleton + pub/sub, bukan Context — 2 dari 3 penulisnya (`PlayerStateListener`, `registerPlaylistListener`) adalah listener level-modul yang jalan sebelum React render, Context tidak punya jalur tulis imperatif untuk kasus itu | Baru: `web/src/services/AppStateService.ts`, `web/src/hooks/useAppState.ts`. Diubah: `PlayerStateListener.ts`, `PlaylistListener.ts`, `hooks/useAgent.ts` | tsc + vite build OK |
+| 2 | `processing`/loading cluster: React Context, coupling `setProcessing`→`globalLoading` dan `setAddingToPlaylist`→`globalLoading` dipertahankan persis dalam 1 file | Baru: `web/src/context/LoadingContext.tsx`. Diubah: `App.tsx` (mount provider) | tsc + vite build OK |
+| 3 | `SocketService.ts` tidak lagi menulis state secara imperatif (`getState().setInitialLoading`) — sekarang expose `onConnect()` pub/sub, `LoadingProvider` yang subscribe | `web/src/services/socket/SocketService.ts` | tsc + vite build OK |
+| 4 | Semua ~13 komponen konsumen (`AgentOfflineOverlay`, `SettingsPage`, `BillingStatus`, `CurrentVideo`, `ProgressBar`, `PlayerControls`, `HomePage`, `PlaylistToolbar`, `PlaylistPanel`, `SearchResultCard`, `SearchPage`, `MenuLink`, `MainLayout`) pindah dari `useAppStore()` ke `useAgentState()`/`usePlayerState()`/`usePlaylistState()`/`useLoading()` | Lihat daftar di atas | tsc + vite build OK |
+| 5 | `search`/`setSearch` (dead code, dikonfirmasi lewat audit — `SearchPage` sudah punya `useState` lokal) tidak diportir | `store/appStore.ts` (dihapus) | — |
+| 6 | Dependency `zustand` dihapus | `web/package.json` | `npm run build` OK |
+
+**Catatan environment (bukan bagian dari perubahan kode)**: saat verifikasi, `web/node_modules` dan `package-lock.json` ternyata kosong/hilang (bukan akibat perubahan sesi ini — tidak ada operasi yang menyentuh `node_modules` sebelum ditemukan kosong). Dijalankan `npm install` ulang untuk memulihkan sebelum build/lint bisa diverifikasi.
+
+**Verifikasi**: `tsc -b && vite build` bersih (PWA generation OK), `npm run lint` — 5 error tersisa, semua dikonfirmasi pre-existing dan tidak berkaitan dengan file yang diubah (`public/sw.js` parsing error, `PlayerControls.tsx` unused assignment, `ProgressBar.tsx`/`VolumeSlider.tsx` set-state-in-effect, `useAgent.ts` implicit any) — 1 error baru yang sempat muncul dari file baru `LoadingContext.tsx` (`react-refresh/only-export-components`, karena file itu export Provider component + hook `useLoading` sekaligus — pola standar React Context, sama seperti punya cashier tapi cashier tidak punya eslint jadi tidak pernah ketahuan) sudah di-suppress dengan komentar inline. `web/` tidak dites end-to-end di browser sungguhan dengan agent/server aktif (butuh koneksi socket nyata, tidak tersedia di environment ini) — cakupan sejauh ini dari typecheck + build + review kode manual terhadap pola yang sudah tervalidasi di `cashier/`.
+
 ---
 
 ## 10. Unit Test & E2E Test Setup
@@ -716,8 +818,10 @@ Semua sudah diperbaiki bersamaan dengan Fix A/B di atas — lihat kode aktual di
 | Package | Framework | File | Jumlah Test |
 |---|---|---|---|
 | server | vitest 2.x | `server/src/services/AgentRegistry.test.ts` | 20 |
-| cashier | vitest 2.x | `cashier/src/store/useTransactionStore.test.ts` | 11 |
-| cashier | vitest 2.x | `cashier/src/services/MultiSocketService.test.ts` | 7 |
+| cashier | vitest 2.x | `cashier/src/services/MultiSocketService.test.ts` | 13 |
+| cashier | vitest 2.x | `cashier/src/utils/roomStatus.test.ts` | 5 |
+
+`cashier/src/store/useTransactionStore.test.ts` sudah **dihapus** bersamaan dengan store-nya (§9.3-A) — merge heuristics yang di-test-nya sudah tidak ada di kode. `MultiSocketService.test.ts` bertambah dari 7 → 13 (5 test replace/flatten/unsubscribe/room-removed dari §9.3-A + 2 test regresi routing per-room dari §9.3-B1).
 
 **Total: 38 test, semua lulus.**
 
@@ -797,15 +901,17 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 - Assets statis: `agent/data/start_image.html`, `expired_image.html`
 
 **Web**
-- Entry: `web/src/main.tsx`, `App.tsx`, `routes/AppRouter.tsx`, `layouts/MainLayout.tsx`
-- Socket: `web/src/services/socket/SocketService.ts`
+- Entry: `web/src/main.tsx`, `App.tsx` (mount `LoadingProvider`, §9.4), `routes/AppRouter.tsx`, `layouts/MainLayout.tsx`
+- Socket: `web/src/services/socket/SocketService.ts` (`on()` kembalikan unsubscribe per-listener sejak §9.3-C1; `onConnect()` pub/sub baru §9.4), `services/socket/PlaylistListener.ts`, `services/player/PlayerStateListener.ts` — ketiganya sekarang menulis ke `appStateService`, bukan store manapun.
 - Player: `web/src/services/player/PlayerCommandService.ts`, `features/player/components/*`
 - Search: `web/src/services/search/SearchService.ts`, `pages/SearchPage.tsx`
-- Store: `web/src/store/appStore.ts`
+- State (§9.4, Zustand dihapus): `web/src/services/AppStateService.ts` (baru — pemilik `agent`/`player`/`playlist`, singleton bukan React), `hooks/useAppState.ts` (baru — `useAgentState()`/`usePlayerState()`/`usePlaylistState()`), `context/LoadingContext.tsx` (baru — `processing`/`globalLoading`/`initialLoading`/`removingItemId`/`addingToPlaylist`). `store/appStore.ts` (Zustand) **dihapus total** beserta direktori `store/`.
 - PWA: `web/public/manifest.json`, `web/public/sw.js`, `web/vite.config.ts`
+- Dihapus (§9.3-C2): `hooks/usePlayer.ts`, `hooks/usePlaylist.ts` — redundan dengan `PlayerStateListener`/`registerPlaylistListener`.
 
 **Cashier**
 - Entry: `cashier/src/App.tsx`, `pages/DashboardPage.tsx`, `layouts/CashierLayout.tsx`
-- Socket: `cashier/src/services/MultiSocketService.ts` (aktif, satu-satunya — `SocketService.ts` legacy sudah dihapus, lihat §9.2 #10)
-- Store: `cashier/src/store/useTransactionStore.ts`, `useRoomStore.ts`
+- Socket: `cashier/src/services/MultiSocketService.ts` — satu-satunya, sekarang juga pemilik data `transactions` per-koneksi (§4.4.2/§9.3-A). `SocketService.ts` legacy sudah dihapus dari sesi audit sebelumnya (§9.2 #10).
+- State: `cashier/src/context/RoomConfigContext.tsx`, `context/LoadingContext.tsx` (§9.3-A) — pengganti `store/useRoomStore.ts`/`useTransactionStore.ts` yang sudah **dihapus total** beserta seluruh direktori `store/`.
 - UI: `cashier/src/components/RoomCard.tsx`, `MoveRoomModal.tsx`, `TransactionModal.tsx`, `PaymentConfirmModal.tsx`, `PrintReceipt.tsx`
+- Util: `cashier/src/utils/roomStatus.ts` (+ `.test.ts` baru, §9.3-B2) — state machine status ruangan, dipakai `RoomCard`/`MoveRoomModal`.

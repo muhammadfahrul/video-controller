@@ -2,15 +2,9 @@ import { useEffect } from "react";
 
 import { agentService } from "../services";
 import { socketService } from "../services";
-import { useAppStore } from "../store/appStore";
+import { appStateService } from "../services/AppStateService";
 
 export function useAgent() {
-
-    const {
-
-        loadAgent
-
-    } = useAppStore();
 
     useEffect(() => {
 
@@ -32,7 +26,7 @@ export function useAgent() {
 
                 const agent = agents[0];
 
-                loadAgent({
+                appStateService.setAgent({
 
                     id: agent.id,
 
@@ -71,7 +65,7 @@ export function useAgent() {
 
                 if (agents.length === 0) {
                     
-                    loadAgent({
+                    appStateService.setAgent({
 
                         id: "",
 
@@ -93,7 +87,7 @@ export function useAgent() {
 
                 const agent = agents[0];
 
-                loadAgent({
+                appStateService.setAgent({
 
                     id: agent.id,
 

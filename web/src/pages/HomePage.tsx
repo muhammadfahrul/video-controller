@@ -3,12 +3,15 @@ import ProgressBar from "../features/player/components/ProgressBar";
 import VolumeSlider from "../features/player/components/VolumeSlider";
 import CurrentVideo from "../features/player/components/CurrentVideo";
 import BillingStatus from "../features/player/components/BillingStatus";
-import { useAppStore } from "../store/appStore";
+import { useAgentState, usePlayerState } from "../hooks/useAppState";
+import { useLoading } from "../context/LoadingContext";
 import { playerCommandService } from "../services";
 
 export default function HomePage(){
 
-    const { agent, player, setProcessing } = useAppStore();
+    const agent = useAgentState();
+    const player = usePlayerState();
+    const { setProcessing } = useLoading();
 
     const handleVolumeChange = (value: number) => {
         if (!agent.id || !agent.online) return;

@@ -3,7 +3,8 @@ import PlaylistEmpty from "./PlaylistEmpty";
 import PlaylistItemCard from "./PlaylistItem";
 import Pagination from "../../../shared/components/Pagination";
 
-import { useAppStore } from "../../../store/appStore";
+import { useAgentState, usePlaylistState } from "../../../hooks/useAppState";
+import { useLoading } from "../../../context/LoadingContext";
 
 import {
     playerCommandService
@@ -14,17 +15,14 @@ from "./PlaylistToolbar";
 
 export default function PlaylistPanel() {
 
+    const agent = useAgentState();
+    const playlist = usePlaylistState();
     const {
-
-        agent,
-
-        playlist,
         removingItemId,
         setRemovingItemId,
         processing,
         setProcessing
-
-    } = useAppStore();
+    } = useLoading();
 
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);

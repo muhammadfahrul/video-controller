@@ -1,9 +1,9 @@
-import { useAppStore } from "../store/appStore";
+import { useAgentState } from "../hooks/useAppState";
 import AgentStatusCard from "../features/agent/components/AgentStatusCard";
 
 export default function SettingsPage() {
 
-    const { agent } = useAppStore();
+    const agent = useAgentState();
 
     return (
 

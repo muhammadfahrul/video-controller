@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import SearchBar from "../features/search/components/SearchBar";
 import SearchResultCard from "../features/search/components/SearchResultCard";
 import Pagination from "../shared/components/Pagination";
-import { useAppStore } from "../store/appStore";
+import { useAgentState } from "../hooks/useAppState";
+import { appStateService } from "../services/AppStateService";
+import { useLoading } from "../context/LoadingContext";
 import { agentService } from "../services";
 import { searchService } from "../services/search";
 import type { SearchResult } from "../features/search/types/SearchResult";
@@ -13,12 +15,13 @@ export default function SearchPage(){
     const [results, setResults] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-    
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 5;
-    
-    const { loadAgent, setProcessing, setGlobalLoading, agent } = useAppStore();
+
+    const agent = useAgentState();
+    const { setProcessing, setGlobalLoading } = useLoading();
 
     const search = async () => {
         if (!keyword.trim()) {
@@ -67,7 +70,7 @@ export default function SearchPage(){
                 const agents = await agentService.list();
                 if (agents.length === 0) return;
                 const agent = agents[0];
-                loadAgent({
+                appStateService.setAgent({
                     id: agent.id,
                     name: agent.name,
                     // Agent is online if status is ONLINE/PLAYING AND isActive is true
@@ -82,7 +85,6 @@ export default function SearchPage(){
         }
 
         load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

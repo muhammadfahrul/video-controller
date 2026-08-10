@@ -216,17 +216,17 @@ video-controller/
 ├── web/              # React PWA frontend
 │   ├── src/
 │   │   ├── components/  # React components
+│   │   ├── context/     # React Context (loading state)
 │   │   ├── hooks/       # Custom hooks
 │   │   ├── pages/       # Page components
-│   │   ├── services/    # API services
-│   │   └── store/       # Zustand state
+│   │   └── services/    # API services (juga pemilik agent/player/playlist state)
 │   └── .env            # SERVER_URL
 ├── cashier/          # React cashier frontend
 │   ├── src/
 │   │   ├── components/  # UI components
+│   │   ├── context/     # React Context (room config, loading state)
 │   │   ├── pages/       # Pages
-│   │   ├── services/    # Socket service
-│   │   └── store/       # Zustand state
+│   │   └── services/    # Socket service (juga pemilik data transaksi)
 │   └── .env            # VITE_ROOMS, BILLING_ENABLED
 ├── install.sh          # Linux installation script
 ├── install.ps1        # Windows installation script
@@ -235,7 +235,7 @@ video-controller/
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS 4, Zustand, React Router
+- **Frontend**: React 19, Vite, Tailwind CSS 4, React Router (tidak pakai Zustand — `web/` dan `cashier/` sama-sama pakai React Context + service singleton, lihat PRD §9.3/§9.4)
 - **Server**: Express, Socket.io, SQLite (sql.js), Google APIs
 - **Agent**: Playwright, Socket.io Client, Pino (logging), Zod
 

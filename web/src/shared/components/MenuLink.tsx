@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-import { useAppStore } from "../../store/appStore";
+import { useLoading } from "../../context/LoadingContext";
 
 interface Props {
 
@@ -24,7 +24,7 @@ export default function MenuLink({
 
     const navigate = useNavigate();
 
-    const setGlobalLoading = useAppStore((state)=>state.setGlobalLoading);
+    const { setGlobalLoading } = useLoading();
 
     const handleClick = (e: React.MouseEvent) => {
 

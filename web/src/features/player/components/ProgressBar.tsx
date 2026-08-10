@@ -5,8 +5,13 @@ import {
 
 
 import {
-    useAppStore
-} from "../../../store/appStore";
+    useAgentState,
+    usePlayerState
+} from "../../../hooks/useAppState";
+
+import {
+    useLoading
+} from "../../../context/LoadingContext";
 
 
 import {
@@ -17,11 +22,9 @@ import {
 export default function ProgressBar(){
 
 
-    const {
-        player,
-        agent,
-        setProcessing
-    } = useAppStore();
+    const player = usePlayerState();
+    const agent = useAgentState();
+    const { setProcessing } = useLoading();
 
 
     const [localValue, setLocalValue] =

@@ -1,4 +1,4 @@
-import { useAppStore } from "../../../store/appStore";
+import { usePlayerState, usePlaylistState } from "../../../hooks/useAppState";
 
 // Helper function to format seconds to MM:SS
 function formatDuration(seconds: number): string {
@@ -11,7 +11,8 @@ function formatDuration(seconds: number): string {
 
 export default function CurrentVideo() {
 
-    const { playlist, player } = useAppStore();
+    const player = usePlayerState();
+    const playlist = usePlaylistState();
 
     // If no player video, show nothing
     if (!player.videoId) {
