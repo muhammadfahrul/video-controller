@@ -1,6 +1,10 @@
 import { io, Socket } from 'socket.io-client';
-import type { AgentInfo, PlayerState, RoomConfig, RoomBilling } from '../types';
-import { useTransactionStore } from '../store/useTransactionStore';
+import type { AgentInfo, PlayerState, RoomConfig, RoomBilling, Transaction } from '../types';
+
+// Generate unique transaction id
+function generateTransactionId(): string {
+  return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+}
 
 // Helper to format duration in seconds to human readable
 function formatDuration(seconds: number): string {
@@ -13,6 +17,7 @@ function formatDuration(seconds: number): string {
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
 type ExpiryWarningCallback = (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => void;
+type TransactionsUpdateCallback = (transactions: Transaction[]) => void;
 
 interface RoomConnection {
   socket: Socket;
@@ -22,6 +27,9 @@ interface RoomConnection {
   agentUpdateQueue: Promise<void>;
   // Track last update timestamp to handle out-of-order events
   lastAgentUpdate: number;
+  // Transactions as last reported by this connection's server (authoritative,
+  // replaced wholesale on every 'transaction:get' - never merged).
+  transactions: Transaction[];
 }
 
 class MultiSocketService {
@@ -29,6 +37,7 @@ class MultiSocketService {
   private updateCallbacks: RoomUpdateCallback[] = [];
   private statusCallbacks: ConnectionStatusCallback[] = [];
   private expiryWarningCallbacks: ExpiryWarningCallback[] = [];
+  private transactionsUpdateCallbacks: TransactionsUpdateCallback[] = [];
   private maxReconnectAttempts = 10;
 
   // Add a new room connection
@@ -56,6 +65,7 @@ class MultiSocketService {
       agents: [],
       agentUpdateQueue: Promise.resolve(),
       lastAgentUpdate: 0,
+      transactions: [],
     };
 
     // Set up one-time connection callback
@@ -108,7 +118,13 @@ class MultiSocketService {
       this.connections.delete(connection.config.id);
       console.log('[MultiSocket] Room disconnected:', roomId, '(matched to', connection.config.id, ')');
       this.notifyUpdate();
+      this.notifyTransactionsUpdate();
     }
+  }
+
+  // Get all transactions across all connected rooms (flattened, server-authoritative)
+  getTransactions(): Transaction[] {
+    return Array.from(this.connections.values()).flatMap(c => c.transactions);
   }
 
   // Get all room configs
@@ -278,11 +294,7 @@ class MultiSocketService {
 
   // Save transaction to server
   private saveTransactionToServer(socket: Socket, transaction: any): void {
-    const transactionWithId = {
-      ...transaction,
-      id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36)
-    };
-    socket.emit('transaction:save', transactionWithId);
+    socket.emit('transaction:save', transaction);
   }
 
   // Load transactions from server for a specific room
@@ -458,17 +470,12 @@ class MultiSocketService {
       socket.emit('transaction:get');
     });
 
-    // Listen for transactions from server
-    socket.on('transaction:get', (transactions: any[]) => {
-      console.log('[MultiSocket] Received transactions from server:', transactions.length);
-      console.log('[MultiSocket] Socket ID:', socket.id, 'Room:', config.name);
-      // Find the cleanedAt value for debugging
-      const cleanedTx = transactions.find(t => t.cleanedAt && t.cleanedAt > 0);
-      console.log('[MultiSocket] Transaction with cleanedAt:', cleanedTx);
-      // Pass sourceRoomId (roomId from agent) so store knows which server sent this.
-      // This prevents cross-server orphans from being dropped during merge.
-      const sourceRoomId = connection.agents[0]?.roomId;
-      useTransactionStore.getState().setTransactions(transactions, sourceRoomId);
+    // Listen for transactions from server - this is always the complete,
+    // authoritative list for this connection, so replace (never merge).
+    socket.on('transaction:get', (transactions: Transaction[]) => {
+      console.log('[MultiSocket] Received transactions from server:', transactions.length, 'Room:', config.name);
+      connection.transactions = transactions;
+      this.notifyTransactionsUpdate();
     });
 
     socket.on('disconnect', (reason) => {
@@ -770,23 +777,10 @@ class MultiSocketService {
         });
         
         if (startTime > 0 && durationSeconds > 0) {
-          useTransactionStore.getState().addTransaction({
-            roomId: data.roomId,
-            roomName: data.roomName || config.name,
-            customerName: agent.customerName,
-            customerPhone: agent.customerPhone,
-            customerEmail: agent.customerEmail,
-            customerNote: agent.customerNote,
-            startTime,
-            endTime,
-            duration: durationSeconds,
-            pricePerHour,
-            totalPrice,
-            paidAt: 0, // unpaid
-          });
-          
-          // Send transaction to server
+          // Server is the source of truth: send once with a single generated id
+          // and let the resulting 'transaction:get' broadcast update local state.
           this.saveTransactionToServer(socket, {
+            id: generateTransactionId(),
             roomId: data.roomId,
             roomName: data.roomName || config.name,
             customerName: agent.customerName,
@@ -940,6 +934,24 @@ class MultiSocketService {
 
   private notifyStatus(roomId: string, connected: boolean): void {
     this.statusCallbacks.forEach(cb => cb(roomId, connected));
+  }
+
+  private notifyTransactionsUpdate(): void {
+    const transactions = this.getTransactions();
+    this.transactionsUpdateCallbacks.forEach(cb => cb(transactions));
+  }
+
+  // Subscribe to transaction updates (flattened across all connected rooms)
+  onTransactionsUpdate(callback: TransactionsUpdateCallback): () => void {
+    this.transactionsUpdateCallbacks.push(callback);
+
+    // Return unsubscribe function
+    return () => {
+      const index = this.transactionsUpdateCallbacks.indexOf(callback);
+      if (index > -1) {
+        this.transactionsUpdateCallbacks.splice(index, 1);
+      }
+    };
   }
 
   // Subscribe to room updates

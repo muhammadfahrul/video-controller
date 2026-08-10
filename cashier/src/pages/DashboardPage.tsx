@@ -1,29 +1,30 @@
 import { useState, useEffect } from 'react';
-import { useRoomStore } from '../store/useRoomStore';
+import { useRoomConfig } from '../context/RoomConfigContext';
+import { useLoading } from '../context/LoadingContext';
 import { multiSocketService } from '../services/MultiSocketService';
 import { RoomCard } from '../components/RoomCard';
 import { Tv, TrendingUp, Wifi, WifiOff, Server, CircleDot } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { roomConfigs, connectionStatus, setRoomConnected, setLoading: setRoomLoading } = useRoomStore();
+  const { roomConfigs, connectionStatus, setRoomConnected } = useRoomConfig();
+  const { setLoading: setRoomLoading } = useLoading();
   const [roomBillings, setRoomBillings] = useState<Map<string, any>>(new Map());
   const [hasNavigated, setHasNavigated] = useState(false);
-  
+
   useEffect(() => {
     // Mark that we've navigated to this page
     setHasNavigated(true);
-    
+
     // Set loading state for initial connection
     setRoomLoading(true, 'connecting');
-    
+
     const unsubscribeUpdate = multiSocketService.onUpdate((billings) => {
       setRoomBillings(billings);
     });
     const unsubscribeStatus = multiSocketService.onStatusChange((roomId, connected) => {
       setRoomConnected(roomId, connected);
     });
-    useRoomStore.getState().initFromEnv();
-    
+
     // Cleanup subscriptions when component unmounts
     return () => {
       unsubscribeUpdate();

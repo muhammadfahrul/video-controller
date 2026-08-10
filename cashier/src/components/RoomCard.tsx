@@ -1,9 +1,9 @@
 import { useEffect, useState, useMemo } from 'react';
-import type { RoomBilling } from '../types';
+import type { RoomBilling, Transaction } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
-import { useRoomStore } from '../store/useRoomStore';
-import { useTransactionStore } from '../store/useTransactionStore';
+import { useRoomConfig } from '../context/RoomConfigContext';
+import { useLoading } from '../context/LoadingContext';
 import type { LoadingMessage } from '../components/FullPageLoading';
 import { TransactionModal } from './TransactionModal';
 import { PaymentConfirmModal } from './PaymentConfirmModal';
@@ -39,9 +39,14 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     duration: number;
     totalPrice: number;
   } | null>(null);
-  const setGlobalLoading = useRoomStore((state) => state.setLoading);
-  const isLoading = useRoomStore((state) => state.isLoading);
-  
+  const { setLoading: setGlobalLoading, isLoading } = useLoading();
+
+  // Transactions - server-authoritative, kept live via subscription
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>(() => multiSocketService.getTransactions());
+  useEffect(() => {
+    return multiSocketService.onTransactionsUpdate(setAllTransactions);
+  }, []);
+
   // Countdown timer for expiry
   const [countdown, setCountdown] = useState<number | null>(null);
   const [showExpiredConfirm, setShowExpiredConfirm] = useState(false);
@@ -90,7 +95,6 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
     
     // Check if there's unpaid transaction for this room (paidAt === 0 means unpaid) - prevent activation if exists
-    const allTransactions = useTransactionStore.getState().transactions;
     // Debug: log transactions for this room
     console.log('[RoomCard] All transactions:', allTransactions);
     console.log('[RoomCard] Checking room:', roomBilling.roomId, roomBilling.roomName);
@@ -210,18 +214,17 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const isExpiringSoon = countdown !== null && countdown <= 60;
   const isWarning = countdown !== null && countdown <= 300;
   
-  // Get price from room config store
-  const roomConfigs = useRoomStore((state) => state.roomConfigs);
+  // Get price from room config
+  const { roomConfigs } = useRoomConfig();
   const roomConfig = roomConfigs.find(r => r.name === roomBilling.roomName);
   const pricePerHour = roomConfig?.pricePerHour ?? roomBilling.pricePerHour ?? 50000;
   // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
   const currentPrice = Math.ceil(totalSeconds / 3600) * pricePerHour;
-  
+
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;
-  
-  // Check for unpaid transactions and needs cleaning - use hook for reactivity
-  const allTransactions = useTransactionStore((state) => state.transactions);
+
+  // Check for unpaid transactions and needs cleaning (allTransactions from subscription above)
   const roomKey = roomBilling.roomId.toLowerCase();
   const roomNameKey = roomBilling.roomName.toLowerCase();
   const roomTransactions = allTransactions.filter(t => 

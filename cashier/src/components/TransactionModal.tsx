@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useTransactionStore } from '../store/useTransactionStore';
-import { useRoomStore } from '../store/useRoomStore';
+import { useLoading } from '../context/LoadingContext';
 import { multiSocketService } from '../services/MultiSocketService';
 import { PaymentConfirmModal } from './PaymentConfirmModal';
 import { PrintReceipt } from './PrintReceipt';
@@ -40,19 +39,30 @@ function formatDuration(seconds: number): string {
 }
 
 export function TransactionModal({ roomId, roomName, onClose }: TransactionModalProps) {
-  const { 
-    transactions: allTransactions,
-    removeTransaction, 
-    clearTransactions
-  } = useTransactionStore();
-  
-  const setGlobalLoading = useRoomStore((state) => state.setLoading);
-  
+  // Transactions - server-authoritative, kept live via subscription
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>(() => multiSocketService.getTransactions());
+  useEffect(() => {
+    return multiSocketService.onTransactionsUpdate(setAllTransactions);
+  }, []);
+
+  const { setLoading: setGlobalLoading } = useLoading();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today'>('all');
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
   const [printTransaction, setPrintTransaction] = useState<Transaction | null>(null);
-  
+  // Row-level "in flight" ids - purely presentational, reconciled by the next
+  // server broadcast (or the timeout fallback in multiSocketService); never
+  // written into any shared transaction state.
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+
+  const markPending = (id: string) => setPendingIds((prev) => new Set(prev).add(id));
+  const clearPending = (id: string) => setPendingIds((prev) => {
+    const next = new Set(prev);
+    next.delete(id);
+    return next;
+  });
+
   // Load transactions for this room
   useEffect(() => {
     // Request transactions from server for this room
@@ -130,10 +140,10 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
           notes,
           paidAt: Date.now()
         };
-        // Update local store
-        useTransactionStore.getState().updateTransaction(currentUnpaid.id, updatedData);
-        // Send to server to persist
+        // Send to server to persist - UI updates once the server broadcasts the change back
+        markPending(currentUnpaid.id);
         multiSocketService.updateTransaction(updatedData);
+        setTimeout(() => clearPending(currentUnpaid.id), 5000);
         setGlobalLoading(false);
       }
     } catch (error) {
@@ -145,15 +155,16 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   const handleDeleteTransaction = (transactionId: string) => {
     if (!confirm('Hapus transaksi ini?')) return;
     setGlobalLoading(true, 'deleting');
-    removeTransaction(transactionId);
-    multiSocketService.deleteTransaction(transactionId);
-    setTimeout(() => setGlobalLoading(false), 500);
+    markPending(transactionId);
+    multiSocketService.deleteTransaction(transactionId, () => {
+      clearPending(transactionId);
+      setGlobalLoading(false);
+    });
   };
-  
+
   const handleClearTransactions = () => {
     if (!confirm(`Hapus semua riwayat transaksi ${roomName}?`)) return;
     setGlobalLoading(true, 'clearing');
-    clearTransactions(roomId, roomName);
     multiSocketService.clearTransactions(() => setGlobalLoading(false), roomId);
   };
 
@@ -161,17 +172,17 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
   const handleMarkCleaned = (transactionId: string) => {
     const tx = filteredTransactions.find(t => t.id === transactionId);
     if (!tx) return;
-    
+
     const cleanedAt = Date.now();
     const updatedData: Transaction = {
       ...tx,
       cleanedAt
     };
-    
-    // Update local store
-    useTransactionStore.getState().updateTransaction(transactionId, { cleanedAt });
-    // Send to server to persist
+
+    // Send to server to persist - UI updates once the server broadcasts the change back
+    markPending(transactionId);
     multiSocketService.updateTransaction(updatedData);
+    setTimeout(() => clearPending(transactionId), 5000);
   };
   
   const modalContent = (
@@ -248,10 +259,12 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
               <p className="text-gray-500 text-sm">Belum ada transaksi</p>
             </div>
           ) : (
-            filteredTransactions.map((transaction) => (
+            filteredTransactions.map((transaction) => {
+              const isPending = pendingIds.has(transaction.id);
+              return (
               <div
                 key={transaction.id}
-                className="bg-[#0f0f1a] rounded-lg p-3 border border-white/5"
+                className={`bg-[#0f0f1a] rounded-lg p-3 border border-white/5 ${isPending ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -327,10 +340,11 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
-        
+
         {/* Footer */}
         {transactions.length > 0 && (
           <div className="p-4 border-t border-white/10">

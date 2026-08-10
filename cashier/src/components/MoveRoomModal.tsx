@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRoomStore } from '../store/useRoomStore';
-import { useTransactionStore } from '../store/useTransactionStore';
+import { useRoomConfig } from '../context/RoomConfigContext';
+import { useLoading } from '../context/LoadingContext';
 import { multiSocketService } from '../services/MultiSocketService';
 import { getRoomStatus, type RoomStatusLabel } from '../utils/roomStatus';
 import { Disc3, ArrowRightLeft, X, Timer, User } from 'lucide-react';
-import type { RoomBilling } from '../types';
+import type { RoomBilling, Transaction } from '../types';
 
 // Only these statuses mean the room is physically ready for a new customer
 const VALID_TARGET_STATUSES: RoomStatusLabel[] = ['ONLINE', 'SUDAH DIBERSIHKAN'];
@@ -27,13 +27,19 @@ function formatCountdown(seconds: number): string {
 export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoomModalProps) {
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [roomBillings, setRoomBillings] = useState<Map<string, RoomBilling>>(() => multiSocketService.getRoomBillings());
-  const setGlobalLoading = useRoomStore((state) => state.setLoading);
-  const transactions = useTransactionStore((state) => state.transactions);
+  const { setLoading: setGlobalLoading } = useLoading();
+  const { roomConfigs } = useRoomConfig();
+  const [transactions, setTransactions] = useState<Transaction[]>(() => multiSocketService.getTransactions());
 
   // Keep target room statuses live while the modal is open
   useEffect(() => {
     const unsubscribe = multiSocketService.onUpdate((billings) => setRoomBillings(billings));
     return unsubscribe;
+  }, []);
+
+  // Keep transactions live while the modal is open
+  useEffect(() => {
+    return multiSocketService.onTransactionsUpdate(setTransactions);
   }, []);
 
   const findTargetBilling = (roomName: string): RoomBilling | undefined => {
@@ -52,7 +58,6 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
 
     setGlobalLoading(true, 'moving');
     try {
-      const roomConfigs = useRoomStore.getState().roomConfigs;
       const targetConfig = roomConfigs.find(c => c.id === selectedTarget || c.name.toLowerCase() === selectedTarget.toLowerCase());
 
       if (!targetConfig) {
@@ -125,7 +130,6 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
     }
   };
 
-  const roomConfigs = useRoomStore.getState().roomConfigs;
   const availableRooms = roomConfigs.filter(c =>
     c.id !== roomBilling.roomId && c.name.toLowerCase() !== roomBilling.roomName.toLowerCase()
   );

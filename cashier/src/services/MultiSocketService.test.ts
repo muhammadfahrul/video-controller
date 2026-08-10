@@ -27,17 +27,8 @@ vi.mock('socket.io-client', () => ({
   io: vi.fn(() => mockSocket),
 }));
 
-// Mock useTransactionStore
-vi.mock('../store/useTransactionStore', () => ({
-  useTransactionStore: {
-    getState: () => ({
-      setTransactions: vi.fn(),
-    }),
-  },
-}));
-
 import { multiSocketService } from './MultiSocketService';
-import type { RoomConfig } from '../types';
+import type { RoomConfig, Transaction } from '../types';
 
 type Svc = {
   addRoom: typeof multiSocketService.addRoom;
@@ -129,5 +120,100 @@ describe('MultiSocketService - Fix B: findConnectionForRoom', () => {
     service.addRoom(config);
 
     expect(service.getRooms()).toHaveLength(1);
+  });
+});
+
+/**
+ * Unit tests for transaction handling - server-authoritative, replace-per-connection.
+ *
+ * Transactions used to live in a Zustand store with a hand-written merge function
+ * reconciling local vs. server state across a single flat array. That merge logic
+ * existed only to compensate for folding N independent room servers' data into one
+ * array. Now each connection owns its own transactions slice (like `agents`), and
+ * every 'transaction:get' broadcast fully replaces that connection's slice - no
+ * merge needed, since one connection's replace can never touch another's data.
+ */
+describe('MultiSocketService - transactions (server-authoritative)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    multiSocketService.disconnectAll();
+  });
+
+  function makeTx(overrides: Partial<Transaction> = {}): Transaction {
+    return {
+      id: Math.random().toString(36).slice(2),
+      roomId: 'room-001',
+      roomName: 'Room 1',
+      startTime: 1000,
+      endTime: 2000,
+      duration: 1000,
+      pricePerHour: 50000,
+      totalPrice: 50000,
+      paidAt: 0,
+      ...overrides,
+    };
+  }
+
+  // mockSocket is shared across connections (io() always returns it), so every
+  // addRoom() call registers its own 'transaction:get' handler on it via `on`.
+  // Handlers are returned in registration order, one per connection.
+  function getTransactionGetHandlers(): Array<(txs: Transaction[]) => void> {
+    return mockSocket.on.mock.calls
+      .filter(([event]) => event === 'transaction:get')
+      .map(([, handler]) => handler as (txs: Transaction[]) => void);
+  }
+
+  it('replaces (not merges) a connection\'s transactions on every transaction:get', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1' }));
+    const [handler] = getTransactionGetHandlers();
+
+    handler([makeTx({ id: 'tx-a' }), makeTx({ id: 'tx-b' })]);
+    expect(multiSocketService.getTransactions().map(t => t.id).sort()).toEqual(['tx-a', 'tx-b']);
+
+    // A later broadcast is the full authoritative list - tx-b is gone because
+    // the server no longer reports it, not because of a merge heuristic.
+    handler([makeTx({ id: 'tx-a' })]);
+    expect(multiSocketService.getTransactions().map(t => t.id)).toEqual(['tx-a']);
+  });
+
+  it('flattens transactions across multiple connections independently, without sourceRoomId', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1', name: 'Room 1' }));
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-2', name: 'Room 2' }));
+    const [handlerA, handlerB] = getTransactionGetHandlers();
+
+    handlerA([makeTx({ id: 'tx-a', roomId: 'room-001' })]);
+    handlerB([makeTx({ id: 'tx-b', roomId: 'room-002' })]);
+
+    expect(multiSocketService.getTransactions().map(t => t.id).sort()).toEqual(['tx-a', 'tx-b']);
+
+    // Replacing room-001's connection never touches room-002's slice.
+    handlerA([]);
+    expect(multiSocketService.getTransactions().map(t => t.id)).toEqual(['tx-b']);
+  });
+
+  it('notifies onTransactionsUpdate subscribers with the flattened list', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1' }));
+    const [handler] = getTransactionGetHandlers();
+
+    const cb = vi.fn();
+    const unsubscribe = multiSocketService.onTransactionsUpdate(cb);
+
+    handler([makeTx({ id: 'tx-a' })]);
+    expect(cb).toHaveBeenCalledWith([expect.objectContaining({ id: 'tx-a' })]);
+
+    unsubscribe();
+    cb.mockClear();
+    handler([makeTx({ id: 'tx-b' })]);
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('drops a connection\'s transactions from getTransactions() when the room is removed', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1' }));
+    const [handler] = getTransactionGetHandlers();
+    handler([makeTx({ id: 'tx-a' })]);
+    expect(multiSocketService.getTransactions()).toHaveLength(1);
+
+    multiSocketService.removeRoom('env-room-1');
+    expect(multiSocketService.getTransactions()).toHaveLength(0);
   });
 });

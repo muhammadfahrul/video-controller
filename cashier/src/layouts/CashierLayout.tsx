@@ -1,34 +1,26 @@
 import { Outlet } from "react-router-dom";
 import { useState, useEffect } from 'react';
 import { Mic } from 'lucide-react';
-import { useRoomStore } from '../store/useRoomStore';
+import { useLoading } from '../context/LoadingContext';
 import { FullPageLoading, loadingDurations } from '../components/FullPageLoading';
 
 export default function CashierLayout() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const roomLoading = useRoomStore((state) => state.isLoading);
-  const roomLoadingType = useRoomStore((state) => state.loadingType);
-  const roomLoadingMessage = useRoomStore((state) => state.loadingMessage);
-  
-  const isLoading = roomLoading;
-  
-  // Determine which loading type and message to show
-  const activeLoadingType = roomLoadingType;
-  const activeLoadingMessage = roomLoadingMessage;
-  
+  const { isLoading, loadingType: activeLoadingType, loadingMessage: activeLoadingMessage, setLoading } = useLoading();
+
   // Auto-clear loading after duration timeout
   useEffect(() => {
     if (!isLoading) return;
-    
+
     const duration = loadingDurations[activeLoadingType] || 5000;
     const timeoutId = setTimeout(() => {
       console.log('[CashierLayout] Auto-clearing loading after timeout:', duration);
-      useRoomStore.getState().setLoading(false);
+      setLoading(false);
     }, duration);
-    
+
     return () => clearTimeout(timeoutId);
-  }, [isLoading, activeLoadingType]);
+  }, [isLoading, activeLoadingType, setLoading]);
   
   // Debug log
   useEffect(() => {
