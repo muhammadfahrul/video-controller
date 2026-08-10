@@ -1,8 +1,8 @@
 import PlayerControls from "../features/player/components/PlayerControls";
-// import PlayerStatus from "../features/player/components/PlayerStatus";
 import ProgressBar from "../features/player/components/ProgressBar";
 import VolumeSlider from "../features/player/components/VolumeSlider";
 import CurrentVideo from "../features/player/components/CurrentVideo";
+import BillingStatus from "../features/player/components/BillingStatus";
 import { useAppStore } from "../store/appStore";
 import { playerCommandService } from "../services";
 import { usePlayer } from "../hooks/usePlayer";
@@ -24,9 +24,9 @@ export default function HomePage(){
 
         <div className="space-y-6 landscape:space-y-5">
 
-            <CurrentVideo />
+            <BillingStatus />
 
-            {/* <PlayerStatus /> */}
+            <CurrentVideo />
 
             <ProgressBar />
 

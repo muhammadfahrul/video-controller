@@ -357,7 +357,7 @@ class MultiSocketService {
     for (const conn of targets) {
       if (conn.socket.connected) {
         conn.socket.on('transaction:get', handleTransactionUpdate);
-        conn.socket.emit('transaction:clear');
+        conn.socket.emit('transaction:clear', roomId ? { roomId } : undefined);
       }
     }
   }

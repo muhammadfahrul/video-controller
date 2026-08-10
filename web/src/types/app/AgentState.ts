@@ -8,4 +8,9 @@ export interface AgentState {
 
     lastHeartbeat: number;
 
+    // Billing/activation info, mirrors what the server tracks per room.
+    isActive: boolean;
+
+    expiresAt: number | null;
+
 }

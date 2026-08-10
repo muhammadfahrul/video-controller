@@ -99,7 +99,9 @@ export class ConfigService {
         // Use SERVER_IP if explicitly set in environment, otherwise auto-detect
         const ip = process.env.SERVER_IP || getLocalIpAddress();
 
-        const port = process.env.PORT || 53331;
+        // SERVER_PORT is the documented env var (see agent/.env.example); PORT is
+        // kept as a fallback for backward compatibility with older setups.
+        const port = process.env.SERVER_PORT || process.env.PORT || 53331;
 
         return `http://${ip}:${port}`;
 

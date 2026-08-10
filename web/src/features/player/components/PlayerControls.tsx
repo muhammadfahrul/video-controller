@@ -36,15 +36,7 @@ import {
 
 } from "../../../store/appStore";
 
-import {
-
-    usePlayerControls
-
-} from "../../../hooks/usePlayerControls";
-
 export default function PlayerControls() {
-
-    const { } = usePlayerControls();
 
     const {
 

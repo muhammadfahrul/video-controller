@@ -139,7 +139,11 @@ create<AppStore>((set)=>({
 
         online:false,
 
-        lastHeartbeat:0
+        lastHeartbeat:0,
+
+        isActive:false,
+
+        expiresAt:null
 
     },
 

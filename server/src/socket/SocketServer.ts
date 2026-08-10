@@ -43,8 +43,8 @@ export class SocketServer {
     // Track activated rooms - persists even after agent disconnects
     private activatedRooms = new Map<string, boolean>();
     
-    // Track room activation timers for auto-expiry
-    private roomTimers = new Map<string, NodeJS.Timeout>();
+    // Track room activation timers for auto-expiry (expiry timer + all warning timers)
+    private roomTimers = new Map<string, NodeJS.Timeout[]>();
     
     // Warning thresholds in seconds before expiry (broadcast to clients)
     private readonly warningThresholds = [300, 120, 60, 30]; // 5min, 2min, 1min, 30sec
@@ -79,6 +79,11 @@ export class SocketServer {
             );
 
         this.setup();
+
+        // Broadcast whenever AgentManager's heartbeat sweep flips an agent OFFLINE
+        this.manager.onStatusChange(() => {
+            this.broadcastAgents(this.manager.getRegistry().getAll());
+        });
 
     }
 
@@ -513,7 +518,7 @@ export class SocketServer {
 
                 socket.on(
                     SocketEvents.CASHIER_DEACTIVATE_ROOM,
-                    (data: { roomId: string }) => {
+                    async (data: { roomId: string }) => {
                         console.log("[SERVER] Cashier deactivates room:", data);
                         
                         // Clear any existing timer
@@ -568,7 +573,15 @@ export class SocketServer {
                             
                             // Update registry with empty state to ensure web PWA and API get cleared data
                             registry.updateSnapshot(agent.id, emptyPlayerState);
-                            
+
+                            // Clear persisted player/playlist state too, so a reconnecting
+                            // agent doesn't get the last real video pushed back to it.
+                            try {
+                                await this.database.clearAgentData(agent.id);
+                            } catch (error) {
+                                console.error("[SERVER] Error clearing agent data in DB:", error);
+                            }
+
                             // Clear customer info
                             (agent as any).customerName = undefined;
                             (agent as any).customerPhone = undefined;
@@ -697,11 +710,14 @@ export class SocketServer {
 
                 socket.on(
                     SocketEvents.TRANSACTION_CLEAR,
-                    async () => {
-                        console.log("[SERVER] Clearing all transactions");
+                    async (data?: { roomId?: string }) => {
+                        const roomId = data?.roomId;
+                        console.log(roomId
+                            ? `[SERVER] Clearing transactions for room ${roomId}`
+                            : "[SERVER] Clearing all transactions");
                         try {
-                            await this.database.clearTransactions();
-                            this.io.emit(SocketEvents.TRANSACTION_GET, []);
+                            await this.database.clearTransactions(roomId);
+                            this.io.emit(SocketEvents.TRANSACTION_GET, await this.database.getTransactions());
                         } catch (error) {
                             console.error("[SOCKET SERVER] Error clearing transactions:", error);
                         }
@@ -831,32 +847,36 @@ export class SocketServer {
         const expiryTime = Date.now() + durationMs;
         
         console.log(`[SERVER] Setting up auto-expiry timer for room ${roomId}: ${durationMinutes} minutes (expires at ${new Date(expiryTime).toISOString()})`);
-        
+
+        const timers: NodeJS.Timeout[] = [];
+
         // Set up warning timers
         for (const threshold of this.warningThresholds) {
             const warningTime = durationMs - (threshold * 1000);
             if (warningTime > 0) {
-                setTimeout(() => {
+                timers.push(setTimeout(() => {
                     this.sendRoomWarning(roomId, threshold, expiryTime);
-                }, warningTime);
+                }, warningTime));
             }
         }
-        
+
         // Set up expiry timer
-        const timer = setTimeout(() => {
+        timers.push(setTimeout(() => {
             this.expireRoom(roomId);
-        }, durationMs);
-        
-        this.roomTimers.set(roomId, timer);
+        }, durationMs));
+
+        this.roomTimers.set(roomId, timers);
     }
-    
-    // Clear room timer
+
+    // Clear all timers (expiry + warnings) for a room
     private clearRoomTimer(roomId: string): void {
-        const existingTimer = this.roomTimers.get(roomId);
-        if (existingTimer) {
-            clearTimeout(existingTimer);
+        const existingTimers = this.roomTimers.get(roomId);
+        if (existingTimers) {
+            for (const t of existingTimers) {
+                clearTimeout(t);
+            }
             this.roomTimers.delete(roomId);
-            console.log(`[SERVER] Cleared timer for room ${roomId}`);
+            console.log(`[SERVER] Cleared ${existingTimers.length} timer(s) for room ${roomId}`);
         }
     }
     
@@ -872,7 +892,7 @@ export class SocketServer {
     }
     
     // Expire a room (auto-deactivate)
-    private expireRoom(roomId: string): void {
+    private async expireRoom(roomId: string): Promise<void> {
         console.log(`[SERVER] Room ${roomId} expired - auto-deactivating`);
         
         // Clear the timer reference
@@ -926,7 +946,13 @@ export class SocketServer {
             this.io.emit(SocketEvents.PLAYER_STATE, emptyPlayerState);
             this.io.emit(SocketEvents.PLAYLIST_STATE, { items: [], currentIndex: -1, repeat: "off", shuffle: false });
             registry.updateSnapshot(agent.id, emptyPlayerState);
-            
+
+            try {
+                await this.database.clearAgentData(agent.id);
+            } catch (error) {
+                console.error("[SERVER] Error clearing agent data in DB:", error);
+            }
+
             this.broadcastAgents(registry.getAll());
         }
         

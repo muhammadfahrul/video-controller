@@ -41,7 +41,11 @@ export function useAgent() {
                     // Agent is online if status is ONLINE/PLAYING AND isActive is true
                     online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
 
-                    lastHeartbeat: agent.lastHeartbeat
+                    lastHeartbeat: agent.lastHeartbeat,
+
+                    isActive: agent.isActive === true,
+
+                    expiresAt: agent.expiresAt ?? null
 
                 });
 
@@ -75,7 +79,11 @@ export function useAgent() {
 
                         online: false,
 
-                        lastHeartbeat: 0
+                        lastHeartbeat: 0,
+
+                        isActive: false,
+
+                        expiresAt: null
 
                     });
 
@@ -94,7 +102,11 @@ export function useAgent() {
                     // Agent is online if status is ONLINE/PLAYING AND isActive is true
                     online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
 
-                    lastHeartbeat: agent.lastHeartbeat
+                    lastHeartbeat: agent.lastHeartbeat,
+
+                    isActive: agent.isActive === true,
+
+                    expiresAt: agent.expiresAt ?? null
 
                 });
 

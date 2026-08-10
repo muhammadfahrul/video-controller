@@ -202,16 +202,19 @@ export const useTransactionStore = create<TransactionStore>()(
     },
     
     getTotalRevenue: () => {
-      return get().transactions.reduce((sum, t) => sum + t.totalPrice, 0);
+      // Only count paid transactions, consistent with getTodayRevenue below.
+      return get().transactions
+        .filter(t => t.paidAt > 0)
+        .reduce((sum, t) => sum + t.totalPrice, 0);
     },
-    
+
     getTodayRevenue: () => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayStart = today.getTime();
-      
+
       return get().transactions
-        .filter(t => t.paidAt >= todayStart)
+        .filter(t => t.paidAt > 0 && t.paidAt >= todayStart)
         .reduce((sum, t) => sum + t.totalPrice, 0);
     },
   })

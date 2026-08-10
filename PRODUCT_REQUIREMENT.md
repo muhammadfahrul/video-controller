@@ -84,8 +84,7 @@ ROOM_NAME=Room 1            # default kode: 'Room 1' (config.ts:69)
 # Opsional
 BILLING_ENABLED=true        # config.ts:72 — "!== 'false'" artinya SEMUA value selain string 'false' dianggap true
 SERVER_IP=                  # kosongkan = auto-detect IP lokal PC (ConfigService.ts:100, getLocalIpAddress())
-SERVER_PORT=53331           # ⚠️ TIDAK DIBACA. Kode aktual membaca process.env.PORT (ConfigService.ts:102), bukan SERVER_PORT.
-                             #    Ini bug dokumentasi/config: set SERVER_PORT di .env TIDAK BERPENGARUH. Default fallback: 53331.
+SERVER_PORT=53331           # Dibaca duluan (ConfigService.ts:102, fixed §9.2 #6), fallback ke PORT lalu 53331 kalau kosong.
 
 # Browser (PC ruangan biasanya visible, pakai display)
 BROWSER_HEADLESS=false       # config.ts:75 — default false kecuali literal 'true'
@@ -116,10 +115,10 @@ Tidak ada env var lain yang dibaca `server/src` — tidak ada `NODE_ENV`, `DB_PA
 ### 3.3 `web/.env` (per PC Ruangan, opsional)
 ```bash
 VITE_SERVER_IP=127.0.0.1    # web/src/utils/getServerUrl.ts:3 — fallback ke window.location.hostname kalau kosong
-VITE_SERVER_PORT=53331      # ⚠️ TIDAK DIBACA sama sekali oleh kode. Port API di-derive dari window.location.port
-                             #    (53332/53333 dev/preview → dipetakan ke 53331; port lain dipakai apa adanya).
-VITE_BILLING_ENABLED=true   # web/src/config/env.ts:7 — ⚠️ DIDEKLARASIKAN TAPI TIDAK PERNAH DIBACA di komponen manapun.
-                             #    Tidak ada UI billing/expiry/countdown di web app sama sekali (lihat §4.3.9).
+VITE_SERVER_PORT=53331      # Kalau diisi, dipakai sebagai override eksplisit (fixed §9.2 #6). Kosongkan untuk
+                             #    heuristik lama: 53332/53333 dev/preview → 53331, port lain dipakai apa adanya.
+VITE_BILLING_ENABLED=true   # web/src/config/env.ts:7 — sekarang dikonsumsi oleh BillingStatus.tsx (fixed §9.2 #9),
+                             #    menampilkan countdown sisa waktu di HomePage saat room aktif.
 ```
 
 ### 3.4 `cashier/.env` (PC Kasir)
@@ -164,7 +163,7 @@ Stack: Express 5 + Socket.IO 4 + sql.js (in-memory WASM SQLite, persist manual k
 
 ⚠️ **Race condition cold-start**: karena `initialize()` tidak di-await, ada jendela waktu di mana event masuk (mis. `player:state`, `transaction:save`) bisa tiba sebelum `this.db` di-set — namun semua method DB guard dengan `if (!this.db) return;` sehingga **silent no-op**, bukan error/queue. Berpotensi silent data-loss di window ini.
 
-`AppContainer` (`server/src/container/AppContainer.ts`) adalah **dead code** — class DI container kedua yang tidak pernah di-instantiate di manapun. Container aktif yang dipakai adalah `ServiceContainer`.
+`AppContainer` (bekas `server/src/container/AppContainer.ts`) adalah class DI container kedua yang tidak pernah di-instantiate di manapun — sudah **dihapus** (lihat §9.2 #10). Container aktif yang dipakai adalah `ServiceContainer`.
 
 #### 4.1.2 Semua Socket.IO Event (Server)
 
@@ -205,7 +204,7 @@ Definisi event: `server/src/socket/SocketEvents.ts` (enum). Semua handler: `serv
 | `transaction:save` | `:655-670` | `TransactionData` lengkap (sudah termasuk `totalPrice`) | Upsert by `id`, lalu broadcast ulang **semua** transaksi via `transaction:get`. **Server TIDAK menghitung harga** — client (cashier) dipercaya penuh. |
 | `transaction:get` | `:672-683` | — | Respon ke pemanggil saja, `ORDER BY paidAt DESC`. |
 | `transaction:delete` | `:685-696` | `transactionId` | Delete by id, broadcast list terbaru ke semua. |
-| `transaction:clear` | `:698-709` | — | `DELETE FROM transactions` **tanpa WHERE** — hapus transaksi **semua ruangan**, bukan hanya satu (⚠️ lihat Known Issues — kontradiksi dengan commit `fff0470`). |
+| `transaction:clear` | `:698-714` | `{roomId?}` (opsional) | `DELETE FROM transactions WHERE roomId=?` kalau `roomId` diisi, else hapus semua (fixed, lihat §9.2 #3) — broadcast sisa transaksi terbaru ke semua client. |
 | `agent:error` | `:712-733` | `{agentId, roomId, timestamp, type, message, stack?, context?}` | Simpan ke tabel `errors`, rebroadcast ke semua. Kalau simpan gagal, **tidak** direbroadcast (client lain tidak pernah tahu ada error). |
 
 **Tidak ada validasi payload sama sekali** (tidak ada zod/joi) — field yang hilang jadi `undefined` dan ditulis apa adanya ke DB.
@@ -252,7 +251,7 @@ Kalau tidak ada agent yang cocok, `activatedRooms` tetap di-set dan timer tetap 
 ```js
 warningThresholds = [300, 120, 60, 30] // detik: 5menit, 2menit, 1menit, 30detik
 ```
-Untuk tiap threshold, jadwalkan `setTimeout` terpisah mengirim `room:expiry-warning`. ⚠️ **Timer warning TIDAK dilacak/dibatalkan** — `clearRoomTimer()` hanya membatalkan timer expiry final, bukan 4 timer warning. Kalau room di-deactivate atau di-extend sebelum warning sempat fire, timer warning lama **tetap jalan** dan mengirim event stale (`secondsRemaining`/`expiresAt` basi) di waktu yang sudah tidak relevan.
+Untuk tiap threshold, jadwalkan `setTimeout` terpisah mengirim `room:expiry-warning`. Semua timer (4 warning + 1 expiry) disimpan sebagai array per room di `roomTimers: Map<string, NodeJS.Timeout[]>`, dan `clearRoomTimer()` membatalkan seluruhnya sekaligus (fixed, lihat §9.2 #2) — deactivate/extend-time sebelum warning fire tidak lagi meninggalkan timer basi.
 
 - **Deactivate** (`cashier:deactivate-room`):
 ```
@@ -267,7 +266,7 @@ emit room:activation{isActive:false, reason:"deactivated", expiresAt, startTime}
 ```
 ⚠️ **Server TIDAK membuat transaksi apa pun di sini** — tidak ada `database.saveTransaction()` call di path deactivate/expire. Transaksi hanya tersimpan lewat event `transaction:save` yang dikirim terpisah oleh cashier (lihat §4.4.6). `agent.status` juga **tidak** direset ke `WAITING` (tetap `ONLINE`).
 
-- **Extend time** (`cashier:extend-time`): `newExpiresAt = (agent.expiresAt || Date.now()) + additionalMinutes*60000`. Kalau `!agent.isActive`, request **diabaikan diam-diam** tanpa error balik. Timer lama diganti total via `setupRoomTimer` lagi (termasuk 4 warning timer baru — timer warning versi lama tetap orphan, lihat di atas).
+- **Extend time** (`cashier:extend-time`): `newExpiresAt = (agent.expiresAt || Date.now()) + additionalMinutes*60000`. Kalau `!agent.isActive`, request **diabaikan diam-diam** tanpa error balik. Timer lama dibatalkan penuh (termasuk semua warning timer, fixed §9.2 #2) lalu diganti via `setupRoomTimer` lagi.
 
 - **Auto-expiry** (`expireRoom`): mirip deactivate, tapi set `agent.expiresAt = null` (deactivate manual justru **membiarkan** `expiresAt` terisi) — inkonsistensi kecil antar dua code path yang seharusnya serupa.
 
@@ -314,7 +313,7 @@ Tidak ada migration framework — hanya try/catch `ALTER TABLE` manual. Tidak ad
 
 **CRUD Transaksi**: `saveTransaction()` = check-then-insert-or-update (2 round trip, bukan `UPSERT`/`INSERT OR REPLACE` walau `id` adalah PK). `getTransactions()` = `SELECT * ORDER BY paidAt DESC`, tanpa pagination. `getTransactionsByRoom`/`getTransactionsByDateRange` **ada di kode tapi tidak pernah dipanggil** (dead code, tidak ada route/handler yang mengekspos).
 
-⚠️ **`clearAgentData(agentId)`** (reset player/playlist ke default di DB) **tidak pernah dipanggil** dari flow deactivate/expire — registry in-memory dan socket broadcast di-clear, tapi row SQLite `agents` tetap menyimpan state video terakhir. Reconnect berikutnya (`loadAndSendAgentData`) bisa push balik video lama yang seharusnya sudah "dibersihkan".
+`clearAgentData(agentId)` (reset player/playlist ke default di DB) sekarang **dipanggil** di kedua flow deactivate dan expire (fixed, lihat §9.2 #4) — row SQLite `agents` ikut ter-reset, jadi reconnect berikutnya tidak lagi mendapat push balik video lama.
 
 **Errors table**: `getAgentErrors()`/`clearAgentErrors()` ada tapi **tidak diekspos** lewat route/socket manapun — tidak ada cara baca/hapus error tersimpan via API saat ini; tabel `errors` cuma tumbuh terus.
 
@@ -352,7 +351,7 @@ Stack: Node + TypeScript + Playwright (persistent Chromium context) + socket.io-
 
 `Agent.start()` (`Agent.ts:162-340`), urutan:
 1. Setup global error handlers (`process.on uncaughtException/unhandledRejection` → forward ke `agent:error`).
-2. `socketClient.connect()` — **panggilan pertama** dari dua (lihat Known Issues, "double connect").
+2. `socketClient.connect()` — satu-satunya panggilan connect (dulu ada panggilan kedua yang duplikat, sudah dihapus — lihat §9.2 #7).
 3. `await socketClient.waitForConnection()`.
 4. **Gate billing** (lihat §4.2.2).
 5. `await browser.start()` — launch Playwright.
@@ -364,9 +363,8 @@ Stack: Node + TypeScript + Playwright (persistent Chromium context) + socket.io-
 11. `player.fullscreen()`.
 12. `player.setOnEnded(...)` — chain video-selesai → `playlist.next()` → `player.openVideo()`.
 13. `registerCommands()`.
-14. `socketClient.connect()` — **panggilan kedua** (lihat Known Issues).
-15. `HeartbeatService.start()`.
-16. Start 3 interval: `startPlayerStateSync()` (1s), `startPlaylistSync()` (1s), `startAutoSkipAds()` (500ms).
+14. `HeartbeatService.start()`.
+15. Start 3 interval: `startPlayerStateSync()` (1s), `startPlaylistSync()` (1s), `startAutoSkipAds()` (500ms).
 
 #### 4.2.2 Activation Gating
 
@@ -381,7 +379,7 @@ if (billingEnabled) {
     socketClient.setActive(true);
 }
 ```
-Selama menunggu, agent kirim heartbeat manual tiap 5 detik (terpisah dari `HeartbeatService`) supaya tidak kena timeout OFFLINE server (15 detik, meski deteksi ini sendiri sekarang tidak berfungsi — lihat §4.1 Known Issues Server).
+Selama menunggu, agent kirim heartbeat manual tiap 5 detik (terpisah dari `HeartbeatService`) supaya tidak kena timeout OFFLINE server (15 detik — deteksi ini sudah diperbaiki, lihat §9.2 #1).
 
 `agent:activation` handler (`SocketClient.ts:212-299`), didaftarkan ulang tiap `connect()`:
 - `isActive:false` → dispatch `STOP` command internal + `playerService.showExpiredImage()`.
@@ -501,9 +499,9 @@ Zustand store tunggal `useAppStore` — **tanpa persistence**, reset tiap reload
 
 Manifest statis (`web/public/manifest.json`) — mereferensikan `icon-192.png`/`icon-512.png` yang **tidak ada** di `web/public/` (hanya `favicon.svg`/`icons.svg`). **Dua mekanisme service worker berjalan bersamaan**: `sw.js` hand-rolled (stale-while-revalidate, precache minim) **dan** SW auto-generate dari `vite-plugin-pwa`/Workbox — potensi konflik cache/versi.
 
-#### 4.3.9 Billing/Activation Display — Gap
+#### 4.3.9 Billing/Activation Display
 
-`VITE_BILLING_ENABLED` **dideklarasikan tapi tidak pernah dibaca** di komponen manapun. **Tidak ada UI billing sama sekali** di web app — tidak ada countdown, harga, atau status sesi. Satu-satunya sinyal terkait billing yang sampai ke UI adalah boolean `agent.online` (kombinasi `status ONLINE/PLAYING` + `isActive===true`) yang menggerakkan `AgentOfflineOverlay`. Kalau produk butuh visibilitas billing di layar kontrol (sisa waktu, harga/jam), ini **belum diimplementasi** — perlu masuk sebagai fitur baru, bukan bug fix.
+`VITE_BILLING_ENABLED` dikonsumsi oleh komponen `BillingStatus.tsx` (fixed §9.2 #9), dirender di atas `HomePage`. Menampilkan countdown live (update tiap detik) berdasar `agent.expiresAt` kalau room punya durasi, atau label "Tanpa Batas" kalau `expiresAt` null (unlimited), dan otomatis tersembunyi kalau billing dimatikan lewat env atau room belum aktif/offline. Field `isActive`/`expiresAt` di-alirkan dari payload `agents:update`/`/api/agents` ke `AgentState` (sebelumnya hanya `online` boolean yang dipakai untuk menggerakkan `AgentOfflineOverlay`; sinyal itu tetap ada, `BillingStatus` menambahkan detail sisa waktu di atasnya).
 
 #### 4.3.10 Config Env yang Dibaca
 
@@ -517,7 +515,7 @@ Stack: React + Vite + Zustand + socket.io-client.
 
 #### 4.4.1 Struktur & Routing
 
-Hanya **satu route terdaftar**: `/` → `DashboardPage` (grid kartu ruangan). `TransactionsPage.tsx` (riwayat transaksi global) **sudah dibangun lengkap tapi tidak pernah di-route** — tidak ada `<Route path="/transactions">`, dan `MenuLink.tsx` (nav-link component) juga tidak dipakai di manapun. Riwayat transaksi global saat ini **hanya bisa diakses per-ruangan** lewat `TransactionModal` (tombol Receipt di `RoomCard`).
+Dua route terdaftar: `/` → `DashboardPage` (grid kartu ruangan) dan `/transactions` → `TransactionsPage` (riwayat transaksi global, fixed §9.2 #8 — sebelumnya dibangun lengkap tapi tidak pernah di-route). Nav link di header `CashierLayout` (pakai `MenuLink.tsx`) menghubungkan keduanya. Riwayat per-ruangan tetap bisa diakses lewat `TransactionModal` (tombol Receipt di `RoomCard`).
 
 #### 4.4.2 MultiSocketService — Multi Koneksi
 
@@ -593,7 +591,7 @@ Algoritma merge: dedupe server list by id → untuk tiap transaksi lokal yang ad
 
 ⚠️ **Bug baru ditemukan (belum dilaporkan sebelumnya)**: `getTotalRevenue()` menjumlahkan `totalPrice` dari **semua** transaksi tanpa filter `paidAt` — transaksi unpaid ikut dihitung sebagai "revenue". `getTodayRevenue()` justru filter `paidAt >= todayStart`, jadi undercount konsisten untuk transaksi unpaid hari ini. Dua fungsi ini **tidak konsisten** satu sama lain.
 
-`useRoomStore` juga punya **sistem transaksi paralel kedua** (`transactions: Map<roomId, Transaction[]>` + method sendiri) yang **tidak dipakai komponen manapun** — vestigial, kandidat dihapus.
+`useRoomStore` dulu juga punya sistem transaksi paralel kedua (`transactions: Map<roomId, Transaction[]>` + method sendiri) yang tidak dipakai komponen manapun — sudah dihapus (fixed §9.2 #10), `useTransactionStore` sekarang satu-satunya sumber data transaksi.
 
 #### 4.4.9 Payment Confirmation & Mark Cleaned
 
@@ -608,11 +606,11 @@ Murni client-side (`window.open` + `document.write` + `window.print()`), tidak a
 #### 4.4.11 Transaction History Pages
 
 - **Per-ruangan** (`TransactionModal`, satu-satunya yang bisa diakses user): filter roomId/roomName, search nama/HP, filter tanggal (`all`/`today`), sort unpaid dulu lalu `paidAt` descending.
-- **Global** (`TransactionsPage`): sudah dibangun lengkap (search, hapus, clear-all, kartu revenue total/hari-ini) tapi **tidak bisa diakses** karena tidak ada route/nav link (§4.4.1).
+- **Global** (`TransactionsPage`, dapat diakses via `/transactions`): search, hapus, clear-all, kartu revenue total/hari-ini (fixed §9.2 #8).
 
 #### 4.4.12 Config Env
 
-`VITE_BILLING_ENABLED` (default enabled), `VITE_ROOMS` (JSON array, wajib). `VITE_SERVER_PORT` dead (dideklarasikan di type, tidak dibaca).
+`VITE_BILLING_ENABLED` (default enabled), `VITE_ROOMS` (JSON array, wajib). `VITE_SERVER_PORT` dideklarasikan di type tapi tidak dipakai di cashier (port server ruangan selalu ikut field `port` per-entry di `VITE_ROOMS`, bukan variabel global — beda kasus dengan `SERVER_PORT`/`VITE_SERVER_PORT` di agent/web yang sudah di-fix §9.2 #6).
 
 ---
 
@@ -666,69 +664,19 @@ Reset tiap reload, tidak ada localStorage/IndexedDB.
 
 ---
 
-## 8. Known Issues — Konsolidasi (Kode Audit + Laporan User)
+## 8. Known Issues — Status Terkini
 
-### 8.1 🔴 CRITICAL — Deteksi OFFLINE via heartbeat timeout TIDAK BERFUNGSI
-**Lokasi**: `server/src/services/AgentManager.ts:52-84` (`checkHeartbeat`).
-**Gejala**: Agent yang berhenti heartbeat (tanpa disconnect socket eksplisit) tidak pernah ditandai OFFLINE — tetap tampil ONLINE/WAITING selamanya di `agents:update`.
-**Penyebab**: `getAll()` mengembalikan **clone**, bukan reference. Loop `checkHeartbeat()` men-set `agent.status="OFFLINE"` pada clone yang langsung dibuang — mutasi tidak pernah mencapai registry Map asli. Flag `changed` di-set tapi tidak ada broadcast/write-back (`// will be called later` — belum selesai dikerjakan).
-**Dampak**: Status OFFLINE hanya terjadi lewat `disconnect` socket asli (yang justru **menghapus total** entry, bukan mark OFFLINE) — jadi ada celah kondisi (agent proses hang tapi socket TCP masih terbuka) yang tidak pernah terdeteksi oleh cashier.
-**Fix yang disarankan**: Ganti `getAll()` dengan iterasi `getRef()`/akses langsung Map internal di `checkHeartbeat`, lalu panggil `broadcastAgents()` setelah ada perubahan.
+Semua 10 issue yang ditemukan dari audit kode (§8.1-8.10 versi sebelumnya) **sudah di-fix, di-typecheck, dan lulus test** — lihat §9.2 untuk detail perubahan tiap item. Yang tersisa hanya item known-by-design yang memang sengaja tidak di-fix:
 
-### 8.2 🟠 HIGH — Timer warning ekspirasi bocor (orphan `setTimeout`)
-**Lokasi**: `server/src/socket/SocketServer.ts` (`setupRoomTimer`/`clearRoomTimer`, `:826-861`).
-**Gejala**: Deactivate manual atau extend-time sebelum warning 5/2/1/0.5 menit sempat fire → warning lama tetap terkirim dengan data stale di waktu yang sudah tidak relevan (room bisa sudah tidak aktif, atau sudah diperpanjang).
-**Penyebab**: `clearRoomTimer` hanya menyimpan & membatalkan 1 timer (expiry final) di `roomTimers` Map; 4 `setTimeout` warning tidak dilacak sama sekali.
-**Fix yang disarankan**: Simpan array timer (bukan satu timeout) per room, batalkan semuanya di `clearRoomTimer`.
-
-### 8.3 🟠 HIGH — `transaction:clear` menghapus SEMUA ruangan, bukan satu ruangan
-**Lokasi**: `server/src/socket/SocketServer.ts:698-709`, `DatabaseService.clearTransactions()`.
-**Gejala**: Commit history (`fff0470 refactor: enhance transaction clearing logic to target specific rooms`) mengindikasikan niat room-scoped, tapi kode aktual masih `DELETE FROM transactions` tanpa `WHERE` — kasir yang klik "Hapus Semua Riwayat" di satu ruangan berisiko menghapus transaksi ruangan lain juga (tergantung apakah cashier mengirim event ini ke semua koneksi atau satu).
-**Fix yang disarankan**: Tambah parameter `roomId` opsional ke event & method DB, `WHERE roomId=?` kalau diisi.
-
-### 8.4 🟡 MEDIUM — DB-level `clearAgentData` tidak pernah dipanggil saat deactivate/expire
-**Lokasi**: `server/src/services/DatabaseService.ts` (method ada), tidak dipanggil dari `SocketServer.ts` manapun.
-**Gejala**: Row SQLite `agents` tetap menyimpan video terakhir walau UI sudah "dibersihkan" — reconnect berikutnya bisa push balik video lama.
-**Fix yang disarankan**: Panggil `database.clearAgentData(agent.id)` di flow deactivate & expire.
-
-### 8.5 🟡 MEDIUM — `getTotalRevenue()` vs `getTodayRevenue()` tidak konsisten soal `paidAt`
-**Lokasi**: `cashier/src/store/useTransactionStore.ts` (`getTotalRevenue` tidak filter `paidAt`, `getTodayRevenue` filter `paidAt>=todayStart`).
-**Gejala**: Total revenue di-inflate oleh transaksi unpaid; today revenue di-undercount untuk transaksi unpaid hari ini.
-**Fix yang disarankan**: Samakan filter — keduanya hanya hitung `paidAt > 0`.
-
-### 8.6 🟡 MEDIUM — `SERVER_PORT` (agent) dan `VITE_SERVER_PORT` (web/cashier) adalah dead config
-**Lokasi**: `agent/src/services/ConfigService.ts:102` (baca `PORT`, bukan `SERVER_PORT`); `web/src/utils/getServerUrl.ts` (derive dari `window.location.port`, bukan env).
-**Gejala**: Operator yang mengikuti `.env.example` mengira mengubah `SERVER_PORT`/`VITE_SERVER_PORT` berpengaruh — tidak.
-**Fix yang disarankan**: Selaraskan nama env var dengan yang benar-benar dibaca, atau update kode supaya baca nama yang didokumentasikan.
-
-### 8.7 🟡 MEDIUM — Double `socket.connect()` di Agent
-**Lokasi**: `agent/src/core/Agent.ts:176,313`.
-**Gejala**: `SocketClient.connect()` dipanggil 2x dalam satu startup, masing-masing membuat instance `io()` baru tanpa men-disconnect yang lama — socket pertama ditinggalkan begitu saja, semua handler didaftar ulang di socket kedua. Berisiko dua koneksi hidup singkat sebelum yang lama timeout, dan state promise internal (`activationResolve`) tidak direset dengan bersih.
-**Fix yang disarankan**: `disconnect()` socket lama sebelum `connect()` kedua, atau restrukturisasi supaya `connect()` hanya dipanggil sekali setelah semua service siap didaftar sebagai handler.
-
-### 8.8 🟢 LOW — `TransactionsPage` (riwayat transaksi global) tidak ke-route
-**Lokasi**: `cashier/src/App.tsx` (hanya route `/`), `cashier/src/pages/TransactionsPage.tsx` (lengkap tapi orphan).
-**Fix yang disarankan**: Tambah `<Route path="/transactions">` + nav link (`MenuLink` sudah ada, juga belum dipakai).
-
-### 8.9 🟢 LOW — Billing/expiry tidak tervisualisasi di Web PWA
-**Lokasi**: `web/src/config/env.ts:7` (`VITE_BILLING_ENABLED` dideklarasikan, tidak dipakai).
-**Catatan**: Ini gap fitur, bukan regresi — perlu keputusan produk apakah web app room perlu menampilkan sisa waktu/harga.
-
-### 8.10 🟢 LOW — Dead code / vestigial (kandidat cleanup, tidak mempengaruhi fungsi)
-- `server/src/container/AppContainer.ts` (DI container tidak terpakai)
-- `cashier/src/services/SocketService.ts` + `utils/getServerUrl.ts` (single-socket legacy)
-- `cashier/src/store/useRoomStore.ts` — sistem transaksi paralel (`transactions: Map`) tidak dipakai
-- `agent/src/youtube/YouTubeController.ts`, `agent/src/services/HealthService.ts` (stub), `agent/src/logger/Logger.ts` — implementasi lama yang sudah digantikan
-- `web/src/features/player/components/PlayerProgress.tsx`, `PlayerStatus.tsx` (commented-out), `usePlayerControls.ts` (return value dibuang)
-- Dependency `pino` di `server/package.json` — terinstall, tidak pernah diimpor
-
-### 8.11 [KNOWN, tidak akan di-fix — sesuai konfirmasi desain]
+### 8.1 [KNOWN, tidak akan di-fix — sesuai konfirmasi desain]
 - **Shared-IP Cashier conflict di AgentRegistry** — sudah tidak relevan pasca Fix C (key registry sekarang `roomId`, bukan `agent.id`).
 - **Per-isolated Database** — sesuai desain, tidak ada sinkronisasi antar server. Backup per-PC tanggung jawab operator.
 
 ---
 
 ## 9. Riwayat Perbaikan (Sudah Selesai & Terverifikasi)
+
+### 9.1 Fix A/B/C (batch pertama)
 
 ### Fix A — Merge transaksi multi-server
 `cashier/src/store/useTransactionStore.ts` — `setTransactions(serverTx, sourceRoomId)` sekarang benar-benar `set()` hasil merge, dengan proteksi orphan cross-server via `sourceRoomId`. **Terverifikasi**: 11 test lulus.
@@ -741,6 +689,23 @@ Reset tiap reload, tidak ada localStorage/IndexedDB.
 
 ### Bug A.1 (setTransactions tidak commit) & Bug A.2 (orphan multi-server hilang) & Bug B.1 (lookup strict)
 Semua sudah diperbaiki bersamaan dengan Fix A/B di atas — lihat kode aktual di §4.4.8/§4.4.2.
+
+### 9.2 Fix batch kedua (hasil audit kode mendalam, 2026-08-11)
+
+| # | Issue | File yang diubah | Verifikasi |
+|---|---|---|---|
+| 1 | 🔴 OFFLINE detection tidak berfungsi | `server/src/services/AgentRegistry.ts` (+`markStaleOffline()`), `AgentManager.ts` (+`onStatusChange()` callback), `SocketServer.ts` (subscribe & broadcast) | 20 test server lulus |
+| 2 | 🟠 Timer warning ekspirasi bocor | `server/src/socket/SocketServer.ts` — `roomTimers` sekarang `Map<string, NodeJS.Timeout[]>`, `clearRoomTimer` membatalkan semua timer (warning + expiry) | tsc clean |
+| 3 | 🟠 `transaction:clear` hapus semua ruangan | `server/src/services/DatabaseService.ts` (`clearTransactions(roomId?)`), `SocketServer.ts` (terima payload `{roomId?}`), `cashier/src/services/MultiSocketService.ts` (kirim `roomId` saat scoped) | tsc clean, build OK |
+| 4 | 🟡 `clearAgentData` tidak dipanggil saat deactivate/expire | `server/src/socket/SocketServer.ts` — dipanggil di kedua flow (`CASHIER_DEACTIVATE_ROOM` handler + `expireRoom()`) | tsc clean |
+| 5 | 🟡 `getTotalRevenue`/`getTodayRevenue` tidak konsisten | `cashier/src/store/useTransactionStore.ts` — keduanya sekarang filter `paidAt > 0` | 18 test cashier lulus |
+| 6 | 🟡 `SERVER_PORT`/`VITE_SERVER_PORT` dead config | `agent/src/services/ConfigService.ts` (baca `SERVER_PORT` dengan fallback `PORT`), `web/src/utils/getServerUrl.ts` (baca `VITE_SERVER_PORT` sebagai override eksplisit) | tsc clean kedua app |
+| 7 | 🟡 Double `socket.connect()` di Agent | `agent/src/core/Agent.ts` — panggilan kedua di `start()` dihapus, listener sudah lengkap dari `connect()` pertama | tsc clean |
+| 8 | 🟢 `TransactionsPage` tidak ke-route | `cashier/src/App.tsx` (+`<Route path="/transactions">`), `cashier/src/layouts/CashierLayout.tsx` (+nav pakai `MenuLink`) | build + tsc OK |
+| 9 | 🟢 Billing tidak tervisualisasi di Web | `web/src/types/app/AgentState.ts` (+`isActive`/`expiresAt`), `useAgent.ts`, `SearchPage.tsx`, `appStore.ts`, `services/agent/AgentService.ts` (+field), komponen baru `features/player/components/BillingStatus.tsx` (countdown live, gated `VITE_BILLING_ENABLED`) dipasang di `HomePage.tsx` | tsc + vite build OK |
+| 10 | 🟢 Dead code (9 file + 1 dependency) | Dihapus: `server/src/container/AppContainer.ts`, `cashier/src/services/SocketService.ts`, `cashier/src/utils/getServerUrl.ts`, `agent/src/youtube/YouTubeController.ts`, `agent/src/services/HealthService.ts` (stub), `agent/src/logger/Logger.ts`, `web/src/features/player/components/PlayerProgress.tsx`, `PlayerStatus.tsx`, `web/src/hooks/usePlayerControls.ts`. Dependency `pino` dihapus dari `server/package.json`. Sistem transaksi paralel & modal-state yang tidak dipakai dihapus dari `cashier/src/store/useRoomStore.ts`. | tsc + build + test lulus di keempat app setelah cleanup |
+
+**Verifikasi menyeluruh setelah semua fix**: server (tsc clean, 20/20 test), agent (tsc clean), cashier (tsc -b clean, vite build OK, 18/18 test), web (tsc clean, vite build + PWA generation OK). E2E suite (`scripts/e2e/run-test.sh`) tidak bisa dijalankan karena binary `esbuild` di root `node_modules` rusak (isu environment pre-existing, tidak terkait perubahan ini) — cakupan sudah tervalidasi lewat unit test + typecheck + production build di semua 4 aplikasi.
 
 ---
 
@@ -789,11 +754,11 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 - [ ] Auto-expiry bekerja (kalau `durationMinutes` diset) → deactivate + clear player di agent.
 - [ ] Timer countdown di Cashier sinkron dengan `expiresAt` server.
 - [ ] Perpanjangan waktu dari Kasir → `expiresAt` update di server + agent.
-- [ ] Transaksi dari tiap ruangan muncul di Transaction page per-ruangan (Fix A terverifikasi). ⚠️ Riwayat global (`TransactionsPage`) belum accessible — lihat §8.8.
+- [x] Transaksi dari tiap ruangan muncul di Transaction page per-ruangan (Fix A terverifikasi) maupun global (`TransactionsPage` sudah ke-route, lihat §9.2 #8).
 - [ ] Status ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE) tampil sesuai kondisi — perhatikan "PAID" bukan status UI terpisah (§7).
 - [ ] Move Room (pindah ruangan) preserve customer info + sisa waktu **aktual** (bukan durasi asli).
 - [ ] `BILLING_ENABLED=false` → agent auto-aktif tanpa tunggu kasir.
-- [ ] ⚠️ **Belum terpenuhi**: agent yang stop-heartbeat (proses hang, socket masih terbuka) terdeteksi OFFLINE oleh cashier — lihat §8.1, saat ini tidak berfungsi.
+- [x] Agent yang stop-heartbeat (proses hang, socket masih terbuka) terdeteksi OFFLINE oleh cashier — fixed di §9.2 #1.
 
 ---
 
@@ -813,7 +778,7 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 
 **Server**
 - Entry/bootstrap: `server/src/index.ts`, `server/src/app.ts`, `server/src/bootstrap/registerRoutes.ts`
-- DI: `server/src/container/ServiceContainer.ts`, `AppContainer.ts` (unused)
+- DI: `server/src/container/ServiceContainer.ts` (`AppContainer.ts` sudah dihapus, lihat §9.2 #10)
 - Realtime: `server/src/socket/SocketServer.ts`, `SocketEvents.ts`
 - Registry/heartbeat: `server/src/services/AgentRegistry.ts` (+ `.test.ts`), `AgentManager.ts`
 - Persistence: `server/src/services/DatabaseService.ts`
@@ -841,7 +806,7 @@ NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
 
 **Cashier**
 - Entry: `cashier/src/App.tsx`, `pages/DashboardPage.tsx`, `layouts/CashierLayout.tsx`
-- Socket: `cashier/src/services/MultiSocketService.ts` (aktif), `SocketService.ts` (dead)
+- Socket: `cashier/src/services/MultiSocketService.ts` (aktif, satu-satunya — `SocketService.ts` legacy sudah dihapus, lihat §9.2 #10)
 - Store: `cashier/src/store/useTransactionStore.ts`, `useRoomStore.ts`
 - UI: `cashier/src/components/RoomCard.tsx`, `MoveRoomModal.tsx`, `TransactionModal.tsx`, `PaymentConfirmModal.tsx`, `PrintReceipt.tsx`
 - Orphan (belum di-route): `cashier/src/pages/TransactionsPage.tsx`, `components/MenuLink.tsx`

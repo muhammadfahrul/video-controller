@@ -185,4 +185,25 @@ export class AgentRegistry {
         }
         return undefined;
     }
+
+    /**
+     * Mark agents whose lastHeartbeat is older than timeoutMs as OFFLINE.
+     * Mutates the live registry entries directly (not clones) so the change
+     * is actually visible to subsequent get()/getAll() calls.
+     * Returns clones of the agents that changed, for broadcasting.
+     */
+    public markStaleOffline(timeoutMs: number): AgentInfo[] {
+        const now = Date.now();
+        const changed: AgentInfo[] = [];
+
+        for (const agent of this.agents.values()) {
+            const diff = now - agent.lastHeartbeat;
+            if (diff > timeoutMs && agent.status !== "OFFLINE") {
+                agent.status = "OFFLINE";
+                changed.push(this.cloneAgent(agent));
+            }
+        }
+
+        return changed;
+    }
 }

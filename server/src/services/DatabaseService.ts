@@ -397,10 +397,14 @@ export class DatabaseService {
         this.save();
     }
 
-    async clearTransactions(): Promise<void> {
+    async clearTransactions(roomId?: string): Promise<void> {
         if (!this.db) return;
 
-        this.db.run(`DELETE FROM transactions`);
+        if (roomId) {
+            this.db.run(`DELETE FROM transactions WHERE roomId = ?`, [roomId]);
+        } else {
+            this.db.run(`DELETE FROM transactions`);
+        }
         this.save();
     }
 

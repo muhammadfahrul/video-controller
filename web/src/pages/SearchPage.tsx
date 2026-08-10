@@ -75,7 +75,9 @@ export default function SearchPage(){
                     name: agent.name,
                     // Agent is online if status is ONLINE/PLAYING AND isActive is true
                     online: (agent.status === "ONLINE" || agent.status === "PLAYING") && agent.isActive === true,
-                    lastHeartbeat: agent.lastHeartbeat
+                    lastHeartbeat: agent.lastHeartbeat,
+                    isActive: agent.isActive === true,
+                    expiresAt: agent.expiresAt ?? null
                 });
             } catch (err) {
                 console.error(err);

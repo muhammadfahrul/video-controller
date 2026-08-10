@@ -2,6 +2,10 @@ import {
     AgentRegistry
 } from "./AgentRegistry";
 
+import {
+    AgentInfo
+} from "../types/Agent";
+
 
 export class AgentManager {
 
@@ -14,6 +18,8 @@ export class AgentManager {
     private timer:
         NodeJS.Timeout;
 
+
+    private statusChangeListeners: Array<(changed: AgentInfo[]) => void> = [];
 
 
     constructor(){
@@ -35,6 +41,14 @@ export class AgentManager {
     }
 
 
+    /**
+     * Register a callback invoked whenever checkHeartbeat() flips one or
+     * more agents to OFFLINE. Used by SocketServer to broadcast agents:update.
+     */
+    onStatusChange(listener: (changed: AgentInfo[]) => void) {
+        this.statusChangeListeners.push(listener);
+    }
+
 
 
 
@@ -51,33 +65,13 @@ export class AgentManager {
 
     private checkHeartbeat() {
 
-        const now = Date.now();
+        const changed = this.registry.markStaleOffline(15000);
 
-        // Create a snapshot to prevent iteration issues during concurrent modifications
-        const agents = [...this.registry.getAll()];
+        if (changed.length > 0) {
 
-        let changed = false;
-
-        for (const agent of agents) {
-
-            const diff = now - agent.lastHeartbeat;
-
-            if (
-                diff > 15000 &&
-                agent.status !== "OFFLINE"
-            ) {
-
-                agent.status = "OFFLINE";
-
-                changed = true;
-
+            for (const listener of this.statusChangeListeners) {
+                listener(changed);
             }
-
-        }
-
-        if (changed) {
-
-            // will be called later
 
         }
 

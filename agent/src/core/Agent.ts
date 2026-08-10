@@ -310,7 +310,13 @@ export class Agent {
 
         this.registerCommands();
 
-        this.socketClient!.connect();
+        // NOTE: socketClient.connect() was previously called again here, but the
+        // socket + all its listeners (agent:activation, command, database-restore,
+        // deactivation) are already fully set up by the connect() call above
+        // (line ~176). playerService/playlistService are read dynamically by those
+        // listeners at event-fire time, so no reconnect is needed once they're set
+        // via setPlayerService/setPlaylistService. Calling connect() twice created
+        // a second io() instance and abandoned the first without disconnecting it.
 
         this.heartbeat =
             new HeartbeatService(

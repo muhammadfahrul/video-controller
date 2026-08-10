@@ -12,6 +12,8 @@ export interface AgentDto {
 
     isActive?: boolean;
 
+    expiresAt?: number | null;
+
 }
 
 export class AgentService {
