@@ -318,43 +318,51 @@ class MultiSocketService {
     connection.socket.emit('cashier:mark-room-cleaned', { roomId: agentRoomId });
   }
 
-  // Update transaction on server (e.g., mark as paid)
-  updateTransaction(transaction: any): void {
+  // Update transaction on server (e.g., mark as paid).
+  //
+  // IMPORTANT: each connected room runs its own independent server + SQLite
+  // DB, so this must only be sent to the one connection that owns the
+  // transaction's roomId. Broadcasting to every connection (the old
+  // behavior) makes every other connected server's DB *also* insert a copy
+  // of the same transaction id - it then legitimately exists on two
+  // different servers and shows up twice once their slices are flattened.
+  updateTransaction(transaction: Transaction): void {
     console.log('[MultiSocket] updateTransaction called with:', transaction.id, 'cleanedAt:', transaction.cleanedAt);
-    // Send update to server - saveTransaction handles both insert and update
-    let sentCount = 0;
-    for (const conn of this.connections.values()) {
-      if (conn.socket.connected) {
-        console.log('[MultiSocket] Emitting transaction:save to:', conn.config.name);
-        conn.socket.emit('transaction:save', transaction);
-        sentCount++;
-      }
+
+    const connection = this.findConnectionForRoom(transaction.roomId);
+    if (!connection || !connection.socket.connected) {
+      console.error('[MultiSocket] Cannot update transaction - room not connected:', transaction.roomId);
+      return;
     }
-    console.log('[MultiSocket] updateTransaction sent to', sentCount, 'connections');
+
+    connection.socket.emit('transaction:save', transaction);
   }
-  
-  // Delete transaction on server
-  deleteTransaction(transactionId: string, onComplete?: () => void): void {
+
+  // Delete transaction on server - targets only the transaction's own room
+  // connection (see updateTransaction for why broadcasting to all connections
+  // is wrong).
+  deleteTransaction(transactionId: string, roomId: string, onComplete?: () => void): void {
+    const connection = this.findConnectionForRoom(roomId);
+    if (!connection || !connection.socket.connected) {
+      console.error('[MultiSocket] Cannot delete transaction - room not connected:', roomId);
+      onComplete?.();
+      return;
+    }
+
     const timeoutMs = 3000;
     const timeoutId = setTimeout(() => {
       onComplete?.();
     }, timeoutMs);
-    
+
     // Listen for transaction update from server
     const handleTransactionUpdate = () => {
       clearTimeout(timeoutId);
-      for (const conn of this.connections.values()) {
-        conn.socket.off('transaction:get', handleTransactionUpdate);
-      }
+      connection.socket.off('transaction:get', handleTransactionUpdate);
       onComplete?.();
     };
-    
-    for (const conn of this.connections.values()) {
-      if (conn.socket.connected) {
-        conn.socket.on('transaction:get', handleTransactionUpdate);
-        conn.socket.emit('transaction:delete', transactionId);
-      }
-    }
+
+    connection.socket.on('transaction:get', handleTransactionUpdate);
+    connection.socket.emit('transaction:delete', transactionId);
   }
 
   // Clear transactions on server. If roomId is given, only that room's

@@ -156,7 +156,7 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
     if (!confirm('Hapus transaksi ini?')) return;
     setGlobalLoading(true, 'deleting');
     markPending(transactionId);
-    multiSocketService.deleteTransaction(transactionId, () => {
+    multiSocketService.deleteTransaction(transactionId, roomId, () => {
       clearPending(transactionId);
       setGlobalLoading(false);
     });

@@ -216,4 +216,34 @@ describe('MultiSocketService - transactions (server-authoritative)', () => {
     multiSocketService.removeRoom('env-room-1');
     expect(multiSocketService.getTransactions()).toHaveLength(0);
   });
+
+  // Regression test: updateTransaction/deleteTransaction used to broadcast to
+  // every connected room's server (not just the transaction's own room). Since
+  // each room runs its own independent server + DB, that made every other
+  // connected server insert its own copy of the same transaction id - the
+  // paid transaction would then legitimately exist on two servers and show up
+  // twice once getTransactions() flattens both connections' slices.
+  it('updateTransaction only emits to the transaction\'s own room connection, not every connected room', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1', name: 'Room 1', roomId: 'room-001' }));
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-2', name: 'Room 2', roomId: 'room-002' }));
+    const [handlerA] = getTransactionGetHandlers();
+    handlerA([makeTx({ id: 'tx-a', roomId: 'room-001' })]);
+
+    mockSocket.emit.mockClear();
+    multiSocketService.updateTransaction(makeTx({ id: 'tx-a', roomId: 'room-001', paidAt: Date.now() }));
+
+    const saveCalls = mockSocket.emit.mock.calls.filter(([event]) => event === 'transaction:save');
+    expect(saveCalls).toHaveLength(1);
+  });
+
+  it('deleteTransaction only emits to the given room\'s connection, not every connected room', () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1', name: 'Room 1' }));
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-2', name: 'Room 2' }));
+
+    mockSocket.emit.mockClear();
+    multiSocketService.deleteTransaction('tx-a', 'env-room-1');
+
+    const deleteCalls = mockSocket.emit.mock.calls.filter(([event]) => event === 'transaction:delete');
+    expect(deleteCalls).toHaveLength(1);
+  });
 });
