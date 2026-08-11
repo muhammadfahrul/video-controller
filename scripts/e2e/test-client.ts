@@ -18,7 +18,6 @@ export interface RoomConfig {
   roomId?: string;
   ip: string;
   port: number;
-  pricePerHour?: number;
 }
 
 export interface CashierClientHandle {
@@ -116,7 +115,7 @@ export async function createCashierLikeClient(configs: RoomConfig[]): Promise<Ca
                 const expiresAt = data.expiresAt ?? agent?.expiresAt;
                 const endTime = expiresAt ?? Date.now();
                 const durationSeconds = Math.max(0, Math.floor((endTime - startTime) / 1000));
-                const pricePerHour = config.pricePerHour ?? 50000;
+                const pricePerHour = agent?.pricePerHour ?? 50000;
                 const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
 
                 if (startTime > 0 && durationSeconds > 0) {

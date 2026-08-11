@@ -9,7 +9,6 @@ export interface RoomConfig {
   roomId?: string; // Optional roomId from env (maps to agent's ROOM_ID)
   ip: string;
   port: number;
-  pricePerHour?: number; // Tarif per ruangan, bisa berbeda-beda
 }
 
 // Room from agent connection
@@ -89,6 +88,7 @@ export interface AgentInfo {
   player?: PlayerState;
   connected?: boolean;
   isActive?: boolean;
+  pricePerHour?: number; // Tarif per jam, dari server/.env PRICE_PER_HOUR ruangan tsb
   expiresAt?: number | null; // Timestamp when room expires
   startTime?: number | null; // Timestamp when room was activated (for billing)
   customerName?: string;

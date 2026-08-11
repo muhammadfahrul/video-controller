@@ -37,6 +37,8 @@ export interface AgentInfo {
 
     isActive: boolean;
 
+    pricePerHour: number; // Tarif per jam ruangan ini, dari server/.env PRICE_PER_HOUR
+
     startTime: number | null; // Timestamp when room was activated
 
     expiresAt: number | null; // Timestamp when room expires (null if no duration set)

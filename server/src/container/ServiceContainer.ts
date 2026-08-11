@@ -18,13 +18,18 @@ export class ServiceContainer {
 
     private readonly billingEnabled: boolean;
 
+    private readonly pricePerHour: number;
+
     private readonly database: DatabaseService;
 
     constructor(
         httpServer: HttpServer,
-        billingEnabled: boolean = true
+        billingEnabled: boolean = true,
+        pricePerHour: number = 50000
     ) {
         this.billingEnabled = billingEnabled;
+
+        this.pricePerHour = pricePerHour;
 
         this.database = new DatabaseService();
 
@@ -36,7 +41,8 @@ export class ServiceContainer {
                 httpServer,
                 this.agentManager,
                 this.billingEnabled,
-                this.database
+                this.database,
+                this.pricePerHour
             );
 
         this.commandService =
