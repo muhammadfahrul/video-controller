@@ -239,8 +239,15 @@ export class SocketClient {
                 customerNote?: string;
             }) => {
                 console.log("Room activation updated:", data);
+
+                // Capture before overwriting - the server sends this same
+                // event (isActive: true) both for genuine reactivation AND
+                // for extend-time on an already-active room (it just bumps
+                // expiresAt). Without this, extend-time would look identical
+                // to a fresh activation below and wrongly reset the display.
+                const wasActive = this.identity.isActive;
                 this.identity.isActive = data.isActive;
-                
+
                 // Set expiresAt if provided
                 if (data.expiresAt) {
                     this.identity.expiresAt = data.expiresAt;
@@ -289,11 +296,11 @@ export class SocketClient {
                     } catch (err) {
                         console.error("Error showing expired image:", err);
                     }
-                } else if (data.isActive) {
-                    // Room was reactivated - resume state sync
+                } else if (data.isActive && !wasActive) {
+                    // Genuine reactivation (was inactive, now active) - resume state sync
                     console.log("Room reactivated, resuming state sync");
                     this.resumeStateSync();
-                    
+
                     // Show start image when room is reactivated
                     try {
                         await this.playerService?.showStartImage();
@@ -301,6 +308,11 @@ export class SocketClient {
                     } catch (err) {
                         console.error("Error showing start image:", err);
                     }
+                } else if (data.isActive && wasActive) {
+                    // Room was already active - this is just an update (e.g.
+                    // extend-time bumping expiresAt, already applied above).
+                    // Don't touch playback/display - the video keeps playing.
+                    console.log("Room activation update while already active (e.g. extend time) - leaving player display untouched");
                 }
             }
         );

@@ -20,7 +20,7 @@ function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
     id: 'agent-room-001',
     socketId: 'socket-001',
-    name: 'Room 1 Agent',
+    name: 'Room 1',
     roomId: 'room-001',
     roomName: 'Room 1',
     status: 'ONLINE',

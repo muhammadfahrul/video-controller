@@ -10,7 +10,7 @@ export default function SettingsPage() {
         <div className="space-y-6 landscape:space-y-5">
 
             <div className="rounded-xl bg-[#12121f] p-4 shadow-[0_0_20px_rgba(255,45,149,0.15)] border border-[#2a2a4a]">
-                <h3 className="font-semibold mb-4 text-white">Agent Status</h3>
+                <h3 className="font-semibold mb-4 text-white">Ruangan Status</h3>
                 <AgentStatusCard
                     agent={{
                         id: agent.id,

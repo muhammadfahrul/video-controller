@@ -28,7 +28,7 @@ export default function AgentOfflineOverlay() {
       </div>
       
       <h2 className="text-2xl font-bold text-white">
-        Agent Offline
+        Ruangan Offline
       </h2>
       
       <div className="flex items-center gap-2 text-[#b8b8d0]">

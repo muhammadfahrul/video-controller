@@ -45,7 +45,7 @@ export class AgentIdentityProvider {
 
 
             name:
-            `${config.room.name} Agent`,
+            `${config.room.name}`,
 
 
             roomId: config.room.id,

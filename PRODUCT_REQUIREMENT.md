@@ -1,6 +1,6 @@
 # Video Controller — Product Requirement Document (PRD) v3
 
-> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`); migrasi itu sempat menimbulkan regresi (`web/` stuck di layar "Loading..." selamanya) yang ketahuan begitu user coba pakai aplikasinya langsung. Root cause sebenarnya baru ketemu di percobaan kedua: ada 2 instance `SocketService` singleton hidup berdampingan (bug lama, bukan cuma dari migrasi ini) — sudah diperbaiki jadi satu-satunya, lihat §9.5.
+> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`); migrasi itu sempat menimbulkan regresi (`web/` stuck di layar "Loading..." selamanya) yang ketahuan begitu user coba pakai aplikasinya langsung. Root cause sebenarnya baru ketemu di percobaan kedua: ada 2 instance `SocketService` singleton hidup berdampingan (bug lama, bukan cuma dari migrasi ini) — sudah diperbaiki jadi satu-satunya, lihat §9.5. **Update lagi**: bug terpisah dilaporkan user — Extend Time dari cashier bikin tampilan agent balik ke `start_image.jpeg` walau video sedang jalan; root cause di agent tidak membedakan "baru diaktifkan" vs "sudah aktif, cuma di-extend" — sudah diperbaiki, lihat §9.6.
 
 ---
 
@@ -266,7 +266,7 @@ emit room:activation{isActive:false, reason:"deactivated", expiresAt, startTime}
 ```
 ⚠️ **Server TIDAK membuat transaksi apa pun di sini** — tidak ada `database.saveTransaction()` call di path deactivate/expire. Transaksi hanya tersimpan lewat event `transaction:save` yang dikirim terpisah oleh cashier (lihat §4.4.6). `agent.status` juga **tidak** direset ke `WAITING` (tetap `ONLINE`).
 
-- **Extend time** (`cashier:extend-time`): `newExpiresAt = (agent.expiresAt || Date.now()) + additionalMinutes*60000`. Kalau `!agent.isActive`, request **diabaikan diam-diam** tanpa error balik. Timer lama dibatalkan penuh (termasuk semua warning timer, fixed §9.2 #2) lalu diganti via `setupRoomTimer` lagi.
+- **Extend time** (`cashier:extend-time`): `newExpiresAt = (agent.expiresAt || Date.now()) + additionalMinutes*60000`. Kalau `!agent.isActive`, request **diabaikan diam-diam** tanpa error balik. Timer lama dibatalkan penuh (termasuk semua warning timer, fixed §9.2 #2) lalu diganti via `setupRoomTimer` lagi. Notifikasi ke agent memakai event **`agent:activation{isActive:true, expiresAt:newExpiresAt}` yang sama persis** dengan event reaktivasi asli — server tidak mengirim penanda apapun untuk membedakan "cuma extend, room sudah aktif" dari "baru diaktifkan". Ini bagian dari root cause bug §9.6 (tampilan agent balik ke `start_image.jpeg` saat di-extend) — fix akhirnya diletakkan di sisi agent (lihat §4.2.2), server-nya tetap begini.
 
 - **Auto-expiry** (`expireRoom`): mirip deactivate, tapi set `agent.expiresAt = null` (deactivate manual justru **membiarkan** `expiresAt` terisi) — inkonsistensi kecil antar dua code path yang seharusnya serupa.
 
@@ -381,9 +381,10 @@ if (billingEnabled) {
 ```
 Selama menunggu, agent kirim heartbeat manual tiap 5 detik (terpisah dari `HeartbeatService`) supaya tidak kena timeout OFFLINE server (15 detik — deteksi ini sudah diperbaiki, lihat §9.2 #1).
 
-`agent:activation` handler (`SocketClient.ts:212-299`), didaftarkan ulang tiap `connect()`:
+`agent:activation` handler (`SocketClient.ts:226-315`), didaftarkan ulang tiap `connect()`:
 - `isActive:false` → dispatch `STOP` command internal + `playerService.showExpiredImage()`.
-- `isActive:true` → `resumeStateSync()` + `playerService.showStartImage()`.
+- `isActive:true` **dan sebelumnya tidak aktif** (`!wasActive`) → `resumeStateSync()` + `playerService.showStartImage()` (reaktivasi genuine).
+- `isActive:true` **dan sebelumnya sudah aktif** (`wasActive`) → hanya update `expiresAt`/data lain, **tidak** menyentuh player/display (mis. extend-time). Fix §9.6 — sebelumnya kedua kasus ini diperlakukan sama, lihat catatan di bawah.
 
 Event `cashier:deactivate-room` juga punya listener terpisah (`setupDeactivationListener`) yang melakukan hal sama — dua jalur independen menuju efek yang sama.
 
@@ -392,6 +393,8 @@ Event `cashier:deactivate-room` juga punya listener terpisah (`setupDeactivation
 **Fix sesi ini (§9.3) — `pauseStateSync` bisa macet permanen**: `agent:clear-data` memanggil `pauseStateSync()`, dan **satu-satunya** tempat yang meng-resume adalah event `agent:activation{isActive:true}`. Kalau event reaktivasi itu pernah hilang/tidak sampai, sync state ke server berhenti **selamanya** sampai proses agent di-restart. Sekarang ada watchdog: kalau sudah paused >15 detik (jendela clear-data asli cuma butuh ~100-500ms) tanpa reaktivasi, `Agent.ts` auto-resume sendiri (dicek tiap tick 1 detik `startPlayerStateSync`, lewat `checkPauseWatchdog()`).
 
 **Fix sesi ini (§9.3) — `expiresAt` tidak pernah ditegakkan lokal**: `identity.expiresAt` disimpan tapi sebelumnya tidak pernah dibandingkan ke `Date.now()` di mana pun — agent 100% bergantung pada event deactivate dari server sampai. Kalau event itu hilang, agent bisa terus memutar video walau waktu sudah habis. Sekarang ada `checkExpiryWatchdog()` (dicek tiap tick 1 detik yang sama) yang self-deactivate (stop + tampilkan gambar expired + `identity.isActive=false`) begitu `Date.now() >= identity.expiresAt` walau tidak ada event yang masuk.
+
+**Fix §9.6 (2026-08-11) — Extend Time bikin tampilan agent balik ke `start_image.jpeg`**: dilaporkan user. Root cause di dua sisi. Server (`CASHIER_EXTEND_TIME` di `server/src/socket/SocketServer.ts`, lihat §4.1.4) mengirim `agent:activation{isActive:true, expiresAt:newExpiresAt}` ke agent setiap kali extend time — event yang **sama persis** dengan reaktivasi asli, tidak ada penanda pembeda. Agent-nya sendiri (`setupActivationListener`) cuma cek `data.isActive===true` tanpa peduli apakah room memang baru aktif atau sudah aktif dari tadi, jadi `showStartImage()` (yang melakukan `page.goto('file://.../start_image.html')`, full navigation menjauh dari video yang sedang diputar — lihat §4.2.6) selalu terpanggil setiap extend. Fix: `SocketClient.ts` sekarang menangkap `wasActive` sebelum overwrite `identity.isActive`, dan cuma menjalankan `resumeStateSync()`+`showStartImage()` kalau transisi `false→true` (reaktivasi genuine). `identity.expiresAt` tetap ter-update di semua kasus (jadi countdown & `checkExpiryWatchdog()` tetap benar), cuma efek display-nya yang di-skip untuk update sesama-aktif. Server sengaja **tidak diubah** — memperbaiki di agent lebih aman/kecil dampaknya daripada menambah event/field baru di server yang dipakai banyak jalur lain.
 
 **Tidak ada auto-navigasi ke video YouTube saat aktivasi** — agent tetap di `start_image.html` sampai perintah `PLAY`/`OPEN_VIDEO`/playlist datang, atau ada video snapshot lama untuk di-restore. Command masuk **diblok diam-diam** kalau `!identity.isActive` (`SocketClient.ts:120-124`).
 
@@ -826,6 +829,18 @@ Lebih parah lagi: ini **bukan bug baru dari sesi ini**. `web/src/services/socket
 **Fix**: `SocketService.ts` sekarang jadi **satu-satunya** tempat instance singleton dikonstruksi. `services/socket/index.ts` diubah jadi murni barrel re-export (`export * from "./SocketService"; export * from "./PlaylistListener";`), tidak lagi bikin instance sendiri. Ditambahkan komentar eksplisit di `SocketService.ts` melarang siapapun menambahkan `new SocketService()` kedua lagi di file lain. Tidak ada perubahan pada `LoadingContext.tsx`/`PlaylistListener.ts` selain import path-nya kini otomatis benar (karena cuma ada satu instance untuk di-import, dari path manapun).
 
 **Verifikasi**: `tsc -b && vite build` bersih, `npm run lint` — 5 error, semua pre-existing (sama seperti §9.4, tidak ada tambahan baru), dev server jalan tanpa warning circular-import (import siklik `index.ts` ⇄ `PlaylistListener.ts` sempat jadi pertimbangan desain — dihindari dengan menjadikan `SocketService.ts` module leaf yang tidak bergantung ke `index.ts`, bukan sebaliknya). `web/node_modules`/`package-lock.json` kosong lagi saat verifikasi (ketiga kalinya dalam sesi ini) — sepertinya environment ini me-reset `node_modules` antar pemanggilan tool, bukan efek perubahan kode; `npm install` ulang memulihkannya tiap kali.
+
+### 9.6 Bug dilaporkan user: Extend Time bikin tampilan agent balik ke `start_image.jpeg` (2026-08-11)
+
+Dilaporkan user: klik "Extend Time" di cashier untuk ruangan yang sedang aktif memutar video, tampilan di agent malah pindah ke gambar `start_image.jpeg` — seharusnya video yang sedang berjalan tidak terganggu sama sekali.
+
+**Root cause, di dua sisi (lihat detail kode di §4.1.4 dan §4.2.2):**
+- **Server** (`CASHIER_EXTEND_TIME` handler, `server/src/socket/SocketServer.ts`) mengirim `agent:activation{isActive:true, expiresAt:newExpiresAt}` ke agent setiap kali extend time — event yang **identik** dengan event reaktivasi genuine, tanpa penanda pembeda "cuma extend" vs "baru diaktifkan".
+- **Agent** (`setupActivationListener`, `agent/src/network/SocketClient.ts`) tidak pernah menyimpan status aktif sebelumnya sebelum menimpanya dengan yang baru — begitu terima `isActive:true` apapun konteksnya, langsung anggap "reaktivasi" dan panggil `playerService.showStartImage()`, yang melakukan `page.goto('file://.../start_image.html')` — full navigation menjauhkan browser dari video yang sedang diputar.
+
+**Fix**: `SocketClient.ts` sekarang menangkap `wasActive = this.identity.isActive` **sebelum** overwrite, lalu efek reaktivasi (`resumeStateSync()` + `showStartImage()`) cuma jalan kalau `data.isActive && !wasActive` (transisi genuine tidak-aktif→aktif). Kalau `data.isActive && wasActive` (room sudah aktif, cuma di-extend), hanya `identity.expiresAt`/data lain yang ter-update — display/player tidak disentuh. Server sengaja tidak diubah — perbaikan di satu titik (agent) lebih aman daripada menambah event/field baru yang harus disebar ke banyak jalur pemanggil di server.
+
+**Verifikasi**: `tsc` (agent) bersih. Tidak dites end-to-end dengan browser/YouTube sungguhan (butuh Playwright + koneksi nyata, tidak tersedia di environment ini) — cakupan dari review kode + typecheck saja.
 
 ---
 
