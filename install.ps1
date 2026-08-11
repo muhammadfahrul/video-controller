@@ -600,9 +600,9 @@ if (-not $found) {
     }
 }
 
-# 3. Check for "video-controller-final" folder in script directory
+# 3. Check for "video-controller" folder in script directory
 if (-not $found) {
-    $siblingPath = Join-Path $PSScriptRoot 'video-controller-final'
+    $siblingPath = Join-Path $PSScriptRoot 'video-controller'
     if (Test-Path $siblingPath) {
         if (Test-Path (Join-Path $siblingPath 'package.json')) {
             $PROJECT_ROOT = $siblingPath
@@ -611,11 +611,11 @@ if (-not $found) {
     }
 }
 
-# 4. Check for video-controller-final in parent directory (common case for Downloads)
+# 4. Check for video-controller in parent directory (common case for Downloads)
 if (-not $found) {
     $parentDir = Split-Path $PSScriptRoot -Parent
     if ($parentDir) {
-        $siblingPath = Join-Path $parentDir 'video-controller-final'
+        $siblingPath = Join-Path $parentDir 'video-controller'
         if (Test-Path $siblingPath) {
             if (Test-Path (Join-Path $siblingPath 'package.json')) {
                 $PROJECT_ROOT = $siblingPath
@@ -643,20 +643,20 @@ if ($found) {
         $checkPath = $parent
     }
     
-    Write-Host "  - $PSScriptRoot\video-controller-final (sibling)"
+    Write-Host "  - $PSScriptRoot\video-controller (sibling)"
     $parentDir = Split-Path $PSScriptRoot -Parent
     if ($parentDir) {
-        Write-Host "  - $parentDir\video-controller-final (sibling in parent)"
+        Write-Host "  - $parentDir\video-controller (sibling in parent)"
     }
     
     Write-Host ""
     Write-Host "[Q] Download dari GitHub? [y/N]: " -ForegroundColor Cyan -NoNewline
     $download = Read-Host
     if ($download -eq 'y' -or $download -eq 'Y') {
-        Write-Host "[INFO] Downloading video-controller-final from GitHub..." -ForegroundColor Yellow
+        Write-Host "[INFO] Downloading video-controller from GitHub..." -ForegroundColor Yellow
         
-        $zipUrl = "https://github.com/muhammadfahrul/video-controller-final/archive/refs/heads/main.zip"
-        $zipFile = "$env:TEMP\video-controller-final.zip"
+        $zipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+        $zipFile = "$env:TEMP\video-controller.zip"
         $extractDir = Split-Path $PSScriptRoot -Parent
         if (-not $extractDir) { $extractDir = $PSScriptRoot }
         
@@ -670,9 +670,9 @@ if ($found) {
             
             Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
             
-            # Move contents from video-controller-final-main to video-controller-final
-            $extractedPath = Join-Path $extractDir "video-controller-final-main"
-            $targetPath = Join-Path $extractDir "video-controller-final"
+            # Move contents from video-controller-main to video-controller
+            $extractedPath = Join-Path $extractDir "video-controller-main"
+            $targetPath = Join-Path $extractDir "video-controller"
             
             # Only create/move if target doesn't have package.json
             if (-not (Test-Path (Join-Path $targetPath 'package.json'))) {
@@ -694,7 +694,7 @@ if ($found) {
         }
     } else {
         Write-Host ""
-        Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller-final" -ForegroundColor Yellow
+        Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller" -ForegroundColor Yellow
         exit 1
     }
 }
@@ -966,11 +966,11 @@ Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundC
 if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     Write-Host "[INFO] Project files not found. Downloading ZIP archive..." -ForegroundColor Yellow
 
-    # Create video-controller-final subfolder in current directory
-    $destDir = Join-Path $PROJECT_ROOT 'video-controller-final'
-    $archiveUrl = 'https://github.com/muhammadfahrul/video-controller-final/archive/refs/heads/main.zip'
-    $archivePath = Join-Path $env:TEMP 'video-controller-final-main.zip'
-    $extractDir = Join-Path $destDir 'video-controller-final-main'
+    # Create video-controller subfolder in current directory
+    $destDir = Join-Path $PROJECT_ROOT 'video-controller'
+    $archiveUrl = 'https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip'
+    $archivePath = Join-Path $env:TEMP 'video-controller-main.zip'
+    $extractDir = Join-Path $destDir 'video-controller-main'
 
     if (-not (Get-Command Expand-Archive -ErrorAction SilentlyContinue)) {
         Write-Host "[ERROR] PowerShell archive support is unavailable." -ForegroundColor Red
@@ -991,7 +991,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
         Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
         Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
 
-        # Move contents from video-controller-final-main to destDir
+        # Move contents from video-controller-main to destDir
         if (Test-Path $extractDir) {
             $items = Get-ChildItem -Path $extractDir
             foreach ($item in $items) {
