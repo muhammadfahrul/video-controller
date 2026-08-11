@@ -157,7 +157,7 @@ Contoh:
 
 Server menghitung biaya berdasarkan:
 
-- `pricePerHour` - Tarif per jam per ruangan (dari cashier config)
+- `pricePerHour` - Tarif per jam ruangan ini (dari env `PRICE_PER_HOUR` di `.env` server ini)
 - `activeTime` - Waktu aktif ruangan
 
 Rumus:
@@ -280,4 +280,4 @@ netstat -ntlp | grep 53331
 
 ### Billing tidak berfungsi
 - Pastikan `BILLING_ENABLED=true` di server dan cashier
-- Cek pricePerHour di cashier config
+- Cek `PRICE_PER_HOUR` di `server/.env`

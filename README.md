@@ -115,8 +115,11 @@ Contoh konfigurasi:
 ROOM_ID=room-002
 ROOM_NAME=Room 2
 
+# Server (.env, PC ruangan yang sama)
+PRICE_PER_HOUR=50000
+
 # Cashier (.env)
-VITE_ROOMS=[{"name":"Room 1","ip":"192.168.1.10","port":53331,"pricePerHour":50000}]
+VITE_ROOMS=[{"name":"Room 1","ip":"192.168.1.10","port":53331}]
 ```
 
 ## Development
@@ -242,7 +245,7 @@ video-controller/
 ## Billing
 
 Sistem billing menghitung biaya berdasarkan:
-- `pricePerHour` - Tarif per jam per ruangan (dari cashier config)
+- `pricePerHour` - Tarif per jam ruangan (dari env `PRICE_PER_HOUR` di `server/.env` PC ruangan tsb)
 - `activeTime` - Waktu aktif ruangan
 
 Rumus:
@@ -313,7 +316,7 @@ Lihat detail di [`scripts/e2e/`](scripts/e2e/) dan [`PRODUCT_REQUIREMENT.md`](PR
 
 ### Billing tidak berfungsi
 - Pastikan `BILLING_ENABLED=true` di server dan cashier
-- Cek `pricePerHour` di cashier config
+- Cek `PRICE_PER_HOUR` di `server/.env` PC ruangan tsb
 - Review server logs
 
 ### Room tidak terdeteksi

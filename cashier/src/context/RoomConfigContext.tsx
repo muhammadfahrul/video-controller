@@ -24,7 +24,7 @@ function loadRoomsFromEnv(): RoomConfig[] {
       parsed = JSON.parse(envRooms);
     } catch (e) {
       console.error('[RoomConfig] Gagal parse VITE_ROOMS. Pastikan format JSON valid:', e);
-      console.error('[RoomConfig] Contoh: [{"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331,"pricePerHour":50000}]');
+      console.error('[RoomConfig] Contoh: [{"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331}]');
       return [];
     }
 
@@ -68,7 +68,6 @@ function loadRoomsFromEnv(): RoomConfig[] {
         roomId: room.roomId,
         ip,
         port,
-        pricePerHour: room.pricePerHour ?? 50000,
       };
     });
   } catch (e) {

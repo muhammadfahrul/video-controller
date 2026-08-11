@@ -9,7 +9,7 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 - **Status Ruangan**: Menampilkan status real-time ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Status Real-time**: Menampilkan status pemutaran video (playing/paused/idle)
 - **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
-- **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`)
+- **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`, dikonfigurasi di `server/.env` PC ruangan tsb, bukan di cashier)
 - **Full Page Loading**: Setiap proses menampilkan loading screen dengan estimasi waktu
 - **Pindah Ruangan**: Memindahkan billing dari satu ruangan ke ruangan lain saat customer ingin pindah
 
@@ -49,13 +49,13 @@ VITE_BILLING_ENABLED=true
 #   - ip    : IP PC Ruangan (tempat server+agent jalan).
 #   - port  : Port server ruangan (default 53331).
 #
-# Field OPTIONAL:
-#   - pricePerHour: Tarif per jam dalam Rupiah (default 50000).
+# Tarif per jam (pricePerHour) TIDAK diisi di sini - tiap PC ruangan mengirim
+# tarifnya sendiri lewat env PRICE_PER_HOUR di server/.env ruangan tsb.
 
 VITE_ROOMS=[
-  {"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331,"pricePerHour":50000},
-  {"roomId":"room-002","name":"Room 2","ip":"192.168.1.11","port":53331,"pricePerHour":60000},
-  {"roomId":"room-003","name":"Room 3","ip":"192.168.1.12","port":53331,"pricePerHour":45000}
+  {"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331},
+  {"roomId":"room-002","name":"Room 2","ip":"192.168.1.11","port":53331},
+  {"roomId":"room-003","name":"Room 3","ip":"192.168.1.12","port":53331}
 ]
 ```
 
@@ -68,7 +68,8 @@ VITE_ROOMS=[
 | `name` | string | Nama ruangan (ditampilkan di UI) |
 | `ip` | string | IP address dimana agent berjalan |
 | `port` | number | Port server (default: 53331) |
-| `pricePerHour` | number | Tarif per jam dalam Rupiah (default: 50000) |
+
+Tarif per jam (`pricePerHour`) dikonfigurasi lewat env `PRICE_PER_HOUR` di `server/.env` PC ruangan tersebut (default 50000), bukan lagi di cashier.
 
 ## Konfigurasi Port
 

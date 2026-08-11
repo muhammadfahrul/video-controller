@@ -37,6 +37,9 @@ export class SocketServer {
     private readonly billingEnabled: boolean;
 
 
+    private readonly pricePerHour: number;
+
+
     private readonly database: DatabaseService;
 
 
@@ -55,13 +58,16 @@ export class SocketServer {
         server: HttpServer,
         manager: AgentManager,
         billingEnabled: boolean = true,
-        database?: DatabaseService
+        database?: DatabaseService,
+        pricePerHour: number = 50000
     ){
 
         this.manager =
             manager;
 
         this.billingEnabled = billingEnabled;
+
+        this.pricePerHour = pricePerHour;
 
         // Initialize database if not provided
         this.database = database || new DatabaseService();
@@ -206,9 +212,11 @@ export class SocketServer {
                             connectedAt: Date.now(),
 
                             isActive: initialActive,
-                            
+
+                            pricePerHour: this.pricePerHour,
+
                             startTime: null,
-                            
+
                             expiresAt: null
 
                         });

@@ -303,7 +303,6 @@ async function main() {
       roomId: ROOM_IDS[i],
       ip: '127.0.0.1',
       port: s.port,
-      pricePerHour: 50000,
     }));
 
     cashier = await createCashierLikeClient(cashierConfigs);

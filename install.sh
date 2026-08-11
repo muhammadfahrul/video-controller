@@ -34,7 +34,8 @@ prompt_env_config() {
     local room_name=""
     local rooms_json=""
     local billing_enabled=""
-    
+    local price_per_hour=""
+
     # Room App mode - needs Server IP, Room ID, Room Name
     if [[ "$mode" == "room" || "$mode" == "all" ]]; then
         echo "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama."
@@ -46,13 +47,17 @@ prompt_env_config() {
         read -p "Room Name (contoh: Room 1, kosongkan untuk skip): " room_name
 
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
+
+        read -p "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip): " price_per_hour
     fi
 
     # Kasir mode - only needs Rooms JSON
     if [[ "$mode" == "kasir" ]]; then
         echo "Topologi: PC Kasir konek ke N server ruangan yg terpisah."
         echo "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)."
-        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
+        echo "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat"
+        echo "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis."
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331}]"
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
 
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
@@ -66,14 +71,16 @@ prompt_env_config() {
 
         echo ""
         echo "Untuk mode all, jika PC ini handle KASIR sekaligus:"
-        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331,\"pricePerHour\":50000}]"
+        echo "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat"
+        echo "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis."
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331}]"
         read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
 
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
     fi
-    
+
     # Apply configuration - only non-empty values will be applied
-    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode"
+    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode" "$price_per_hour"
 }
 
 apply_env_config() {
@@ -83,9 +90,10 @@ apply_env_config() {
     local rooms_json="$4"
     local billing_enabled="$5"
     local mode="$6"
-    
+    local price_per_hour="$7"
+
     # Skip if all values are empty
-    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" ]]; then
+    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" && -z "$price_per_hour" ]]; then
         echo "[INFO] Tidak ada konfigurasi yang diubah"
         return
     fi
@@ -150,14 +158,17 @@ apply_env_config() {
         fi
     fi
     
-    # Server .env - BILLING_ENABLED
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR
     local server_env="$PROJECT_ROOT/server/.env"
     if [[ -f "$server_env" ]]; then
         if [[ -n "$billing_enabled" ]]; then
             sed -i "s|BILLING_ENABLED=.*|BILLING_ENABLED=$billing_enabled|" "$server_env"
         fi
+        if [[ -n "$price_per_hour" ]]; then
+            sed -i "s|PRICE_PER_HOUR=.*|PRICE_PER_HOUR=$price_per_hour|" "$server_env"
+        fi
     fi
-    
+
     # Agent .env - BILLING_ENABLED
     local agent_env="$PROJECT_ROOT/agent/.env"
     if [[ -f "$agent_env" ]]; then

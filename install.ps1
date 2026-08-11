@@ -130,11 +130,12 @@ function Set-EnvConfig {
         [string]$RoomID,
         [string]$RoomName,
         [string]$Rooms,
-        [string]$BillingEnabled
+        [string]$BillingEnabled,
+        [string]$PricePerHour
     )
 
     # Skip if all values are empty
-    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled) {
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour) {
         Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
         return
     }
@@ -213,12 +214,17 @@ function Set-EnvConfig {
         }
     }
     
-    # Server .env - BILLING_ENABLED
-    if ($BillingEnabled) {
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR
+    if ($BillingEnabled -or $PricePerHour) {
         $serverEnvPath = Join-Path $ProjectRoot "server\.env"
         if (Test-Path $serverEnvPath) {
             $envContent = Get-Content $serverEnvPath -Raw
-            $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            if ($BillingEnabled) {
+                $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            }
+            if ($PricePerHour) {
+                $envContent = $envContent -replace 'PRICE_PER_HOUR=.*', "PRICE_PER_HOUR=$PricePerHour"
+            }
             Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
             Write-Host "[OK] Updated server/.env" -ForegroundColor Green
         }
@@ -717,6 +723,7 @@ $RoomID = ""
 $RoomName = ""
 $Rooms = ""
 $BillingEnabled = ""
+$PricePerHour = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
 if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
@@ -733,13 +740,18 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
 
     $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
     if ($input -ne "") { $BillingEnabled = $input }
+
+    $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
+    if ($input -ne "") { $PricePerHour = $input }
 }
 
 # Kasir mode - only needs Rooms JSON
 if ($INSTALL_MODE -eq "kasir") {
     Write-Host "Topologi: PC Kasir konek ke N server ruangan yg terpisah." -ForegroundColor Cyan
     Write-Host "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)." -ForegroundColor Cyan
-    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}]" -ForegroundColor Cyan
+    Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat" -ForegroundColor Cyan
+    Write-Host "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
     $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
 
@@ -750,7 +762,9 @@ if ($INSTALL_MODE -eq "kasir") {
 # All mode - also needs Rooms JSON
 if ($INSTALL_MODE -eq "all") {
     Write-Host "Untuk mode all, jika PC ini handle KASIR sekaligus:" -ForegroundColor Cyan
-    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331,`"pricePerHour`":50000}]" -ForegroundColor Cyan
+    Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat" -ForegroundColor Cyan
+    Write-Host "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
     $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
     if ($input -ne "") { $Rooms = $input }
 
@@ -894,7 +908,7 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
 # Normal mode - continue with service start
 
 # Apply .env configuration for existing project
-Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled
+Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
 
 $nodeExePath = Find-NodeJS
 
@@ -1016,7 +1030,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     $PROJECT_ROOT = $destDir
 
     # Apply .env configuration AFTER PROJECT_ROOT is set correctly
-    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow

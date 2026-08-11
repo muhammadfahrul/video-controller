@@ -1,6 +1,6 @@
 # Video Controller — Product Requirement Document (PRD) v3
 
-> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`); migrasi itu sempat menimbulkan regresi (`web/` stuck di layar "Loading..." selamanya) yang ketahuan begitu user coba pakai aplikasinya langsung. Root cause sebenarnya baru ketemu di percobaan kedua: ada 2 instance `SocketService` singleton hidup berdampingan (bug lama, bukan cuma dari migrasi ini) — sudah diperbaiki jadi satu-satunya, lihat §9.5. **Update lagi**: bug terpisah dilaporkan user — Extend Time dari cashier bikin tampilan agent balik ke `start_image.jpeg` walau video sedang jalan; root cause di agent tidak membedakan "baru diaktifkan" vs "sudah aktif, cuma di-extend" — sudah diperbaiki, lihat §9.6.
+> Dokumen ini jadi acuan utama sebelum fix bug atau tambah fitur. Versi ini adalah hasil audit kode mendalam (bukan cuma asumsi desain) terhadap `server/`, `agent/`, `web/`, `cashier/` — setiap klaim dilengkapi `file:line` supaya bisa diverifikasi langsung. Bagian "Known Issues" sengaja dipisah per severity karena banyak yang baru ketemu lewat audit ini (bukan dari laporan user). **v3 (2026-08-11)**: `cashier/` sudah tidak pakai Zustand sama sekali (§9.3-A); 2 bug produksi dari laporan user (transaksi duplikat, status Move Room salah) dan 6 celah sinkronisasi dari audit `agent/`+`web/` sudah diperbaiki (§9.3). **Update sama hari**: `web/` juga sudah tidak pakai Zustand (§9.4, atas permintaan eksplisit user demi konsistensi arsitektur — bukan bug fix, tidak ada masalah data-divergence yang ditemukan di store `web/`); migrasi itu sempat menimbulkan regresi (`web/` stuck di layar "Loading..." selamanya) yang ketahuan begitu user coba pakai aplikasinya langsung. Root cause sebenarnya baru ketemu di percobaan kedua: ada 2 instance `SocketService` singleton hidup berdampingan (bug lama, bukan cuma dari migrasi ini) — sudah diperbaiki jadi satu-satunya, lihat §9.5. **Update lagi**: bug terpisah dilaporkan user — Extend Time dari cashier bikin tampilan agent balik ke `start_image.jpeg` walau video sedang jalan; root cause di agent tidak membedakan "baru diaktifkan" vs "sudah aktif, cuma di-extend" — sudah diperbaiki, lihat §9.6. **Update terakhir**: atas permintaan user, `pricePerHour` dipindah dari `cashier/.env` (`VITE_ROOMS`) ke `server/.env` tiap PC ruangan (`PRICE_PER_HOUR`) — server sekarang jadi sumber tarif, dikirim ke cashier lewat `AgentInfo.pricePerHour`; kalkulasi `totalPrice` tetap di cashier — lihat §9.7.
 
 ---
 
@@ -108,6 +108,8 @@ LOG_LEVEL=info                # config.ts:90, dipakai LoggerService (pino)
 ```bash
 PORT=53331                    # index.ts:10, fallback 53331
 BILLING_ENABLED=true          # index.ts:11 — "!== 'false'"
+PRICE_PER_HOUR=50000          # index.ts:12 — Number(...), fallback 50000. Tarif per jam ruangan ini
+                               #   (§9.7). WAJIB beda tiap PC ruangan sesuai tarif ruangan tsb.
 YOUTUBE_API_KEY=<key>         # YoutubeSearchService.ts:27,34,58 — kalau kosong, search akan gagal (500) tanpa pesan jelas
 ```
 Tidak ada env var lain yang dibaca `server/src` — tidak ada `NODE_ENV`, `DB_PATH`, `LOG_LEVEL`, atau CORS-origin override. `server/src/config/` folder ada tapi **kosong** (belum dipakai).
@@ -128,13 +130,14 @@ VITE_BILLING_ENABLED=true   # cashier/src/config/billing.ts:3 — default enable
 # Tiap entry = 1 ruangan di 1 PC server tersendiri.
 # 'ip' = IP PC ruangan tsb (bukan IP server pusat).
 # 'roomId' HARUS sama dengan ROOM_ID di agent/.env PC terkait.
+# pricePerHour TIDAK ADA di sini lagi (dipindah ke server/.env tiap ruangan, §9.7).
 VITE_ROOMS=[
-  {"roomId":"room-001","name":"Room 1","ip":"192.168.1.104","port":53331,"pricePerHour":50000},
-  {"roomId":"room-002","name":"Room 2","ip":"192.168.1.114","port":53331,"pricePerHour":60000},
-  {"roomId":"room-003","name":"Room 3","ip":"192.168.1.12", "port":53331,"pricePerHour":45000}
+  {"roomId":"room-001","name":"Room 1","ip":"192.168.1.104","port":53331},
+  {"roomId":"room-002","name":"Room 2","ip":"192.168.1.114","port":53331},
+  {"roomId":"room-003","name":"Room 3","ip":"192.168.1.12", "port":53331}
 ]
 ```
-`config.id` di-set ke `room.roomId` (bukan id acak terpisah) — lihat `context/RoomConfigContext.tsx` (`loadRoomsFromEnv()`, pindahan dari `useRoomStore.ts` lama pasca penghapusan Zustand, §9.3). `pricePerHour` default `50000` kalau tidak diisi (`?? 50000`), tapi angka default ini **terduplikasi di beberapa lokasi kode berbeda** (`RoomConfigContext.tsx`, `MultiSocketService.ts`, `RoomCard.tsx`) — bukan konstanta tersentralisasi.
+`config.id` di-set ke `room.roomId` (bukan id acak terpisah) — lihat `context/RoomConfigContext.tsx` (`loadRoomsFromEnv()`, pindahan dari `useRoomStore.ts` lama pasca penghapusan Zustand, §9.3). `pricePerHour` **sudah tidak lagi bagian dari `RoomConfig`/`VITE_ROOMS`** (§9.7) — tarif sekarang milik server tiap ruangan (`PRICE_PER_HOUR` di §3.2), dikirim ke cashier lewat field `pricePerHour` pada `AgentInfo` (`agent:register`/`agents:update`). Fallback `?? 50000` tetap ada di 3 titik baca (`MultiSocketService.ts` x2, `RoomCard.tsx`) untuk kondisi agent belum terkoneksi, tapi sumber angkanya sekarang seragam dari data server, bukan config lokal duplikat seperti sebelumnya.
 
 `VITE_SERVER_PORT` dideklarasikan di `cashier/src/vite-env.d.ts:3-7` tapi **tidak pernah dibaca** — dead env var.
 
@@ -319,7 +322,9 @@ Tidak ada migration framework — hanya try/catch `ALTER TABLE` manual. Tidak ad
 
 #### 4.1.6 Perhitungan Harga Transaksi — TIDAK di Server
 
-Grep menyeluruh `pricePerHour`/`totalPrice`/`Math.ceil` di `server/src` = nol hasil logic perhitungan. Field-field ini hanya dideklarasikan di interface `TransactionData` dan di-passthrough saat `INSERT`/`UPDATE`. **Semua kalkulasi harga (per jam, ceiling ke atas) terjadi di `cashier/` (client), server hanya menyimpan hasil akhir apa adanya.** Lihat §4.4.6 untuk formula aslinya.
+Grep menyeluruh `totalPrice`/`Math.ceil` di `server/src` = nol hasil logic perhitungan. Field `totalPrice` hanya dideklarasikan di interface `TransactionData` dan di-passthrough saat `INSERT`/`UPDATE`. **Semua kalkulasi harga (per jam, ceiling ke atas) terjadi di `cashier/` (client), server hanya menyimpan hasil akhir apa adanya.** Lihat §4.4.6 untuk formula aslinya.
+
+Sejak §9.7, tarif (`pricePerHour`) **sendiri** sekarang dimiliki server (env `PRICE_PER_HOUR`, §3.2), bukan lagi client — server hanya memberi tahu cashier berapa tarifnya (lewat `AgentInfo.pricePerHour`), tapi tidak ikut menghitung `totalPrice`. Pembagian tanggung jawab: **server = sumber tarif, cashier = tempat kalkulasi**.
 
 #### 4.1.7 Error Handling
 
@@ -600,7 +605,7 @@ Extend: form menit terpisah (max 480), server recalculate `expiresAt` dan reset 
 
 Transaksi **dibuat di cashier**, dipicu oleh listener `room:activation` yang mendeteksi transisi `isActive: true→false`:
 ```ts
-const pricePerHour = config.pricePerHour ?? 50000;
+const pricePerHour = agent.pricePerHour ?? 50000; // dari AgentInfo, sumbernya server/.env (§9.7)
 const startTime = agent.startTime || 0;
 const endTime = data.expiresAt || agent.expiresAt || Date.now();
 const durationSeconds = Math.floor((endTime - startTime) / 1000);
@@ -644,7 +649,7 @@ Murni client-side (`window.open` + `document.write` + `window.print()`), tidak a
 
 #### 4.4.12 Config Env
 
-`VITE_BILLING_ENABLED` (default enabled), `VITE_ROOMS` (JSON array, wajib). `VITE_SERVER_PORT` dideklarasikan di type tapi tidak dipakai di cashier (port server ruangan selalu ikut field `port` per-entry di `VITE_ROOMS`, bukan variabel global — beda kasus dengan `SERVER_PORT`/`VITE_SERVER_PORT` di agent/web yang sudah di-fix §9.2 #6).
+`VITE_BILLING_ENABLED` (default enabled), `VITE_ROOMS` (JSON array, wajib, entry `{roomId, name, ip, port}` — **tidak lagi ada `pricePerHour`**, dipindah ke server tiap ruangan, §9.7). `VITE_SERVER_PORT` dideklarasikan di type tapi tidak dipakai di cashier (port server ruangan selalu ikut field `port` per-entry di `VITE_ROOMS`, bukan variabel global — beda kasus dengan `SERVER_PORT`/`VITE_SERVER_PORT` di agent/web yang sudah di-fix §9.2 #6).
 
 ---
 
@@ -841,6 +846,24 @@ Dilaporkan user: klik "Extend Time" di cashier untuk ruangan yang sedang aktif m
 **Fix**: `SocketClient.ts` sekarang menangkap `wasActive = this.identity.isActive` **sebelum** overwrite, lalu efek reaktivasi (`resumeStateSync()` + `showStartImage()`) cuma jalan kalau `data.isActive && !wasActive` (transisi genuine tidak-aktif→aktif). Kalau `data.isActive && wasActive` (room sudah aktif, cuma di-extend), hanya `identity.expiresAt`/data lain yang ter-update — display/player tidak disentuh. Server sengaja tidak diubah — perbaikan di satu titik (agent) lebih aman daripada menambah event/field baru yang harus disebar ke banyak jalur pemanggil di server.
 
 **Verifikasi**: `tsc` (agent) bersih. Tidak dites end-to-end dengan browser/YouTube sungguhan (butuh Playwright + koneksi nyata, tidak tersedia di environment ini) — cakupan dari review kode + typecheck saja.
+
+### 9.7 Pemindahan `pricePerHour` dari `cashier/.env` ke `server/.env` tiap ruangan (2026-08-11)
+
+Diminta user: tarif per jam (`pricePerHour`) sebelumnya diisi manual per-entry di `VITE_ROOMS` (`cashier/.env`), dengan default `?? 50000` **terduplikasi** di 3 lokasi kode berbeda (`RoomConfigContext.tsx`, `MultiSocketService.ts` x3, `RoomCard.tsx`) — lihat catatan lama di §3.4. Dipindah supaya tiap PC ruangan jadi sumber kebenaran tarifnya sendiri, konsisten dengan topologi "1 Ruangan = 1 PC berdiri sendiri" (§1.1) dan pola env var `BILLING_ENABLED` yang sudah lebih dulu per-PC ruangan.
+
+**Perubahan server (`server/`):**
+- Env baru `PRICE_PER_HOUR` (§3.2), dibaca `index.ts` (`Number(...)`, fallback `50000`), diteruskan `ServiceContainer` → `SocketServer`.
+- `AgentInfo.pricePerHour: number` (`server/src/types/Agent.ts`) — field baru, di-set saat `AGENT_REGISTER` (`SocketServer.ts`) dari `this.pricePerHour` (nilai env, sama untuk semua agent karena 1 PC = 1 ruangan). Otomatis ikut ter-broadcast lewat `agents:update`/`agents:list` (`registry.getAll()`) karena itu full clone `AgentInfo` — **tidak perlu** ubah payload `room:activation` (§4.1.2) yang memang sengaja payload tersendiri (curated), bukan `AgentInfo` penuh.
+
+**Perubahan cashier (`cashier/`):**
+- `RoomConfig` (`types/index.ts`) tidak lagi punya field `pricePerHour` — `VITE_ROOMS` sekarang cuma `{roomId, name, ip, port}`.
+- `AgentInfo` (cashier, match tipe server) dapat field baru `pricePerHour?: number`.
+- 3 titik baca harga di `MultiSocketService.ts` (fallback saat belum ada agent, kalkulasi transaksi di listener `room:activation`, `agentToBilling()`) semuanya baca dari `agent.pricePerHour ?? 50000` — bukan lagi `config.pricePerHour ?? 50000`. `RoomCard.tsx` disederhanakan jadi `roomBilling.pricePerHour ?? 50000` langsung, `useRoomConfig()` **dihapus** dari file itu (satu-satunya pemakaiannya di situ memang untuk baca harga).
+- Formula kalkulasi (`Math.ceil(durationSeconds/3600) * pricePerHour`, per-blok/jam minimum 1 jam) **tidak berubah** dan **tetap di cashier** — hanya sumber angka tarifnya yang pindah. Server tetap tidak menghitung `totalPrice` (§4.1.6).
+
+**E2E test helper (`scripts/e2e/`)**: `test-client.ts` (simulasi cashier) dan `spawn-server.ts` diupdate senada — `spawn-server.ts` sekarang bisa terima opsi `pricePerHour` (env `PRICE_PER_HOUR` ke proses server nyata yang di-spawn), `test-client.ts` baca `agent?.pricePerHour ?? 50000` alih-alih `config.pricePerHour`.
+
+**Verifikasi**: `tsc --noEmit` bersih di `server/` dan `cashier/` (termasuk `noUnusedLocals`/`noUnusedParameters` strict cashier). Unit test: `server` 20/20 lulus (`AgentRegistry.test.ts`), `cashier` 18/18 lulus (termasuk `MultiSocketService.test.ts` setelah fixture `makeConfig()` disesuaikan). Tidak dites end-to-end lewat UI browser sungguhan di sesi ini.
 
 ---
 

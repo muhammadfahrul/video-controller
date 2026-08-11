@@ -17,6 +17,8 @@ export interface SpawnServerOptions {
   name: string;
   /** Billing enabled (default true). */
   billingEnabled?: boolean;
+  /** Tarif per jam ruangan ini (default 50000). */
+  pricePerHour?: number;
   /** YouTube API key (default empty). */
   youtubeApiKey?: string;
   /** Root project directory (auto-detected). */
@@ -69,6 +71,7 @@ export async function spawnServer(opts: SpawnServerOptions): Promise<ServerHandl
     ...process.env,
     PORT: String(opts.port),
     BILLING_ENABLED: opts.billingEnabled === false ? 'false' : 'true',
+    PRICE_PER_HOUR: String(opts.pricePerHour ?? 50000),
     YOUTUBE_API_KEY: opts.youtubeApiKey ?? '',
     NODE_ENV: 'test',
   };

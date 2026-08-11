@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo } from 'react';
 import type { RoomBilling, Transaction } from '../types';
 import { multiSocketService } from '../services/MultiSocketService';
 import { billingConfig } from '../config/billing';
-import { useRoomConfig } from '../context/RoomConfigContext';
 import { useLoading } from '../context/LoadingContext';
 import type { LoadingMessage } from '../components/FullPageLoading';
 import { TransactionModal } from './TransactionModal';
@@ -214,10 +213,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   const isExpiringSoon = countdown !== null && countdown <= 60;
   const isWarning = countdown !== null && countdown <= 300;
   
-  // Get price from room config
-  const { roomConfigs } = useRoomConfig();
-  const roomConfig = roomConfigs.find(r => r.name === roomBilling.roomName);
-  const pricePerHour = roomConfig?.pricePerHour ?? roomBilling.pricePerHour ?? 50000;
+  // Price comes from the room's server (AgentInfo.pricePerHour), broadcast via socket
+  const pricePerHour = roomBilling.pricePerHour ?? 50000;
   // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
   const currentPrice = Math.ceil(totalSeconds / 3600) * pricePerHour;
 
