@@ -281,8 +281,8 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             </button>
           )}
           
-          {/* Move Room Button - only show when active */}
-          {billingConfig.enabled && roomBilling.isActive && (
+          {/* Move Room Button - only show when active and connected */}
+          {billingConfig.enabled && roomBilling.isActive && !isLocked && (
             <button 
               onClick={() => setShowMoveRoom(true)}
               className="w-6 h-6 flex items-center justify-center rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30"
@@ -299,7 +299,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${badgeColor}`}>
           {badgeText}
         </span>
-        {isTimerBased && roomBilling.isActive && (
+        {isTimerBased && roomBilling.isActive && !isLocked && (
           <div className="text-right">
             <p className="text-[9px] text-gray-500 uppercase">Tagihan</p>
             <p className="text-sm font-bold text-yellow-400">{formatPrice(currentPrice)}</p>
