@@ -548,17 +548,8 @@ export class SocketServer {
                         const agent = registry.getByRoomIdRef(data.roomId);
                         console.log("[SERVER] Found agent for room:", agent ? { id: agent.id, roomId: agent.roomId, socketId: agent.socketId } : "NOT FOUND");
                         
-                        // Actual moment of manual deactivation - this is the real billing
-                        // end time when stopping early, not the room's original (still-future)
-                        // scheduled expiresAt.
-                        const actualEndTime = Date.now();
-
                         if (agent) {
                             agent.isActive = false;
-                            // Clear the stale scheduled expiresAt now that the room is inactive,
-                            // so a later reactivation (or any client state resync) never sees a
-                            // leftover future timestamp from this finished session.
-                            agent.expiresAt = null;
                             console.log("[SERVER] Emitting agent:activation to socketId:", agent.socketId);
                             // Notify the specific agent
                             this.io.to(agent.socketId).emit("agent:activation", { isActive: false });
@@ -620,15 +611,13 @@ export class SocketServer {
                                 agent.lastTransactionEndTime = Date.now();
                             }
 
-                            // Broadcast deactivation to all clients (include the actual end time,
-                            // not the room's original scheduled expiresAt, so the cashier bills
-                            // the real elapsed duration when stopped early)
+                            // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
                             this.io.emit("room:activation", {
                                 roomId: data.roomId,
                                 roomName: agent.roomName,
                                 isActive: false,
                                 reason: data.reason === "move" ? "move" : "deactivated",
-                                expiresAt: actualEndTime,
+                                expiresAt: agent.expiresAt,
                                 startTime: agent.startTime,
                                 needsCleaning: agent.needsCleaning,
                                 lastTransactionEndTime: agent.lastTransactionEndTime
