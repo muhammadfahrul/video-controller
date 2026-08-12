@@ -507,6 +507,7 @@ export class SocketServer {
                             this.io.to(agent.socketId).emit("agent:activation", {
                                 isActive: true,
                                 expiresAt: expiresAt,
+                                serverTime: Date.now(),
                                 ...customerInfo
                             });
                             this.broadcastAgents(registry.getAll());
@@ -690,7 +691,8 @@ export class SocketServer {
                         // Notify the agent
                         this.io.to(agent.socketId).emit("agent:activation", {
                             isActive: true,
-                            expiresAt: newExpiresAt
+                            expiresAt: newExpiresAt,
+                            serverTime: Date.now()
                         });
                         
                         // Broadcast update to all clients

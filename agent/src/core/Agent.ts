@@ -647,13 +647,29 @@ export class Agent {
             return;
         }
 
-        if (Date.now() < this.identity.expiresAt) {
+        // Compare against server time (local clock + last known offset from
+        // the server) instead of raw Date.now(), so a drifted local clock on
+        // the room PC can't cut a session short or let it run past its paid
+        // time.
+        const serverAdjustedNow = Date.now() + (this.identity.serverTimeOffsetMs ?? 0);
+
+        if (serverAdjustedNow < this.identity.expiresAt) {
             return;
         }
 
         console.warn(
             "[AGENT] Expiry watchdog: expiresAt has passed but room still marked active locally - self-deactivating"
         );
+
+        this.socketClient?.sendError({
+            type: "WATCHDOG_EXPIRY_FIRED",
+            message: "Local expiry watchdog self-deactivated the room; explicit deactivation push was not received in time",
+            context: {
+                expiresAt: this.identity.expiresAt,
+                serverAdjustedNow,
+                serverTimeOffsetMs: this.identity.serverTimeOffsetMs ?? 0
+            }
+        });
 
         this.identity.isActive = false;
 
@@ -688,6 +704,15 @@ export class Agent {
             Agent.SYNC_PAUSE_SAFETY_TIMEOUT_MS,
             "ms with no reactivation event - auto-resuming"
         );
+
+        this.socketClient?.sendError({
+            type: "WATCHDOG_PAUSE_AUTO_RESUME",
+            message: "Local pause watchdog auto-resumed state sync; expected reactivation event was not received in time",
+            context: {
+                pausedForMs: this.syncPausedAt ? Date.now() - this.syncPausedAt : undefined,
+                safetyTimeoutMs: Agent.SYNC_PAUSE_SAFETY_TIMEOUT_MS
+            }
+        });
 
         this.resumeStateSync();
     }

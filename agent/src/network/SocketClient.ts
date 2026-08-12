@@ -230,9 +230,10 @@ export class SocketClient {
         
         this.socket?.on(
             "agent:activation",
-            async (data: { 
-                isActive: boolean; 
-                expiresAt?: number; 
+            async (data: {
+                isActive: boolean;
+                expiresAt?: number;
+                serverTime?: number;
                 customerName?: string;
                 customerPhone?: string;
                 customerEmail?: string;
@@ -252,6 +253,14 @@ export class SocketClient {
                 if (data.expiresAt) {
                     this.identity.expiresAt = data.expiresAt;
                     console.log("[SOCKET] Expiry time set:", new Date(data.expiresAt).toISOString());
+                }
+
+                // Recompute local-vs-server clock offset whenever the server sends
+                // its own timestamp, so the expiry watchdog compares expiresAt
+                // against server time instead of a potentially-drifted local clock.
+                if (data.serverTime) {
+                    this.identity.serverTimeOffsetMs = data.serverTime - Date.now();
+                    console.log("[SOCKET] Server time offset updated (ms):", this.identity.serverTimeOffsetMs);
                 }
                 
                 // Set customer info if provided
