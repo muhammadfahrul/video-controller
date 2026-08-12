@@ -869,39 +869,7 @@ Diminta user: tarif per jam (`pricePerHour`) sebelumnya diisi manual per-entry d
 
 ## 10. Unit Test & E2E Test Setup
 
-### 10.1 Unit Test
-
-| Package | Framework | File | Jumlah Test |
-|---|---|---|---|
-| server | vitest 2.x | `server/src/services/AgentRegistry.test.ts` | 20 |
-| cashier | vitest 2.x | `cashier/src/services/MultiSocketService.test.ts` | 13 |
-| cashier | vitest 2.x | `cashier/src/utils/roomStatus.test.ts` | 5 |
-
-`cashier/src/store/useTransactionStore.test.ts` sudah **dihapus** bersamaan dengan store-nya (§9.3-A) — merge heuristics yang di-test-nya sudah tidak ada di kode. `MultiSocketService.test.ts` bertambah dari 7 → 13 (5 test replace/flatten/unsubscribe/room-removed dari §9.3-A + 2 test regresi routing per-room dari §9.3-B1).
-
-**Total: 38 test, semua lulus.**
-
-```bash
-cd server && npm test
-cd cashier && npm test
-cd cashier && npm run test:watch   # watch mode
-```
-
-**TypeScript Build Status**: server ✅ tsc OK · agent ✅ tsc OK · cashier ✅ tsc -b + vite OK · web ✅ tsc + vite OK.
-
-### 10.2 E2E Test
-
-- Lokasi: `scripts/e2e/` — entry `run.ts`, wrapper `run-test.sh`, helper `spawn-server.ts`/`test-client.ts`/`spawn-mock-agent.ts`.
-- Simulasi topologi produksi (1 ruangan = 1 PC) di 1 host: 3 server (port 53331-53333), 3 mock agent, 1 cashier-like multi-socket client.
-- 5 skenario: multi-server connection, activate flow end-to-end, transaction merge (Fix A), connection lookup (Fix B), reconnect setelah restart server.
-- Prasyarat: Node 18+ sistem (bukan Electron-bundled), `cd server && npm run build`.
-
-```bash
-./scripts/e2e/run-test.sh
-NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh   # override node path
-```
-
-**Hasil terakhir**: 33 assertion lulus di 5 skenario.
+Seluruh infrastruktur testing (unit test vitest di `server`/`cashier`, E2E test di `scripts/e2e/`, config `vitest.config.ts`, script `npm test`/`test:e2e`, dan dependency terkait) telah **dihapus dari project** atas permintaan pemilik project (2026-08-12). Bagian ini disisakan sebagai catatan historis bahwa setup tersebut pernah ada — lihat git history sebelum tanggal tersebut untuk detail implementasinya.
 
 ---
 

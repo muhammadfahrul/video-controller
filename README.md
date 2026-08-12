@@ -276,32 +276,6 @@ Sistem cashier menampilkan status ruangan secara real-time:
 ### Pemblokiran Aktivasi
 Ruangan dengan status BERSIHKAN tidak dapat diaktifkan sampai status berubah ke SUDAH DIBERSIHKAN.
 
-## Testing
-
-Project ini punya 2 lapis test:
-
-### Unit Tests (vitest)
-- **Server**: `cd server && npm test` → 20 tests untuk `AgentRegistry`
-- **Cashier**: `cd cashier && npm test` → 18 tests untuk transaction store & MultiSocketService
-- Total: **38 unit tests**
-
-### E2E Tests
-Mensimulasikan topologi 3 ruangan di 3 PC berbeda, dijalankan di 1 host:
-
-```bash
-./scripts/e2e/run-test.sh
-# atau
-NODE_BIN=/path/to/node ./scripts/e2e/run-test.sh
-```
-
-E2E test akan:
-1. Spawn 3 servers di port 53331, 53332, 53333 (isolated SQLite DB per server)
-2. Spawn 3 mock agents (register + heartbeat)
-3. Buat cashier-like client yang connect ke 3 server simultan
-4. Run 5 test scenarios: multi-server connection, activate flow, transaction merge, connection lookup, reconnect
-
-Lihat detail di [`scripts/e2e/`](scripts/e2e/) dan [`PRODUCT_REQUIREMENT.md`](PRODUCT_REQUIREMENT.md) §11.
-
 ## Troubleshooting
 
 ### Agent tidak terhubung

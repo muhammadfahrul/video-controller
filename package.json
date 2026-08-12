@@ -19,20 +19,10 @@
     "start:agent": "cd agent && npm run start",
     "start:server": "cd server && npm run start",
     "start:web": "cd web && npm run preview:host",
-    "start:cashier": "cd cashier && npm run preview:host",
-    "test:unit:server": "cd server && npm test",
-    "test:unit:cashier": "cd cashier && npm test",
-    "test:unit": "npm run test:unit:server && npm run test:unit:cashier",
-    "test:e2e:build": "esbuild scripts/e2e/run.ts --bundle --platform=node --target=es2018 --outfile=scripts/e2e/dist/run.cjs --format=cjs",
-    "test:e2e:run": "node scripts/e2e/dist/run.cjs",
-    "test:e2e": "npm run build:server && npm run test:e2e:build && npm run test:e2e:run",
-    "test": "npm run test:unit && npm run test:e2e",
-    "postinstall": "echo 'Note: run npm run test:e2e with system Node 18+ (not Electron-bundled Node)'"
+    "start:cashier": "cd cashier && npm run preview:host"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "socket.io-client": "^4.8.3",
-    "tsx": "^4.7.2",
     "typescript": "^5.7.0"
   }
 }
