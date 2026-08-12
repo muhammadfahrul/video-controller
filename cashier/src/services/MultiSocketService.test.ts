@@ -246,3 +246,82 @@ describe('MultiSocketService - transactions (server-authoritative)', () => {
     expect(deleteCalls).toHaveLength(1);
   });
 });
+
+// Regression test: activating a room with a timer, deactivating it early (before
+// the timer expires), then reactivating it WITHOUT a duration must clear the
+// countdown - it must not resume the stale expiresAt from the earlier session.
+describe('MultiSocketService - reactivation clears stale expiresAt', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    multiSocketService.disconnectAll();
+  });
+
+  function getHandler(event: string): (...args: any[]) => void {
+    const call = mockSocket.on.mock.calls.find(([e]) => e === event);
+    if (!call) throw new Error(`No handler registered for ${event}`);
+    return call[1] as (...args: any[]) => void;
+  }
+
+  function makeAgent(overrides: Partial<import('../types').AgentInfo> = {}): import('../types').AgentInfo {
+    return {
+      id: 'agent-1',
+      name: 'Room 1',
+      roomId: 'room-001',
+      roomName: 'Room 1',
+      status: 'ONLINE' as any,
+      lastHeartbeat: Date.now(),
+      connectedAt: Date.now(),
+      isActive: false,
+      expiresAt: null,
+      startTime: null,
+      ...overrides,
+    };
+  }
+
+  // Handlers append their update onto the connection's internal promise queue
+  // rather than resolving synchronously - flush pending microtasks so the
+  // merge has actually applied before we read state back out.
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('does not resume the previous session\'s countdown on a no-duration reactivation', async () => {
+    multiSocketService.addRoom(makeConfig({ id: 'env-room-1', name: 'Room 1', roomId: 'room-001' }));
+
+    const registerHandler = getHandler('agent:register');
+    const activationHandler = getHandler('room:activation');
+    const agentsUpdateHandler = getHandler('agents:update');
+
+    // Initial registration: idle room.
+    registerHandler(makeAgent());
+    await flush();
+
+    // 1) Activate with a 3-minute timer.
+    const firstExpiresAt = Date.now() + 3 * 60 * 1000;
+    activationHandler({ roomId: 'room-001', isActive: true, expiresAt: firstExpiresAt, startTime: Date.now() });
+    await flush();
+    agentsUpdateHandler([makeAgent({ isActive: true, expiresAt: firstExpiresAt, startTime: Date.now() })]);
+    await flush();
+
+    let billing = multiSocketService.getRoomBillings().get('room-001');
+    expect(billing?.expiresAt).toBe(firstExpiresAt);
+
+    // 2) Deactivate immediately, well before the 3 minutes are up.
+    activationHandler({ roomId: 'room-001', isActive: false, expiresAt: null });
+    await flush();
+    agentsUpdateHandler([makeAgent({ isActive: false, expiresAt: null, startTime: null })]);
+    await flush();
+
+    billing = multiSocketService.getRoomBillings().get('room-001');
+    expect(billing?.expiresAt).toBeFalsy();
+
+    // 3) Reactivate with NO duration - the server sends expiresAt: null.
+    const secondStartTime = Date.now();
+    activationHandler({ roomId: 'room-001', isActive: true, expiresAt: null, startTime: secondStartTime });
+    await flush();
+    agentsUpdateHandler([makeAgent({ isActive: true, expiresAt: null, startTime: secondStartTime })]);
+    await flush();
+
+    billing = multiSocketService.getRoomBillings().get('room-001');
+    // Must NOT still be the stale 3-minute-from-the-first-activation timestamp.
+    expect(billing?.expiresAt).toBeFalsy();
+  });
+});
