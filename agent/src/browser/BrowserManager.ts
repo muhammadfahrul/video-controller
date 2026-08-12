@@ -93,7 +93,7 @@ export class BrowserManager {
 
                 name: browser.browserType().name(),
 
-                version: await browser.version(),
+                version: browser.version(),
 
                 channel:
                     config.browser.channel
