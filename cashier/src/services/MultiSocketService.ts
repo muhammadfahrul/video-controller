@@ -1,19 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import type { AgentInfo, PlayerState, RoomConfig, RoomBilling, Transaction } from '../types';
 
-// Generate unique transaction id
-function generateTransactionId(): string {
-  return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-}
-
-// Helper to format duration in seconds to human readable
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}j ${minutes}m`;
-  return `${minutes}m`;
-}
-
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
 type ExpiryWarningCallback = (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => void;
@@ -265,8 +252,6 @@ class MultiSocketService {
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
     
-    // Transaction will be recorded by room:activation event listener (single source)
-    
     // Set up timeout fallback
     const timeoutMs = 3000;
     const timeoutId = setTimeout(() => {
@@ -290,11 +275,6 @@ class MultiSocketService {
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
     
     // Transaction will be recorded by room:activation event listener (single source)
-  }
-
-  // Save transaction to server
-  private saveTransactionToServer(socket: Socket, transaction: any): void {
-    socket.emit('transaction:save', transaction);
   }
 
   // Load transactions from server for a specific room
@@ -738,73 +718,11 @@ class MultiSocketService {
         timeDiff: data.expiresAt ? data.expiresAt - Date.now() : null
       });
       
-      // Capture state BEFORE queuing for transaction recording
-      const existingAgent = connection.agents[0];
-      const wasActive = existingAgent?.isActive === true;
-      const isNowInactive = data.isActive === false;
-      
-      // Record transaction BEFORE queue (to capture current state).
-      // Skip on 'move': the source room isn't billed on its own - the session
-      // continues (with its original startTime) at the target room instead,
-      // which records the transaction once the session actually ends.
-      if (existingAgent && wasActive && isNowInactive && data.reason !== 'move') {
-        const agent = existingAgent as any;
-        const pricePerHour = agent.pricePerHour ?? 50000;
-        const startTime = agent.startTime || 0;
-        // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
-        const endTime = data.expiresAt || agent.expiresAt || Date.now();
-        const durationSeconds = Math.floor((endTime - startTime) / 1000);
-        
-        console.log('[MultiSocket] Transaction calculation:', {
-          startTime,
-          startTimeFormatted: startTime ? new Date(startTime).toISOString() : 'null',
-          dataExpiresAt: data.expiresAt,
-          dataExpiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : 'null/undefined',
-          agentExpiresAt: agent.expiresAt,
-          endTime,
-          endTimeFormatted: new Date(endTime).toISOString(),
-          durationSeconds,
-          durationFormatted: formatDuration(durationSeconds),
-        });
-        // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
-        const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
-        
-        console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
-          roomId: data.roomId,
-          roomName: data.roomName || config.name,
-          startTime,
-          startTimeFormatted: new Date(startTime).toISOString(),
-          endTime,
-          endTimeFormatted: new Date(endTime).toISOString(),
-          duration: durationSeconds,
-          durationFormatted: formatDuration(durationSeconds),
-          totalPrice,
-          customerName: agent.customerName,
-          agentStartTime: agent.startTime,
-          agentExpiresAt: agent.expiresAt,
-        });
-        
-        if (startTime > 0 && durationSeconds > 0) {
-          // Server is the source of truth: send once with a single generated id
-          // and let the resulting 'transaction:get' broadcast update local state.
-          this.saveTransactionToServer(socket, {
-            id: generateTransactionId(),
-            roomId: data.roomId,
-            roomName: data.roomName || config.name,
-            customerName: agent.customerName,
-            customerPhone: agent.customerPhone,
-            customerEmail: agent.customerEmail,
-            customerNote: agent.customerNote,
-            startTime,
-            endTime,
-            duration: durationSeconds,
-            pricePerHour,
-            totalPrice,
-            paidAt: 0, // unpaid
-          });
-        }
-      }
-      
+      // Transaction recording (duration/totalPrice calculation) now happens
+      // server-side when the room actually deactivates, using the server's
+      // own authoritative agent.startTime/pricePerHour - not client-supplied
+      // numbers. The cashier just reflects whatever the server broadcasts.
+
       // Use queue for state update
       this.queueAgentUpdate(connection, (agent, existing) => {
         const merged = { ...agent, isActive: data.isActive };

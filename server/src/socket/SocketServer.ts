@@ -19,8 +19,13 @@ import {
 
 
 import {
-    DatabaseService
+    DatabaseService,
+    TransactionData
 } from "../services/DatabaseService";
+
+import {
+    AgentInfo
+} from "../types/Agent";
 
 
 
@@ -550,6 +555,13 @@ export class SocketServer {
                         console.log("[SERVER] Found agent for room:", agent ? { id: agent.id, roomId: agent.roomId, socketId: agent.socketId } : "NOT FOUND");
                         
                         if (agent) {
+                            // Capture before overwriting: if the room was already
+                            // inactive (e.g. it auto-expired moments ago and this
+                            // is a delayed/duplicate deactivate click), the
+                            // transaction for that session was already recorded -
+                            // skip recording it again below.
+                            const wasActive = agent.isActive;
+
                             agent.isActive = false;
                             console.log("[SERVER] Emitting agent:activation to socketId:", agent.socketId);
                             // Notify the specific agent
@@ -598,19 +610,23 @@ export class SocketServer {
                                 console.error("[SERVER] Error clearing agent data in DB:", error);
                             }
 
-                            // Clear customer info
-                            (agent as any).customerName = undefined;
-                            (agent as any).customerPhone = undefined;
-                            (agent as any).customerEmail = undefined;
-                            (agent as any).customerNote = undefined;
-
                             // Room moved out: no transaction is recorded for this room (it's
                             // recorded at the target room instead), so mark it as needing a
                             // physical cleaning check independent of the transaction/payment flow.
                             if (data.reason === "move") {
                                 agent.needsCleaning = true;
                                 agent.lastTransactionEndTime = Date.now();
+                            } else if (wasActive) {
+                                // Bill for the full purchased duration (expiresAt), not just
+                                // however long actually elapsed before the cashier deactivated.
+                                await this.recordTransaction(agent, agent.expiresAt || Date.now());
                             }
+
+                            // Clear customer info
+                            (agent as any).customerName = undefined;
+                            (agent as any).customerPhone = undefined;
+                            (agent as any).customerEmail = undefined;
+                            (agent as any).customerNote = undefined;
 
                             // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
                             this.io.emit("room:activation", {
@@ -712,14 +728,30 @@ export class SocketServer {
                     }
                 );
 
-                // Transaction handlers
+                // Transaction handlers. Client-originated saves may only update
+                // an existing transaction's payment/customer-info fields - they
+                // can never create a new transaction or touch its price. New
+                // transactions are only ever created server-side, by
+                // recordTransaction() when a room session actually ends.
                 socket.on(
                     SocketEvents.TRANSACTION_SAVE,
                     async (transaction) => {
-                        console.log("[SERVER] Saving transaction:", transaction.id, "cleanedAt:", transaction.cleanedAt);
-                        console.log("[SERVER] Full transaction data:", JSON.stringify(transaction));
+                        console.log("[SERVER] Updating transaction:", transaction?.id, "cleanedAt:", transaction?.cleanedAt);
                         try {
-                            await this.database.saveTransaction(transaction);
+                            const updated = await this.database.applyClientTransactionUpdate(transaction.id, {
+                                customerName: transaction.customerName,
+                                customerPhone: transaction.customerPhone,
+                                customerEmail: transaction.customerEmail,
+                                customerNote: transaction.customerNote,
+                                paymentMethod: transaction.paymentMethod,
+                                paidAt: transaction.paidAt,
+                                cleanedAt: transaction.cleanedAt,
+                                notes: transaction.notes
+                            });
+                            if (!updated) {
+                                console.warn("[SERVER] Ignored transaction:save for unknown id:", transaction?.id);
+                                return;
+                            }
                             // Broadcast to all connected cashiers
                             const allTransactions = await this.database.getTransactions();
                             console.log("[SERVER] Broadcasting transactions, count:", allTransactions.length);
@@ -886,6 +918,50 @@ export class SocketServer {
 
     }
     
+    // Compute and persist the transaction for a room session that just ended.
+    // This is the single source of truth for duration/totalPrice: the cashier
+    // client used to compute these itself and send the finished number over,
+    // which meant nothing on the server ever verified it. Billing math now
+    // only ever runs here, from agent.startTime/pricePerHour that the server
+    // already holds - the client can no longer hand the server a made-up price.
+    private async recordTransaction(agent: AgentInfo, endTime: number): Promise<void> {
+        const startTime = agent.startTime || 0;
+        const durationSeconds = Math.floor((endTime - startTime) / 1000);
+
+        if (startTime <= 0 || durationSeconds <= 0) {
+            return;
+        }
+
+        // Per-block/jam: minimum 1 jam, dibulatkan ke atas
+        const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * agent.pricePerHour);
+
+        const agentAny = agent as any;
+        const transaction: TransactionData = {
+            id: Date.now().toString(36) + Math.random().toString(36).substring(2, 9),
+            roomId: agent.roomId,
+            roomName: agent.roomName,
+            customerName: agentAny.customerName,
+            customerPhone: agentAny.customerPhone,
+            customerEmail: agentAny.customerEmail,
+            customerNote: agentAny.customerNote,
+            startTime,
+            endTime,
+            duration: durationSeconds,
+            pricePerHour: agent.pricePerHour,
+            totalPrice,
+            paidAt: 0
+        };
+
+        console.log("[SERVER] Recording transaction:", transaction.id, "room:", transaction.roomId, "totalPrice:", totalPrice);
+
+        try {
+            await this.database.saveTransaction(transaction);
+            this.io.emit(SocketEvents.TRANSACTION_GET, await this.database.getTransactions());
+        } catch (error) {
+            console.error("[SERVER] Error recording transaction:", error);
+        }
+    }
+
     // Set up auto-expiry timer for a room
     private setupRoomTimer(roomId: string, durationMinutes: number, socketId?: string): void {
         // Clear any existing timer for this room
@@ -957,11 +1033,25 @@ export class SocketServer {
         const expiryTime = agent?.expiresAt || Date.now();
         
         if (agent) {
+            if (!agent.isActive) {
+                // Already deactivated by a concurrent manual deactivate that
+                // won the race (e.g. cashier clicked deactivate right as this
+                // timer fired) - it already recorded the transaction and did
+                // the cleanup below, so bail out to avoid double-billing.
+                return;
+            }
+
+            // Flip isActive synchronously, before the first await, so a
+            // concurrent CASHIER_DEACTIVATE_ROOM handler running interleaved
+            // during recordTransaction's awaits can't also record this same
+            // session.
             agent.isActive = false;
             agent.expiresAt = null;
-            
+
+            await this.recordTransaction(agent, expiryTime);
+
             // Notify the specific agent
-            this.io.to(agent.socketId).emit("agent:activation", { 
+            this.io.to(agent.socketId).emit("agent:activation", {
                 isActive: false,
                 reason: "expired"
             });

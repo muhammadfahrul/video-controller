@@ -303,18 +303,22 @@ export class DatabaseService {
         const existing = this.db.exec(`SELECT id FROM transactions WHERE id = ?`, [transaction.id]);
         
         if (existing.length > 0 && existing[0].values.length > 0) {
+            // Financial/identity fields (roomId, roomName, startTime, endTime,
+            // duration, pricePerHour, totalPrice) are deliberately excluded here.
+            // They're set once at creation from server-authoritative data and
+            // must never be overwritable by a later client-supplied update
+            // (e.g. marking a transaction paid/cleaned) - only the fields below
+            // are legitimately mutable after creation.
             this.db.run(`
-                UPDATE transactions SET 
-                    roomId = ?, roomName = ?, customerName = ?, customerPhone = ?,
-                    customerEmail = ?, customerNote = ?, startTime = ?, endTime = ?,
-                    duration = ?, pricePerHour = ?, totalPrice = ?, paymentMethod = ?,
-                    paidAt = ?, cleanedAt = ?, notes = ?
+                UPDATE transactions SET
+                    customerName = ?, customerPhone = ?,
+                    customerEmail = ?, customerNote = ?,
+                    paymentMethod = ?, paidAt = ?, cleanedAt = ?, notes = ?
                 WHERE id = ?
             `, [
-                transaction.roomId, transaction.roomName, transaction.customerName || null,
+                transaction.customerName || null,
                 transaction.customerPhone || null, transaction.customerEmail || null,
-                transaction.customerNote || null, transaction.startTime, transaction.endTime,
-                transaction.duration, transaction.pricePerHour, transaction.totalPrice,
+                transaction.customerNote || null,
                 transaction.paymentMethod || null, transaction.paidAt, transaction.cleanedAt || null, transaction.notes || null,
                 transaction.id
             ]);
@@ -334,6 +338,67 @@ export class DatabaseService {
             ]);
         }
         this.save();
+    }
+
+    // For client-originated updates only (marking a transaction paid/cleaned,
+    // editing customer info). Unlike saveTransaction(), this never inserts -
+    // a client can only ever mutate a transaction the server already created
+    // via recordTransaction(), never fabricate a brand-new one with an
+    // arbitrary totalPrice by emitting an unknown id. Returns false (no-op)
+    // if the id doesn't exist.
+    async applyClientTransactionUpdate(
+        id: string,
+        fields: {
+            customerName?: string;
+            customerPhone?: string;
+            customerEmail?: string;
+            customerNote?: string;
+            paymentMethod?: 'cash' | 'transfer' | 'other';
+            paidAt?: number;
+            cleanedAt?: number;
+            notes?: string;
+        }
+    ): Promise<boolean> {
+        if (!this.db) return false;
+
+        const existing = this.db.exec(`SELECT id, paymentMethod, paidAt, cleanedAt, notes, customerName, customerPhone, customerEmail, customerNote FROM transactions WHERE id = ?`, [id]);
+
+        if (existing.length === 0 || existing[0].values.length === 0) {
+            return false;
+        }
+
+        const row = existing[0].values[0];
+        const current = {
+            paymentMethod: row[1] as string | null,
+            paidAt: row[2] as number,
+            cleanedAt: row[3] as number | null,
+            notes: row[4] as string | null,
+            customerName: row[5] as string | null,
+            customerPhone: row[6] as string | null,
+            customerEmail: row[7] as string | null,
+            customerNote: row[8] as string | null
+        };
+
+        this.db.run(`
+            UPDATE transactions SET
+                customerName = ?, customerPhone = ?,
+                customerEmail = ?, customerNote = ?,
+                paymentMethod = ?, paidAt = ?, cleanedAt = ?, notes = ?
+            WHERE id = ?
+        `, [
+            fields.customerName ?? current.customerName,
+            fields.customerPhone ?? current.customerPhone,
+            fields.customerEmail ?? current.customerEmail,
+            fields.customerNote ?? current.customerNote,
+            fields.paymentMethod ?? current.paymentMethod,
+            fields.paidAt ?? current.paidAt,
+            fields.cleanedAt ?? current.cleanedAt,
+            fields.notes ?? current.notes,
+            id
+        ]);
+
+        this.save();
+        return true;
     }
 
     async getTransactions(): Promise<TransactionData[]> {
