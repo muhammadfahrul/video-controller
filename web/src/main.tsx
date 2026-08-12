@@ -35,15 +35,8 @@ socketService.connect();
 
 
 
-// Register Service Worker for PWA
-
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // Service worker registration failed, app still works
-    });
-  });
-}
+// Service worker registration for the production PWA is handled by
+// vite-plugin-pwa's auto-injected registerSW.js (see vite.config.ts).
 
 
 
