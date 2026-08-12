@@ -341,23 +341,6 @@ function Ensure-PlaywrightBrowsers {
 }
 
 # ============================================
-# Create a minimized-window shortcut for a .bat script
-# ============================================
-function New-MinimizedShortcut {
-    param(
-        [string]$ShortcutPath,
-        [string]$TargetPath
-    )
-
-    $shell = New-Object -ComObject WScript.Shell
-    $shortcut = $shell.CreateShortcut($ShortcutPath)
-    $shortcut.TargetPath = $TargetPath
-    $shortcut.WorkingDirectory = Split-Path $TargetPath -Parent
-    $shortcut.WindowStyle = 7  # 7 = Minimized
-    $shortcut.Save()
-}
-
-# ============================================
 # Auto-start setup (Windows Task Scheduler)
 # ============================================
 function Setup-Autostart {
@@ -367,13 +350,7 @@ function Setup-Autostart {
 
     # Use Startup folder approach (simpler and more reliable)
     $startupFolder = [Environment]::GetFolderPath('Startup')
-
-    # Actual .bat scripts live here; Startup folder only gets minimized shortcuts pointing to them
-    $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
-    if (-not (Test-Path $scriptsFolder)) {
-        New-Item -ItemType Directory -Path $scriptsFolder -Force | Out-Null
-    }
-
+    
     # Find Node.js and npm location (used for all autostart scripts)
     $npmPath = $null
     try {
@@ -388,20 +365,19 @@ function Setup-Autostart {
         
         if ($npmPath) {
             $npmDir = Split-Path $npmPath -Parent
-
+            
             # Server startup script
-            $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
+            $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
             @"
 @echo off
 echo Starting Server at %date% %time% > "$logFile"
 set PATH=$npmDir;%PATH%
 cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
 "@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
             Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
 
             # Agent startup script
-            $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
+            $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
             @"
 @echo off
 echo Starting Agent at %date% %time% >> "$logFile"
@@ -409,54 +385,49 @@ set PATH=$npmDir;%PATH%
 set BROWSER_HEADLESS=false
 cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
 "@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
             Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
 
             # Web startup script
-            $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
+            $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
             @"
 @echo off
 echo Starting Web at %date% %time% >> "$logFile"
 set PATH=$npmDir;%PATH%
 cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
 "@ | Out-File -FilePath $webStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
             Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
         } else {
             # Fallback if npm not found
-            $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
+            $serverStartupScript = Join-Path $startupFolder "VideoController_Server.bat"
             @"
 @echo off
 echo WARNING: npm not found in PATH >> "$logFile"
 cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
 "@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
             Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
 
-            $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
+            $agentStartupScript = Join-Path $startupFolder "VideoController_Agent.bat"
             @"
 @echo off
 set BROWSER_HEADLESS=false
 cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
 "@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
             Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
 
-            $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
+            $webStartupScript = Join-Path $startupFolder "VideoController_Web.bat"
             @"
 @echo off
 cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
 "@ | Out-File -FilePath $webStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
             Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
         }
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
         # Cashier startup script
-        $cashierBatScript = Join-Path $scriptsFolder "VideoController_Cashier.bat"
+        $cashierBatScript = Join-Path $startupFolder "VideoController_Cashier.bat"
         $cashierLogFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
-
+        
         if ($npmPath) {
             # Use full path to npm
             $npmDir = Split-Path $npmPath -Parent
@@ -476,8 +447,7 @@ echo WARNING: npm not found in PATH >> "$cashierLogFile"
 cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
 "@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
         }
-
-        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -TargetPath $cashierBatScript
+        
         Write-Host "[OK] Cashier auto-start configured: $cashierBatScript" -ForegroundColor Green
         if ($npmPath) {
             Write-Host "[OK] Using npm: $npmPath" -ForegroundColor Green
@@ -488,20 +458,19 @@ cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
     }
 
     Write-Host ""
-    Write-Host "[INFO] Auto-start menggunakan Windows Startup folder (shortcut minimized)" -ForegroundColor Yellow
-    Write-Host "[INFO] Shortcut (.lnk) terletak di: $startupFolder" -ForegroundColor Yellow
-    Write-Host "[INFO] Script asli (.bat) terletak di: $scriptsFolder" -ForegroundColor Yellow
+    Write-Host "[INFO] Auto-start menggunakan Windows Startup folder" -ForegroundColor Yellow
+    Write-Host "[INFO] File terletak di: $startupFolder" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "[INFO] Untuk testing manual:" -ForegroundColor Yellow
     Write-Host "  1. Buka folder: $startupFolder" -ForegroundColor Yellow
     if ($mode -eq "room") {
-        Write-Host "  2. Klik dua kali shortcut VideoController_Server / Agent / Web (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Klik dua kali file VideoController_Server.bat / Agent.bat / Web.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\room_startup.log" -ForegroundColor Yellow
     } elseif ($mode -eq "kasir") {
-        Write-Host "  2. Klik dua kali shortcut VideoController_Cashier (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Klik dua kali file VideoController_Cashier.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
     } else {
-        Write-Host "  2. Klik dua kali shortcut VideoController_* (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Klik dua kali file VideoController_*.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log di $PROJECT_ROOT" -ForegroundColor Yellow
     }
     Write-Host ""
@@ -519,41 +488,26 @@ function Remove-Autostart {
     # Use Startup folder approach
     $startupFolder = [Environment]::GetFolderPath('Startup')
 
-    # Actual .bat scripts live here (see Setup-Autostart); Startup folder only has minimized shortcuts
-    $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
-
     if ($mode -eq "room" -or $mode -eq "all") {
-        # Remove Room App shortcuts (.lnk in Startup) + scripts (.bat in scripts folder)
-        # Also cleans up legacy .bat files from older installs that wrote directly into Startup
-        $baseNames = @("VideoController_Server", "VideoController_Agent", "VideoController_Web")
-        foreach ($baseName in $baseNames) {
-            $pathsToRemove = @(
-                (Join-Path $startupFolder "$baseName.lnk"),
-                (Join-Path $startupFolder "$baseName.bat"),
-                (Join-Path $scriptsFolder "$baseName.bat")
-            )
-            foreach ($path in $pathsToRemove) {
-                if (Test-Path $path) {
-                    Remove-Item -Path $path -Force
-                    Write-Host "[OK] Removed $path" -ForegroundColor Green
-                }
+        # Remove Room App startup scripts
+        $scriptsToRemove = @("VideoController_Server.bat", "VideoController_Agent.bat", "VideoController_Web.bat")
+        foreach ($scriptName in $scriptsToRemove) {
+            $scriptPath = Join-Path $startupFolder $scriptName
+            if (Test-Path $scriptPath) {
+                Remove-Item -Path $scriptPath -Force
+                Write-Host "[OK] Removed $scriptName" -ForegroundColor Green
             }
         }
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Remove Cashier shortcut (.lnk in Startup) + script (.bat in scripts folder)
-        # Also cleans up legacy files from older installs
-        $pathsToRemove = @(
-            (Join-Path $startupFolder "VideoController_Cashier.lnk"),
-            (Join-Path $startupFolder "VideoController_Cashier.bat"),
-            (Join-Path $startupFolder "VideoController_Cashier.ps1"),
-            (Join-Path $scriptsFolder "VideoController_Cashier.bat")
-        )
-        foreach ($path in $pathsToRemove) {
-            if (Test-Path $path) {
-                Remove-Item -Path $path -Force
-                Write-Host "[OK] Removed $path" -ForegroundColor Green
+        # Remove Cashier startup scripts
+        $cashierScripts = @("VideoController_Cashier.bat", "VideoController_Cashier.ps1")
+        foreach ($scriptName in $cashierScripts) {
+            $scriptPath = Join-Path $startupFolder $scriptName
+            if (Test-Path $scriptPath) {
+                Remove-Item -Path $scriptPath -Force
+                Write-Host "[OK] Removed $scriptName" -ForegroundColor Green
             }
         }
         # Also remove log file if exists
@@ -1178,7 +1132,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
 
     # Start Server first
-    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Minimized -PassThru
+    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -PassThru
     $processes += $serverProcess
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
     
@@ -1194,7 +1148,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
 
     # Start Agent (only if server is still running)
     if (-not $serverProcess.HasExited) {
-        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Minimized -PassThru
+        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -PassThru
         $processes += $agentProcess
         Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
         Start-Sleep -Seconds 2
@@ -1208,7 +1162,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     }
 
     # Start Web
-    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -WindowStyle Minimized -PassThru
+    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -PassThru
     $processes += $webProcess
     Write-Host "   - Web: PID $($webProcess.Id)" -ForegroundColor Cyan
 }
@@ -1216,7 +1170,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
 if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
     Write-Host "[INFO] Starting Kasir service..." -ForegroundColor Yellow
 
-    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -WindowStyle Minimized -PassThru
+    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -PassThru
     $processes += $cashierProcess
     Write-Host "   - Cashier: PID $($cashierProcess.Id)" -ForegroundColor Cyan
 }
