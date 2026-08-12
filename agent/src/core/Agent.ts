@@ -48,6 +48,7 @@ import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandle
 import { ToggleFullscreenHandler } from "../commands/handlers/ToggleFullscreenHandler";
 import { RepeatModeHandler } from "../commands/handlers/RepeatModeHandler";
 import { SkipAdHandler } from "../commands/handlers/SkipAdHandler";
+import { SetAutoSkipAdsHandler } from "../commands/handlers/SetAutoSkipAdsHandler";
 import { RepeatMode } from "../playlist/RepeatMode";
 import { PlaylistRepository } from "../repositories/PlaylistRepository";
 import { PlayerRepository } from "../repositories/PlayerRepository";
@@ -237,7 +238,9 @@ export class Agent {
 
             this.browser.getBrowserManager(),
 
-            this.player
+            this.player,
+
+            (event) => this.socketClient?.sendError(event)
 
         );
 
@@ -355,6 +358,13 @@ export class Agent {
         }
     }
 
+    // A fatal error may have run while the process was in the middle of
+    // anything - the process is in an undefined state afterwards, so we
+    // exit rather than limp on. The process manager (PM2/NSSM/etc.) is
+    // responsible for relaunching. The short delay just gives the error
+    // report a chance to actually reach the socket before the process dies.
+    private static readonly FATAL_ERROR_EXIT_DELAY_MS = 500;
+
     // Set up global error handlers to catch unhandled errors
     private setupGlobalErrorHandlers() {
         // Handle uncaught exceptions
@@ -365,6 +375,7 @@ export class Agent {
                 message: err.message,
                 stack: err.stack
             });
+            setTimeout(() => process.exit(1), Agent.FATAL_ERROR_EXIT_DELAY_MS);
         });
 
         // Handle unhandled promise rejections
@@ -376,6 +387,7 @@ export class Agent {
                 stack: reason instanceof Error ? reason.stack : undefined,
                 context: { promise: String(promise) }
             });
+            setTimeout(() => process.exit(1), Agent.FATAL_ERROR_EXIT_DELAY_MS);
         });
     }
 
@@ -567,6 +579,18 @@ export class Agent {
                 this.player!
             )
         );
+
+        this.commandDispatcher.register(
+            CommandType.SET_AUTO_SKIP_ADS,
+            new SetAutoSkipAdsHandler(
+                (enabled) => this.setAutoSkipEnabled(enabled)
+            )
+        );
+    }
+
+    public setAutoSkipEnabled(enabled: boolean): void {
+        this.autoSkipEnabled = enabled;
+        console.log("[AGENT] autoSkipEnabled set to", enabled);
     }
 
     public getSocketClient() {

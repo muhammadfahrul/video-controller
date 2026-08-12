@@ -65,7 +65,13 @@ export class HealthService {
 
         private readonly player:
 
-            PlayerService
+            PlayerService,
+
+        private readonly onEvent?: (event: {
+            type: string;
+            message: string;
+            context?: Record<string, unknown>;
+        }) => void
 
     ) {
 
@@ -219,17 +225,39 @@ export class HealthService {
 
                     );
 
+                    this.onEvent?.({
+                        type: "HEALTH_BROWSER_UNRECOVERABLE",
+                        message: "Browser reported unhealthy; agent process is exiting so the process manager can relaunch it",
+                        context: { ...this.snapshot }
+                    });
+
                     process.exit(1);
 
                 } else {
 
+                    const failuresBeforeRecovery = this.consecutiveFailures;
+
                     this.recovery.recover(
                         RecoveryAction.RELOAD_PAGE
-                    ).catch((error) => {
+                    ).then((result) => {
+
+                        this.onEvent?.({
+                            type: "HEALTH_RECOVERY_ATTEMPT",
+                            message: `Recovery action ${result.action} ${result.success ? "succeeded" : "failed"}`,
+                            context: { ...result, consecutiveFailuresBeforeRecovery: failuresBeforeRecovery }
+                        });
+
+                    }).catch((error) => {
 
                         LoggerService.error(
                             `[HEALTH] Recovery attempt failed: ${error}`
                         );
+
+                        this.onEvent?.({
+                            type: "HEALTH_RECOVERY_ATTEMPT",
+                            message: `Recovery action threw: ${error instanceof Error ? error.message : String(error)}`,
+                            context: { consecutiveFailuresBeforeRecovery: failuresBeforeRecovery }
+                        });
 
                     });
 

@@ -91,6 +91,17 @@ Argument browser dipisahkan dengan `||`:
 - `--disable-web-security` - Disable web security
 - `--disable-setuid-sandbox` - Disable setuid sandbox
 
+### Browser Profile (Data Lokal)
+
+`data/browser-profile/` menyimpan profil Chrome persisten (cookies, session, login data YouTube, cache) untuk PC ruangan tersebut. Ini **disengaja**: supaya login YouTube dan preferensi browser tidak hilang tiap kali agent restart. Data ini murni lokal di PC — tidak pernah disinkronkan ke atau dari server.
+
+Kapan perlu direset:
+- PC ruangan diganti/di-reimage dan perlu login ulang dari awal
+- Perlu logout paksa akun YouTube yang sedang dipakai
+- Profil korup (browser gagal start terus-menerus meski konfigurasi benar)
+
+Cara reset: hentikan agent, hapus folder `data/browser-profile/` secara manual, lalu jalankan ulang agent — folder akan dibuat ulang otomatis dan browser akan start dengan profil bersih (perlu login YouTube ulang jika diperlukan).
+
 ## Topologi (1 Ruangan = 1 PC)
 
 Setiap PC ruangan adalah unit self-contained yang menjalankan **Agent + Server + Web** sebagai satu bundle. Topologi ini berarti:
@@ -134,12 +145,11 @@ agent/
 │   ├── recovery/     # Auto-recovery
 │   ├── services/     # Services
 │   ├── socket/       # Socket client
-│   ├── state/        # State management
 │   ├── types/        # TypeScript types
 │   ├── utils/        # Utilities
 │   ├── youtube/      # YouTube helpers
 │   └── index.ts      # Entry point
-├── data/              # Browser profile data
+├── data/              # Browser profile data (lokal, lihat "Browser Profile (Data Lokal)")
 ├── dist/             # Build output
 └── package.json
 ```

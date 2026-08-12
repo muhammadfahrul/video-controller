@@ -241,16 +241,6 @@ export class BrowserManager {
 
     }
 
-    public async restart(): Promise<void> {
-
-        LoggerService.info("Restarting browser...");
-
-        await this.stop();
-
-        await this.start();
-
-    }
-
     public isRunning(): boolean {
 
         return this.state === BrowserState.RUNNING;
