@@ -6,7 +6,7 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 
 - **Monitoring Ruangan**: Menampilkan semua ruangan karaoke yang terhubung
 - **Billing Otomatis**: Menghitung biaya berdasarkan durasi penggunaan dan harga per jam per ruangan
-- **Status Ruangan**: Menampilkan status real-time ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
+- **Status Ruangan**: Menampilkan status real-time ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Status Real-time**: Menampilkan status pemutaran video (playing/paused/idle)
 - **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
 - **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`, dikonfigurasi di `server/.env` PC ruangan tsb, bukan di cashier)
@@ -73,8 +73,8 @@ Tarif per jam (`pricePerHour`) dikonfigurasi lewat env `PRICE_PER_HOUR` di `serv
 
 ## Konfigurasi Port
 
-- Development: `http://localhost:5174`
-- Production Preview: `http://localhost:4173`
+- Development: `http://localhost:53334`
+- Production Preview: `http://localhost:53335`
 
 ## Endpoint Server
 
@@ -96,7 +96,7 @@ cashier/
 │   ├── config/        # Konfigurasi aplikasi
 │   ├── context/       # React Context (room config, loading state)
 │   ├── layouts/       # Layout components
-│   ├── pages/         # Halaman (Home, RoomDetail, dll)
+│   ├── pages/         # DashboardPage (halaman utama, satu-satunya page)
 │   ├── services/      # Socket service (juga pemilik data transaksi)
 │   ├── types/         # TypeScript types
 │   └── utils/         # Utility functions
@@ -127,21 +127,23 @@ python -m http.server 8080
 
 ## Status Ruangan
 
+Status dihitung di client (`src/utils/roomStatus.ts`), prioritas: OFFLINE > AKTIF > UNPAID > BERSIHKAN/SUDAH DIBERSIHKAN > ONLINE. Tidak ada status `PAID` tersendiri.
+
 | Status | Deskripsi |
 |--------|-----------|
 | OFFLINE | Ruangan tidak terhubung ke server |
 | AKTIF | Ruangan sedang digunakan |
-| UNPAID | Transaksi belum lunas (belum dibayar) |
-| PAID | Transaksi sudah lunas, belum memasuki fase pembersihan |
-| BERSIHKAN | Transaksi sudah lunas, memasuki fase pembersihan (3 menit) |
-| SUDAH DIBERSIHKAN | Fase pembersihan selesai, ruangan siap digunakan |
-| ONLINE | Ruangan terhubung tapi tidak aktif |
+| UNPAID | Ada transaksi belum lunas (`paidAt === 0`) |
+| BERSIHKAN | Sudah dibayar, dalam 30 menit pertama setelah `paidAt` |
+| SUDAH DIBERSIHKAN | 30-60 menit setelah `paidAt`, atau transaksi sudah ditandai `cleanedAt` |
+| ONLINE | Terhubung, tidak aktif, dan lebih dari 60 menit sejak `paidAt` |
 
 ### Transisi Status Otomatis
-- **PAID → BERSIHKAN**: Secara otomatis setelah 3 menit
-- **BERSIHKAN → SUDAH DIBERSIHKAN**: Secara otomatis setelah 1 menit
-- **SUDAH DIBERSIHKAN → ONLINE**: Ruangan siap diaktifkan kembali
+- **UNPAID → BERSIHKAN**: Otomatis begitu transaksi ditandai lunas (`paidAt` terisi)
+- **BERSIHKAN → SUDAH DIBERSIHKAN**: Otomatis 30 menit setelah `paidAt`
+- **SUDAH DIBERSIHKAN → ONLINE**: Otomatis 60 menit setelah `paidAt`
 
 ### Fitur Cleaning Manual
-- Tombol "Sudah Bersih" untuk mempercepat transisi dari BERSIHKAN ke SUDAH DIBERSIHKAN
+- Tombol "Sudah Bersih" di modal riwayat transaksi menandai `cleanedAt` pada transaksi tsb, langsung memindahkan ke SUDAH DIBERSIHKAN tanpa menunggu 30 menit
+- Tombol terpisah di kartu ruangan (`cashier:mark-room-cleaned`) khusus untuk ruangan yang di-vacate lewat fitur Pindah Ruangan (tidak ada transaksi baru untuk ruangan asal, jadi statusnya dilacak lewat `needsCleaning`/`lastTransactionEndTime`, bukan lewat transaksi)
 - Ruangan dengan status BERSIHKAN tidak bisa diaktifkan

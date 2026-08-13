@@ -9,7 +9,7 @@ Agent yang berjalan di ruangan karaoke untuk mengontrol pemutaran video YouTube.
 - **Browser Otomatis**: Membuka browser secara otomatis (Playwright)
 - **Health Check**: Memantau status browser dan video secara berkala
 - **Auto-recovery**: Recovery otomatis jika browser crash
-- **Billing Integration**: Mengirim data penggunaan ke server untuk billing
+- **Billing Integration**: Menerima status aktif/nonaktif ruangan (`agent:activation`) dari server - perhitungan biaya sendiri sepenuhnya di server, agent tidak mengirim data usage
 
 ## Cara Menjalankan
 
@@ -60,7 +60,10 @@ HEALTH_INTERVAL=5000
 LOG_LEVEL=info
 
 # Server Configuration
-SERVER_URL=http://localhost:53331
+# SERVER_IP = IP PC server (di topologi 1 ruangan = 1 PC, ini PC yang sama dengan agent).
+# Kosongkan untuk auto-detect local IP.
+SERVER_IP=
+SERVER_PORT=53331
 ```
 
 ### Konfigurasi Room
@@ -133,21 +136,22 @@ Setiap PC ruangan adalah unit self-contained yang menjalankan **Agent + Server +
 agent/
 ├── src/
 │   ├── browser/        # Browser management (launch, profile, state)
-│   ├── commands/       # Command handlers
+│   │   └── adapters/   # Browser adapter implementations
+│   ├── commands/       # Command definitions + handlers
+│   │   └── handlers/   # 1 handler class per CommandType
 │   ├── config/         # Configuration
 │   ├── core/           # Agent core logic
 │   ├── events/         # Event definitions
 │   ├── health/         # Health check
-│   ├── logger/        # Logging
-│   ├── network/       # Network utilities
-│   ├── player/        # Player controls
+│   ├── network/       # Socket client, local IP detection
+│   ├── player/        # YouTube player control (DOM, selectors)
 │   ├── playlist/      # Playlist management
 │   ├── recovery/     # Auto-recovery
-│   ├── services/     # Services
-│   ├── socket/       # Socket client
+│   ├── repositories/ # Local persistence untuk player/playlist state
+│   ├── services/     # Services (termasuk LoggerService, ConfigService)
+│   ├── socket/       # Socket.io event name constants
 │   ├── types/        # TypeScript types
 │   ├── utils/        # Utilities
-│   ├── youtube/      # YouTube helpers
 │   └── index.ts      # Entry point
 ├── data/              # Browser profile data (lokal, lihat "Browser Profile (Data Lokal)")
 ├── dist/             # Build output
@@ -156,19 +160,28 @@ agent/
 
 ## Perintah yang Didukung
 
-Agent menerima perintah dari server:
+Agent menerima perintah dari server lewat event `command`, di-route ke handler di `src/commands/handlers/` berdasarkan `CommandType` (`src/commands/CommandType.ts`):
 
-| Perintah | Deskripsi |
-|----------|-----------|
-| `play` | Memutar video |
-| `pause` | Jeda video |
-| `stop` | Stop video |
-| `next` | Video berikutnya |
-| `previous` | Video sebelumnya |
-| `playUrl` | Mainkan URL YouTube |
-| `addToQueue` | Tambah ke queue |
-| `clearQueue` | Clear queue |
-| `setVolume` | Atur volume |
+| CommandType | Handler | Deskripsi |
+|-------------|---------|-----------|
+| `PLAY` | PlayHandler | Memutar video |
+| `PAUSE` | PauseHandler | Jeda video |
+| `STOP` | StopHandler | Stop video |
+| `NEXT` | NextHandler | Video berikutnya di playlist |
+| `PREVIOUS` | PreviousHandler | Video sebelumnya di playlist |
+| `OPEN_VIDEO` | OpenVideoHandler | Buka/mainkan URL video YouTube tertentu |
+| `SEEK` | SeekHandler | Lompat ke posisi waktu tertentu |
+| `VOLUME` | VolumeHandler | Atur volume (0-100) |
+| `MUTE` / `UNMUTE` | MuteHandler / UnmuteHandler | Bisukan/nyalakan suara |
+| `FULLSCREEN` / `EXIT_FULLSCREEN` / `TOGGLE_FULLSCREEN` | FullscreenHandler dkk | Kontrol fullscreen |
+| `ADD_PLAYLIST` | AddPlaylistHandler | Tambah item ke queue |
+| `REMOVE_PLAYLIST` | RemovePlaylistHandler | Hapus item dari queue |
+| `CLEAR_PLAYLIST` | ClearPlaylistHandler | Kosongkan queue |
+| `PLAY_PLAYLIST_ITEM` | PlayPlaylistItemHandler | Mainkan item queue tertentu |
+| `SHUFFLE_PLAYLIST` | ShufflePlaylistHandler | Acak urutan queue |
+| `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | RepeatModeHandler | Atur mode repeat |
+| `SKIP_AD` | SkipAdHandler | Skip iklan YouTube yang sedang tampil |
+| `SET_AUTO_SKIP_ADS` | SetAutoSkipAdsHandler | Toggle auto-skip iklan |
 
 ## Cara Install sebagai Service (Linux)
 
@@ -216,7 +229,7 @@ pm2 startup
 
 ## Logging
 
-Log menggunakan Pino dengan level yang bisa dikonfigurasi:
+Log menggunakan Pino (dengan `pino-pretty` untuk output berwarna) dengan level yang bisa dikonfigurasi lewat `LOG_LEVEL`:
 
 - `trace` - Semua log
 - `debug` - Debug info
@@ -224,9 +237,7 @@ Log menggunakan Pino dengan level yang bisa dikonfigurasi:
 - `warn` - Warning
 - `error` - Error
 
-Log tersimpan di:
-- Console (stdout)
-- File: `logs/agent.log` (jika dikonfigurasi)
+Log hanya ditulis ke console (stdout) - saat ini `LoggerService` tidak punya file transport, jadi tidak ada file `logs/agent.log`. Kalau butuh persist log, redirect stdout secara manual (mis. lewat systemd/PM2 log file) atau tambahkan transport file di `src/services/LoggerService.ts`.
 
 ## Troubleshooting
 
@@ -235,7 +246,7 @@ Log tersimpan di:
 - Cek browser installation
 
 ### Tidak terhubung ke server
-- Cek `SERVER_URL` di .env
+- Cek `SERVER_IP` dan `SERVER_PORT` di .env
 - Cek firewall/network
 
 ### Video tidak autoplay
