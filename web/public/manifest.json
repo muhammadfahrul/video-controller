@@ -1,7 +1,7 @@
 {
-  "name": "Video Controller",
-  "short_name": "VideoCtrl",
-  "description": "Remote Video Player Controller",
+  "name": "Remote - Video Controller",
+  "short_name": "Remote",
+  "description": "Video Controller Remote",
   "start_url": "/",
   "display": "fullscreen",
   "orientation": "any",
