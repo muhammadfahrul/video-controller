@@ -525,7 +525,7 @@ Fix: `usePlayer.ts`/`usePlaylist.ts` **dihapus total** (ternyata 100% redundan �
 
 #### 4.3.8 PWA
 
-Manifest statis (`web/public/manifest.json`) — mereferensikan `icon-192.png`/`icon-512.png` yang **tidak ada** di `web/public/` (hanya `favicon.svg`/`icons.svg`). **Dua mekanisme service worker berjalan bersamaan**: `sw.js` hand-rolled (stale-while-revalidate, precache minim) **dan** SW auto-generate dari `vite-plugin-pwa`/Workbox — potensi konflik cache/versi.
+Manifest statis (`web/public/manifest.json`) — mereferensikan `icon-192.png`/`icon-512.png` yang **tidak ada** di `web/public/` (hanya `favicon.svg`). **Dua mekanisme service worker berjalan bersamaan**: `sw.js` hand-rolled (stale-while-revalidate, precache minim) **dan** SW auto-generate dari `vite-plugin-pwa`/Workbox — potensi konflik cache/versi.
 
 #### 4.3.9 Billing/Activation Display
 
