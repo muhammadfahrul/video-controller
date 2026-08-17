@@ -232,7 +232,7 @@ export class SocketClient {
             "agent:activation",
             async (data: {
                 isActive: boolean;
-                expiresAt?: number;
+                expiresAt?: number | null;
                 serverTime?: number;
                 customerName?: string;
                 customerPhone?: string;
@@ -249,8 +249,22 @@ export class SocketClient {
                 const wasActive = this.identity.isActive;
                 this.identity.isActive = data.isActive;
 
-                // Set expiresAt if provided
-                if (data.expiresAt) {
+                // Update expiresAt. On deactivation, clear it outright so a
+                // stale timestamp can never leak into a later reactivation.
+                // On genuine reactivation (was inactive, now active), trust
+                // the server's value verbatim - including "not provided",
+                // which means no duration was set and the watchdog should
+                // NOT expire the room using the previous session's timer.
+                // Only while already active (extend-time) do we treat a
+                // missing expiresAt as "no change" and keep the current one.
+                if (!data.isActive) {
+                    this.identity.expiresAt = undefined;
+                } else if (!wasActive) {
+                    this.identity.expiresAt = data.expiresAt ?? undefined;
+                    if (data.expiresAt) {
+                        console.log("[SOCKET] Expiry time set:", new Date(data.expiresAt).toISOString());
+                    }
+                } else if (data.expiresAt) {
                     this.identity.expiresAt = data.expiresAt;
                     console.log("[SOCKET] Expiry time set:", new Date(data.expiresAt).toISOString());
                 }
