@@ -1,19 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import type { AgentInfo, PlayerState, RoomConfig, RoomBilling, Transaction } from '../types';
 
-// Generate unique transaction id
-function generateTransactionId(): string {
-  return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-}
-
-// Helper to format duration in seconds to human readable
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}j ${minutes}m`;
-  return `${minutes}m`;
-}
-
 type RoomUpdateCallback = (rooms: Map<string, RoomBilling>) => void;
 type ConnectionStatusCallback = (roomId: string, connected: boolean) => void;
 type ExpiryWarningCallback = (data: { roomId: string; secondsRemaining: number; expiresAt: number }) => void;
@@ -189,7 +176,8 @@ class MultiSocketService {
     customerEmail?: string,
     customerNote?: string,
     onComplete?: () => void,
-    originalStartTime?: number
+    originalStartTime?: number,
+    packageId?: string
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
@@ -231,6 +219,7 @@ class MultiSocketService {
       roomId: agentRoomId,
       roomName,
       durationMinutes: durationMinutes ?? undefined,
+      packageId: packageId ?? undefined,
       customerName: customerName ?? undefined,
       customerPhone: customerPhone ?? undefined,
       customerEmail: customerEmail ?? undefined,
@@ -265,8 +254,6 @@ class MultiSocketService {
 
     const agentRoomId = connection.agents[0]?.roomId || roomId;
     
-    // Transaction will be recorded by room:activation event listener (single source)
-    
     // Set up timeout fallback
     const timeoutMs = 3000;
     const timeoutId = setTimeout(() => {
@@ -290,11 +277,6 @@ class MultiSocketService {
     console.log('[MultiSocket] Deactivating room:', roomId, '-> agentRoomId:', agentRoomId);
     
     // Transaction will be recorded by room:activation event listener (single source)
-  }
-
-  // Save transaction to server
-  private saveTransactionToServer(socket: Socket, transaction: any): void {
-    socket.emit('transaction:save', transaction);
   }
 
   // Load transactions from server for a specific room
@@ -529,15 +511,20 @@ class MultiSocketService {
         const merged = { ...agent, ...data.agent };
         const existing = existingAgent as any;
         
-        // Preserve billing data - use later expiry
+        // Preserve billing data - use later expiry, but ONLY while the room
+        // stays active (extending time). On reactivation (was inactive, now
+        // active) trust the server's new expiresAt verbatim, including null
+        // (meaning "no duration set") - don't resurrect the stale old expiry.
         if (existing) {
-          if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
-            merged.expiresAt = existing.expiresAt;
+          const wasActive = existing.isActive === true;
+          const isNowActive = merged.isActive === true;
+          if (wasActive && isNowActive) {
+            if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
+              merged.expiresAt = existing.expiresAt;
+            }
           }
           // Use the LATEST startTime when reactivating (new activation = new startTime)
           // Only preserve old startTime if the room is still active (extending time scenario)
-          const wasActive = existing.isActive === true;
-          const isNowActive = merged.isActive === true;
           if (wasActive && isNowActive) {
             // Room was active before and still active - use earlier startTime (extending time)
             if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
@@ -567,16 +554,21 @@ class MultiSocketService {
       this.queueAgentUpdate(connection, (agent, existingAgent) => {
         const merged = { ...agent, ...data.agent };
         const existing = existingAgent as any;
-        
-        // Preserve billing data - use later expiry
+
+        // Preserve billing data - use later expiry, but ONLY while the room
+        // stays active (extending time). On reactivation (was inactive, now
+        // active) trust the server's new expiresAt verbatim, including null
+        // (meaning "no duration set") - don't resurrect the stale old expiry.
         if (existing) {
-          if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
-            merged.expiresAt = existing.expiresAt;
+          const wasActive = existing.isActive === true;
+          const isNowActive = merged.isActive === true;
+          if (wasActive && isNowActive) {
+            if (existing.expiresAt && (!merged.expiresAt || existing.expiresAt > merged.expiresAt)) {
+              merged.expiresAt = existing.expiresAt;
+            }
           }
           // Use the LATEST startTime when reactivating (new activation = new startTime)
           // Only preserve old startTime if the room is still active (extending time scenario)
-          const wasActive = existing.isActive === true;
-          const isNowActive = merged.isActive === true;
           if (wasActive && isNowActive) {
             // Room was active before and still active - use earlier startTime (extending time)
             if (existing.startTime && (!merged.startTime || existing.startTime < merged.startTime)) {
@@ -634,9 +626,15 @@ class MultiSocketService {
           if (incomingAgent && existingAgent) {
             const existingExpiresAt = existingAgent.expiresAt;
             const incomingExpiresAt = incomingAgent.expiresAt;
-            // Use later expiresAt (more time remaining)
-            if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
-              incomingAgent.expiresAt = existingExpiresAt;
+            // Use later expiresAt (more time remaining), but ONLY while the
+            // room stays active (extending time). On reactivation (was
+            // inactive, now active) trust the server's new value verbatim,
+            // including null (meaning "no duration set") - don't resurrect
+            // the stale old expiry.
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+                incomingAgent.expiresAt = existingExpiresAt;
+              }
             }
             // Use the LATEST startTime when reactivating (new activation = new startTime)
             // Only preserve old startTime if the room is still active (extending time scenario)
@@ -665,7 +663,7 @@ class MultiSocketService {
             // If room was inactive and now active (reactivation), don't preserve old customer info
           }
         }
-        
+
         connection.agents = agents;
         connection.lastAgentUpdate = timestamp;
         this.notifyUpdate();
@@ -693,9 +691,15 @@ class MultiSocketService {
           if (incomingAgent && existingAgent) {
             const existingExpiresAt = existingAgent.expiresAt;
             const incomingExpiresAt = incomingAgent.expiresAt;
-            // Use later expiresAt (more time remaining)
-            if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
-              incomingAgent.expiresAt = existingExpiresAt;
+            // Use later expiresAt (more time remaining), but ONLY while the
+            // room stays active (extending time). On reactivation (was
+            // inactive, now active) trust the server's new value verbatim,
+            // including null (meaning "no duration set") - don't resurrect
+            // the stale old expiry.
+            if (incomingAgent.isActive && existingAgent.isActive) {
+              if (existingExpiresAt && (!incomingExpiresAt || existingExpiresAt > incomingExpiresAt)) {
+                incomingAgent.expiresAt = existingExpiresAt;
+              }
             }
             // Use the LATEST startTime when reactivating (new activation = new startTime)
             // Only preserve old startTime if the room is still active (extending time scenario)
@@ -730,7 +734,7 @@ class MultiSocketService {
     });
 
     // Listen for room activation updates (includes expiry info)
-    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string; needsCleaning?: boolean; lastTransactionEndTime?: number | null }) => {
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string; needsCleaning?: boolean; lastTransactionEndTime?: number | null; activePackageId?: string | null; packagePrice?: number | null; packageDurationMinutes?: number | null }) => {
       console.log('[MultiSocket] Room activation update:', config.name, {
         ...data,
         expiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
@@ -738,82 +742,27 @@ class MultiSocketService {
         timeDiff: data.expiresAt ? data.expiresAt - Date.now() : null
       });
       
-      // Capture state BEFORE queuing for transaction recording
-      const existingAgent = connection.agents[0];
-      const wasActive = existingAgent?.isActive === true;
-      const isNowInactive = data.isActive === false;
-      
-      // Record transaction BEFORE queue (to capture current state).
-      // Skip on 'move': the source room isn't billed on its own - the session
-      // continues (with its original startTime) at the target room instead,
-      // which records the transaction once the session actually ends.
-      if (existingAgent && wasActive && isNowInactive && data.reason !== 'move') {
-        const agent = existingAgent as any;
-        const pricePerHour = agent.pricePerHour ?? 50000;
-        const startTime = agent.startTime || 0;
-        // Use data.expiresAt from event (server sends actual expiry time), fallback to agent state then Date.now()
-        const endTime = data.expiresAt || agent.expiresAt || Date.now();
-        const durationSeconds = Math.floor((endTime - startTime) / 1000);
-        
-        console.log('[MultiSocket] Transaction calculation:', {
-          startTime,
-          startTimeFormatted: startTime ? new Date(startTime).toISOString() : 'null',
-          dataExpiresAt: data.expiresAt,
-          dataExpiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : 'null/undefined',
-          agentExpiresAt: agent.expiresAt,
-          endTime,
-          endTimeFormatted: new Date(endTime).toISOString(),
-          durationSeconds,
-          durationFormatted: formatDuration(durationSeconds),
-        });
-        // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
-        const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * pricePerHour);
-        
-        console.log('[MultiSocket] Auto-deactivate: Recording transaction:', {
-          roomId: data.roomId,
-          roomName: data.roomName || config.name,
-          startTime,
-          startTimeFormatted: new Date(startTime).toISOString(),
-          endTime,
-          endTimeFormatted: new Date(endTime).toISOString(),
-          duration: durationSeconds,
-          durationFormatted: formatDuration(durationSeconds),
-          totalPrice,
-          customerName: agent.customerName,
-          agentStartTime: agent.startTime,
-          agentExpiresAt: agent.expiresAt,
-        });
-        
-        if (startTime > 0 && durationSeconds > 0) {
-          // Server is the source of truth: send once with a single generated id
-          // and let the resulting 'transaction:get' broadcast update local state.
-          this.saveTransactionToServer(socket, {
-            id: generateTransactionId(),
-            roomId: data.roomId,
-            roomName: data.roomName || config.name,
-            customerName: agent.customerName,
-            customerPhone: agent.customerPhone,
-            customerEmail: agent.customerEmail,
-            customerNote: agent.customerNote,
-            startTime,
-            endTime,
-            duration: durationSeconds,
-            pricePerHour,
-            totalPrice,
-            paidAt: 0, // unpaid
-          });
-        }
-      }
-      
+      // Transaction recording (duration/totalPrice calculation) now happens
+      // server-side when the room actually deactivates, using the server's
+      // own authoritative agent.startTime/pricePerHour - not client-supplied
+      // numbers. The cashier just reflects whatever the server broadcasts.
+
       // Use queue for state update
       this.queueAgentUpdate(connection, (agent, existing) => {
         const merged = { ...agent, isActive: data.isActive };
         const existingData = existing as any;
         
-        // Use later expiresAt (more time remaining) - authoritative source from server
+        // expiresAt handling mirrors startTime below: only merge with the
+        // "later wins" heuristic while the room stays active (extending time).
+        // On reactivation (was inactive, now active) always trust the server's
+        // new value verbatim - including null, which means "no duration set".
         const currentExpiresAt = merged.expiresAt;
         const newExpiresAt = data.expiresAt ?? null;
-        if (!currentExpiresAt || (newExpiresAt && newExpiresAt > currentExpiresAt)) {
+        const wasActiveBeforeThisUpdate = existingData?.isActive;
+        if (data.isActive && !wasActiveBeforeThisUpdate) {
+          // Reactivation - server's value is authoritative, even if null
+          merged.expiresAt = newExpiresAt;
+        } else if (!currentExpiresAt || (newExpiresAt && newExpiresAt > currentExpiresAt)) {
           merged.expiresAt = newExpiresAt;
         }
         
@@ -860,6 +809,19 @@ class MultiSocketService {
         } else if (data.needsCleaning !== undefined) {
           (merged as any).needsCleaning = data.needsCleaning;
           (merged as any).lastTransactionEndTime = data.lastTransactionEndTime ?? null;
+        }
+
+        // Package info - only sent by the server on activation. On deactivation
+        // the session is over, so clear it (a package never carries across
+        // reactivations/moves - server resets it too, see recordTransaction).
+        if (data.isActive) {
+          (merged as any).activePackageId = data.activePackageId ?? null;
+          (merged as any).packagePrice = data.packagePrice ?? null;
+          (merged as any).packageDurationMinutes = data.packageDurationMinutes ?? null;
+        } else {
+          (merged as any).activePackageId = null;
+          (merged as any).packagePrice = null;
+          (merged as any).packageDurationMinutes = null;
         }
 
         return merged;
@@ -910,9 +872,20 @@ class MultiSocketService {
       currentDuration = agent.player.currentTime;
     }
 
-    // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas)
+    // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas).
+    // If a package is active, this is just a live estimate for display - the
+    // server recomputes the real, authoritative totalPrice the same way when
+    // the session actually ends (recordTransaction on the server).
     const pricePerHour = agent.pricePerHour ?? 50000;
-    const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
+    const packagePrice = agent.packagePrice ?? null;
+    const packageDurationMinutes = agent.packageDurationMinutes ?? null;
+    let totalPrice: number;
+    if (packagePrice != null && packageDurationMinutes != null) {
+      const overageSeconds = Math.max(0, currentDuration - packageDurationMinutes * 60);
+      totalPrice = packagePrice + Math.ceil(overageSeconds / 3600) * pricePerHour;
+    } else {
+      totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
+    }
 
     const agentAny = agent as any;
     return {
@@ -932,6 +905,10 @@ class MultiSocketService {
       customerPhone: agentAny.customerPhone,
       customerEmail: agentAny.customerEmail,
       customerNote: agentAny.customerNote,
+      activePackageId: agentAny.activePackageId ?? null,
+      packagePrice,
+      packageDurationMinutes,
+      packages: agent.packages,
     };
   }
 

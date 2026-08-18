@@ -24,6 +24,7 @@ export interface AgentIdentity {
     customerEmail?: string;
     customerNote?: string;
     expiresAt?: number;
+    serverTimeOffsetMs?: number;
 
 
 }

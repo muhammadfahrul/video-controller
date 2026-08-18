@@ -93,7 +93,7 @@ export class BrowserManager {
 
                 name: browser.browserType().name(),
 
-                version: await browser.version(),
+                version: browser.version(),
 
                 channel:
                     config.browser.channel
@@ -238,16 +238,6 @@ export class BrowserManager {
         this.browserInfo = undefined;
 
         LoggerService.info("Browser stopped.");
-
-    }
-
-    public async restart(): Promise<void> {
-
-        LoggerService.info("Restarting browser...");
-
-        await this.stop();
-
-        await this.start();
 
     }
 

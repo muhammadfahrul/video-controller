@@ -364,7 +364,7 @@ export class PlayerService {
                 `[PLAYER] Invalid snapshot, using last healthy snapshot (age ${fallbackAge}ms).`
             );
 
-            return this.lastHealthySnapshot;
+            return { ...this.lastHealthySnapshot, isFallbackSnapshot: true };
 
         }
 
@@ -648,11 +648,6 @@ export class PlayerService {
 
     }
 
-    public getLastHealthySnapshot() {
-
-        return this.lastHealthySnapshot;
-
-    }
 
     /**
      * Show start image when room is activated.

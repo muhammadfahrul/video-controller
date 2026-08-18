@@ -9,7 +9,7 @@ Server pusat untuk menghubungkan semua komponen sistem video controller. Server 
 - **Command Dispatcher**: Meneruskan perintah dari client ke agent yang sesuai
 - **YouTube API Integration**: Untuk pencarian dan validasi video YouTube
 - **Billing Service**: Menghitung biaya penggunaan ruangan
-- **Room Matching**: Fuzzy matching untuk ID ruangan (roomId, altRoomId, roomName)
+- **Room Matching**: Exact match berdasarkan `roomId` (lihat bagian "Room ID Matching" di bawah)
 
 ## Cara Menjalankan
 
@@ -39,6 +39,10 @@ PORT=53331
 
 # Billing Configuration
 BILLING_ENABLED=true
+PRICE_PER_HOUR=50000
+
+# Opsional - daftar paket harga tetap untuk ruangan ini (JSON array)
+PACKAGES=[{"id":"p2j","name":"Paket 2 Jam","durationMinutes":120,"price":150000}]
 ```
 
 ### Konfigurasi Parameter
@@ -48,6 +52,8 @@ BILLING_ENABLED=true
 | `PORT` | `53331` | Port server |
 | `YOUTUBE_API_KEY` | - | API key untuk YouTube Data API v3 |
 | `BILLING_ENABLED` | `true` | Aktifkan fitur billing |
+| `PRICE_PER_HOUR` | `50000` | Tarif per jam ruangan ini (Rupiah). Wajib beda tiap PC ruangan sesuai tarif ruangan tsb - sumber kebenaran satu-satunya untuk harga (dikirim ke cashier lewat `pricePerHour` pada `AgentInfo`) |
+| `PACKAGES` | `[]` | Opsional. JSON array paket harga tetap ruangan ini: `{ id, name, durationMinutes, price }[]`. Dikirim ke cashier lewat `packages` pada `AgentInfo`; JSON invalid di-log dan diabaikan (fallback ke `[]`), server tidak crash |
 
 ## Topologi
 
@@ -83,16 +89,15 @@ server/
 ├── src/
 │   ├── app.ts           # Express app
 │   ├── index.ts         # Entry point
-│   ├── bootstrap/       # Bootstrap modules
-│   ├── config/          # Configuration
-│   ├── container/      # DI container
+│   ├── bootstrap/       # Route registration (registerRoutes.ts)
+│   ├── container/      # DI container (ServiceContainer)
 │   ├── controllers/     # HTTP controllers
 │   ├── routes/          # API routes
-│   ├── services/        # Business logic
+│   ├── services/        # Business logic (AgentRegistry, database, dll)
 │   ├── socket/          # Socket.io handlers
 │   │   ├── SocketEvents.ts
 │   │   └── SocketServer.ts
-│   ├── types/           # TypeScript types
+│   ├── types/           # TypeScript types (Agent, PlayerState, dll)
 │   └── youtube/         # YouTube API helpers
 ├── data/                # SQLite database
 ├── dist/                # Build output
@@ -101,57 +106,80 @@ server/
 
 ## Socket Events
 
-### Client → Server
+Didefinisikan di `src/socket/SocketEvents.ts`, diimplementasi di `src/socket/SocketServer.ts` (setup terjadi per-connection di `io.on("connection", ...)`).
+
+### Agent → Server
 
 | Event | Payload | Deskripsi |
 |-------|---------|-----------|
-| `agent:register` | `{ roomId, roomName }` | Agent register ke server |
-| `agent:heartbeat` | `{ roomId, status }` | Heartbeat dari agent |
-| `agent:state` | `{ roomId, state }` | Update state agent |
-| `command:execute` | `{ roomId, command, payload }` | Eksekusi perintah |
+| `agent:register` | `AgentInfo` | Agent register ke server saat connect |
+| `agent:heartbeat` | `{ id }` | Heartbeat periodik dari agent |
+| `player:state` | `AgentSnapshot` | Push state player terbaru (disimpan + disiarkan sebagai `player:update`) |
+| `playlist:state` | `PlaylistSnapshot` | Push state playlist terbaru (disimpan + disiarkan sebagai `playlist:update`) |
+| `agent:error` | `{ agentId, roomId, type, message, ... }` | Agent lapor error, disimpan ke DB lalu disiarkan ulang |
 
-### Server → Client
+### Cashier/Web → Server
 
 | Event | Payload | Deskripsi |
 |-------|---------|-----------|
-| `agents:update` | `Agent[]` | Broadcast semua agent state |
-| `command:result` | `{ success, result }` | Result dari perintah |
-| `error` | `{ message }` | Error message |
+| `client:request-state` | - | Web minta ulang `agents:update` |
+| `cashier:request-agents` | - | Cashier minta ulang `agents:update` |
+| `player:command` | `CommandPayload` | Kirim perintah kontrol video ke agent tertentu (`agentId`) |
+| `cashier:activate-room` | `{ roomId, roomName, durationMinutes?, packageId?, customerName?, customerPhone?, customerEmail?, customerNote?, originalStartTime? }` | Aktivasi ruangan (mulai sesi billing). `packageId` dicocokkan ke `PACKAGES` server-side; kalau ditemukan, durasi & harga paket dipakai (override `durationMinutes`), kalau tidak dikenal fallback ke billing hourly |
+| `cashier:deactivate-room` | `{ roomId, reason?: "manual" \| "move" }` | Nonaktifkan ruangan; server menghitung & menyimpan transaksi di sini |
+| `cashier:extend-time` | `{ roomId, additionalMinutes }` | Perpanjang waktu sesi yang sedang aktif |
+| `cashier:mark-room-cleaned` | `{ roomId }` | Tandai ruangan hasil Move Room sudah dibersihkan (clear `needsCleaning`) |
+| `transaction:get` | - | Minta daftar transaksi (dijawab lewat event yang sama) |
+| `transaction:save` | `Transaction` | Update field pembayaran/customer/`cleanedAt` pada transaksi yang sudah ada. Server menolak update ke transaksi yang tidak dikenal, dan tidak pernah menerima harga dari client - `totalPrice` selalu dihitung server-side |
+| `transaction:delete` | `transactionId` | Hapus satu transaksi |
+| `transaction:clear` | `{ roomId? }` | Hapus semua transaksi (atau per ruangan kalau `roomId` diisi) |
+
+### Server → Agent
+
+| Event | Payload | Deskripsi |
+|-------|---------|-----------|
+| `command` | `CommandPayload` | Perintah yang dieksekusi agent |
+| `agent:activation` | `{ isActive, expiresAt?, serverTime?, reason?, ...customerInfo }` | Beri tahu agent statusnya aktif/nonaktif |
+| `agent:clear-data` | `{}` | Minta agent kosongkan player/playlist |
+
+### Server → Semua Client
+
+| Event | Payload | Deskripsi |
+|-------|---------|-----------|
+| `agents:update` | `AgentInfo[]` | Broadcast semua agent state (juga dikirim ke socket baru saat connect) |
+| `player:update` | `AgentSnapshot` | Broadcast state player terbaru |
+| `playlist:update` | `PlaylistSnapshot` | Broadcast state playlist terbaru |
+| `room:activation` | `{ roomId, roomName, isActive, expiresAt, startTime, reason?, ...customerInfo }` | Broadcast perubahan status aktivasi ruangan |
+| `room:expiry-warning` | `{ roomId, secondsRemaining, expiresAt }` | Peringatan sebelum sesi ruangan habis (dikirim di beberapa threshold sebelum expiry) |
 
 ## API Endpoints
 
 ### Health Check
 
 ```
-GET /health
+GET /health         # Detail: uptime, memory, daftar agent
+GET /health/live     # Liveness check sederhana
+GET /health/ready    # Readiness check
 ```
 
-### Room Status
+### Agents & Commands
 
 ```
-GET /api/rooms
-GET /api/rooms/:roomId
+GET  /api/agents     # Daftar semua agent yang terdaftar di server ini
+POST /api/command    # Body: { agentId, command } - kirim command ke agent
 ```
 
-### YouTube
+### YouTube Search
 
 ```
-GET /api/youtube/search?q=query
-GET /api/youtube/video/:videoId
+GET /api/search?keyword=query
 ```
 
 ## Room ID Matching
 
-Server mendukung fuzzy matching untuk room ID:
+Server **tidak** melakukan fuzzy matching. `AgentRegistry` (`src/services/AgentRegistry.ts`) menyimpan agent dengan **primary key = `roomId`** (exact match). `agent.id` disimpan sebagai secondary index untuk lookup fallback (dipakai mis. oleh `POST /api/command`), tapi ini juga exact match, bukan pencocokan nama.
 
-1. Coba `roomId` (exact match)
-2. Coba `altRoomId` (jika ada)
-3. Coba `roomName` (fuzzy match)
-
-Contoh:
-- Agent: `roomId: "room-002"`, `roomName: "Room 2"`
-- Cashier: `id: "env-room-1"`
-- Server akan mencocokkan berdasarkan konfigurasi
+Konsekuensinya: `ROOM_ID` di `agent/.env` harus persis sama dengan `roomId` pada entry `VITE_ROOMS` di `cashier/.env` yang menunjuk ke PC ruangan tersebut. Tidak ada field `altRoomId`, dan `roomName` tidak dipakai untuk matching sama sekali (hanya untuk tampilan).
 
 ## Billing
 
@@ -160,37 +188,62 @@ Server menghitung biaya berdasarkan:
 - `pricePerHour` - Tarif per jam ruangan ini (dari env `PRICE_PER_HOUR` di `.env` server ini)
 - `activeTime` - Waktu aktif ruangan
 
-Rumus:
+Rumus (hourly, default):
 ```
-biaya = (activeTime dalam jam) × pricePerHour
+biaya = ceil(activeTime dalam jam) × pricePerHour  # minimum 1 jam
 ```
+
+### Paket Harga Tetap (opsional)
+
+Kalau `PACKAGES` diisi, `AgentInfo.packages` membawa daftar paket ke cashier. Saat `cashier:activate-room` menyertakan `packageId` yang valid, server men-snapshot `activePackageId`/`packagePrice`/`packageDurationMinutes` ke agent (bukan re-lookup saat sesi berakhir), lalu `durationMinutes` efektif jadi durasi paket. `recordTransaction()` menghitung:
+
+```
+biaya = packagePrice + ceil(max(0, durationSeconds - packageDurationMinutes*60) / 3600) × pricePerHour
+```
+
+Field paket ikut disimpan di transaksi (`packageId`, `packageName`, `packagePrice`) dan **tidak** termasuk field yang bisa diubah lewat `transaction:save` - sama seperti `totalPrice`/`pricePerHour`, ini di-set sekali saat `recordTransaction()` dan final. Package state di-reset ke `null` di agent setiap kali sesi berakhir (baik lewat deaktivasi manual, auto-expiry, maupun Move Room) sehingga aktivasi berikutnya default ke hourly lagi sampai paket dipilih ulang.
 
 ### Transaksi dan Status Ruangan
 
-Server menyimpan data transaksi dengan field:
+Server menyimpan data transaksi dengan field (`TransactionData`):
 - `paidAt` - Timestamp saat transaksi lunas (0 = unpaid)
-- `cleanedAt` - Timestamp saat ruangan ditandai sudah bersih
+- `cleanedAt` - Timestamp saat transaksi ditandai sudah bersih (diset via `transaction:save`, tombol "Sudah Bersih" di cashier)
+- `totalPrice` - Dihitung server-side saja, di `recordTransaction()`: hourly `ceil(durationSeconds / 3600) * pricePerHour`, atau formula paket di atas kalau sesi pakai paket (dibulatkan ke atas per blok jam, minimum 1 jam)
+- `packageId` / `packageName` / `packagePrice` - Terisi kalau sesi diaktifkan dengan paket, `null` kalau hourly biasa
 
-Status ruangan dihitung berdasarkan:
-- Jika `paidAt === 0` → UNPAID
-- Jika `paidAt > 0` dan belum ada `cleanedAt`:
-  - Dalam 3 menit setelah paidAt → PAID
-  - 3-4 menit setelah paidAt → BERSIHKAN
-  - Setelah 4 menit atau ada `cleanedAt` → SUDAH DIBERSIHKAN
+Status ruangan yang ditampilkan di cashier **dihitung di client** (`cashier/src/utils/roomStatus.ts`), bukan dikirim server, dengan prioritas OFFLINE > AKTIF > UNPAID > BERSIHKAN/SUDAH DIBERSIHKAN > ONLINE:
+- Tidak terhubung → OFFLINE
+- `isActive` → AKTIF
+- Ada transaksi dengan `paidAt === 0` → UNPAID
+- `paidAt > 0` dan belum `cleanedAt`:
+  - < 30 menit sejak `paidAt` → BERSIHKAN
+  - 30-60 menit sejak `paidAt` → SUDAH DIBERSIHKAN
+  - > 60 menit sejak `paidAt` → kembali ke ONLINE
+- Kalau semua transaksi yang sudah `paidAt` juga sudah `cleanedAt` → langsung SUDAH DIBERSIHKAN
+
+Tidak ada status `PAID` tersendiri - begitu lunas, status langsung masuk fase BERSIHKAN.
 
 ## Command Types
 
-| Command | Payload | Deskripsi |
-|---------|---------|-----------|
-| `play` | - | Memutar video |
-| `pause` | - | Jeda video |
-| `stop` | - | Stop video |
-| `next` | - | Video berikutnya |
-| `previous` | - | Video sebelumnya |
-| `playUrl` | `{ url }` | Mainkan URL YouTube |
-| `addToQueue` | `{ url, title }` | Tambah ke queue |
-| `clearQueue` | - | Clear queue |
-| `setVolume` | `{ level }` | Atur volume (0-100) |
+Command dikirim lewat event `player:command` (dari client) / `command` (ke agent), dengan `type` sesuai `CommandType` di `agent/src/commands/CommandType.ts`:
+
+| CommandType | Payload tambahan | Deskripsi |
+|-------------|-------------------|-----------|
+| `PLAY` / `PAUSE` / `STOP` | - | Kontrol pemutaran |
+| `NEXT` / `PREVIOUS` | - | Navigasi playlist |
+| `OPEN_VIDEO` | `{ url }` | Mainkan URL YouTube tertentu |
+| `SEEK` | `{ time }` | Lompat ke posisi waktu tertentu |
+| `VOLUME` | `{ level }` | Atur volume (0-100) |
+| `MUTE` / `UNMUTE` | - | Bisukan/nyalakan suara |
+| `FULLSCREEN` / `EXIT_FULLSCREEN` / `TOGGLE_FULLSCREEN` | - | Kontrol fullscreen |
+| `ADD_PLAYLIST` | `{ url, title, ... }` | Tambah item ke queue |
+| `REMOVE_PLAYLIST` | `{ id }` | Hapus item dari queue |
+| `CLEAR_PLAYLIST` | - | Kosongkan queue |
+| `PLAY_PLAYLIST_ITEM` | `{ index }` | Mainkan item queue tertentu |
+| `SHUFFLE_PLAYLIST` | - | Acak urutan queue |
+| `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | - | Atur mode repeat |
+| `SKIP_AD` | - | Skip iklan YouTube yang sedang tampil |
+| `SET_AUTO_SKIP_ADS` | `{ enabled }` | Toggle auto-skip iklan |
 
 ## Cara Install sebagai Service (Linux)
 
@@ -238,12 +291,7 @@ pm2 startup
 
 ## Logging
 
-Server menggunakan Pino untuk logging:
-
-- Console output
-- File: `logs/server.log`
-
-Level: `trace`, `debug`, `info`, `warn`, `error`
+Server memakai `console.log`/`console.error` biasa (tidak ada library logging seperti Pino, dan tidak ada file transport). Semua log hanya muncul di stdout/stderr proses server.
 
 ## Database
 
@@ -274,8 +322,8 @@ netstat -ntlp | grep 53331
 - Pastikan API key valid dan quota cukup
 
 ### Agent tidak terkoneksi
-- Cek roomId di agent .env
-- Cek server URL di agent .env
+- Cek `ROOM_ID` di agent .env
+- Cek `SERVER_IP`/`SERVER_PORT` di agent .env
 - Lihat logs untuk error detail
 
 ### Billing tidak berfungsi

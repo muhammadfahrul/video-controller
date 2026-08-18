@@ -20,4 +20,9 @@ export interface PlayerSnapshot {
 
     thumbnail?: string;
 
+    // True when this snapshot is a cached last-healthy fallback rather than
+    // a live read (see PlayerService.getSnapshot()), so consumers can tell
+    // real-time data from a few-seconds-stale substitute.
+    isFallbackSnapshot?: boolean;
+
 }

@@ -131,11 +131,12 @@ function Set-EnvConfig {
         [string]$RoomName,
         [string]$Rooms,
         [string]$BillingEnabled,
-        [string]$PricePerHour
+        [string]$PricePerHour,
+        [string]$Packages
     )
 
     # Skip if all values are empty
-    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour) {
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour -and -not $Packages) {
         Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
         return
     }
@@ -214,8 +215,8 @@ function Set-EnvConfig {
         }
     }
     
-    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR
-    if ($BillingEnabled -or $PricePerHour) {
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES
+    if ($BillingEnabled -or $PricePerHour -or $Packages) {
         $serverEnvPath = Join-Path $ProjectRoot "server\.env"
         if (Test-Path $serverEnvPath) {
             $envContent = Get-Content $serverEnvPath -Raw
@@ -224,6 +225,16 @@ function Set-EnvConfig {
             }
             if ($PricePerHour) {
                 $envContent = $envContent -replace 'PRICE_PER_HOUR=.*', "PRICE_PER_HOUR=$PricePerHour"
+            }
+            if ($Packages) {
+                # PACKAGES is a newer, optional var that may not exist yet in
+                # older .env files - replace it if present, append if not
+                # (plain -replace is a no-op when the line doesn't exist).
+                if ($envContent -match '(?m)^PACKAGES=.*') {
+                    $envContent = $envContent -replace '(?m)^PACKAGES=.*', "PACKAGES=$Packages"
+                } else {
+                    $envContent = $envContent.TrimEnd() + "`r`nPACKAGES=$Packages`r`n"
+                }
             }
             Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
             Write-Host "[OK] Updated server/.env" -ForegroundColor Green
@@ -358,6 +369,39 @@ function New-MinimizedShortcut {
 }
 
 # ============================================
+# Build .bat content that restarts the given npm script in a loop.
+# Without this, a service that exits (crash, uncaught error, or the
+# agent's own health-check/fatal-error process.exit(1)) stays dead until
+# someone notices - the Windows Startup folder only runs shortcuts at
+# login, there's no PM2/systemd here to relaunch a crashed process.
+# ============================================
+function Build-AutostartBatchContent {
+    param(
+        [string]$Name,
+        [string]$LogFile,
+        [string]$WorkDir,
+        [string]$NpmScript,
+        [string]$NpmDir,
+        [string]$ExtraEnv = ""
+    )
+
+    $pathLine = if ($NpmDir) { "set PATH=$NpmDir;%PATH%" } else { "echo WARNING: npm not found in PATH >> `"$LogFile`"" }
+
+    return @"
+@echo off
+$pathLine
+$ExtraEnv
+cd /d "$WorkDir"
+:loop
+echo [%date% %time%] Starting $Name... >> "$LogFile"
+call npm run $NpmScript
+echo [%date% %time%] $Name exited with code %errorlevel%, restarting in 5s... >> "$LogFile"
+timeout /t 5 /nobreak > nul
+goto loop
+"@
+}
+
+# ============================================
 # Auto-start setup (Windows Task Scheduler)
 # ============================================
 function Setup-Autostart {
@@ -385,100 +429,44 @@ function Setup-Autostart {
     
     if ($mode -eq "room" -or $mode -eq "all") {
         $logFile = Join-Path $PROJECT_ROOT "room_startup.log"
-        
-        if ($npmPath) {
-            $npmDir = Split-Path $npmPath -Parent
+        $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
 
-            # Server startup script
-            $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
-            @"
-@echo off
-echo Starting Server at %date% %time% > "$logFile"
-set PATH=$npmDir;%PATH%
-cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
-"@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
-            Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
+        # Server startup script
+        $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
+        Build-AutostartBatchContent -Name "Server" -LogFile $logFile -WorkDir "$PROJECT_ROOT\server" -NpmScript "start" -NpmDir $npmDir |
+            Out-File -FilePath $serverStartupScript -Encoding ASCII
+        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
+        Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
 
-            # Agent startup script
-            $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
-            @"
-@echo off
-echo Starting Agent at %date% %time% >> "$logFile"
-set PATH=$npmDir;%PATH%
-set BROWSER_HEADLESS=false
-cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
-"@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
-            Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
+        # Agent startup script
+        $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
+        Build-AutostartBatchContent -Name "Agent" -LogFile $logFile -WorkDir "$PROJECT_ROOT\agent" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set BROWSER_HEADLESS=false" |
+            Out-File -FilePath $agentStartupScript -Encoding ASCII
+        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
+        Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
 
-            # Web startup script
-            $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
-            @"
-@echo off
-echo Starting Web at %date% %time% >> "$logFile"
-set PATH=$npmDir;%PATH%
-cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
-"@ | Out-File -FilePath $webStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
-            Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
-        } else {
-            # Fallback if npm not found
-            $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
-            @"
-@echo off
-echo WARNING: npm not found in PATH >> "$logFile"
-cmd /k "cd /d "$PROJECT_ROOT\server" && npm run start"
-"@ | Out-File -FilePath $serverStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
-            Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
+        # Web startup script
+        $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
+        Build-AutostartBatchContent -Name "Web" -LogFile $logFile -WorkDir "$PROJECT_ROOT\web" -NpmScript "preview:host" -NpmDir $npmDir |
+            Out-File -FilePath $webStartupScript -Encoding ASCII
+        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
+        Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
 
-            $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
-            @"
-@echo off
-set BROWSER_HEADLESS=false
-cmd /k "cd /d "$PROJECT_ROOT\agent" && npm run start"
-"@ | Out-File -FilePath $agentStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
-            Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
-
-            $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
-            @"
-@echo off
-cmd /k "cd /d "$PROJECT_ROOT\web" && npm run preview:host"
-"@ | Out-File -FilePath $webStartupScript -Encoding ASCII
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
-            Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
-        }
+        Write-Host "[INFO] Server/Agent/Web will now auto-restart if they crash or exit unexpectedly" -ForegroundColor Green
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
         # Cashier startup script
         $cashierBatScript = Join-Path $scriptsFolder "VideoController_Cashier.bat"
         $cashierLogFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
 
-        if ($npmPath) {
-            # Use full path to npm
-            $npmDir = Split-Path $npmPath -Parent
-            @"
-@echo off
-echo Starting Cashier at %date% %time% > "$cashierLogFile"
-echo Using npm: $npmPath >> "$cashierLogFile"
-set PATH=$npmDir;%PATH%
-cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
-"@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
-        } else {
-            # Fallback to regular npm command
-            @"
-@echo off
-echo Starting Cashier at %date% %time% > "$cashierLogFile"
-echo WARNING: npm not found in PATH >> "$cashierLogFile"
-cmd /k "cd /d "$PROJECT_ROOT\cashier" && npm run preview:host"
-"@ | Out-File -FilePath $cashierBatScript -Encoding ASCII
-        }
+        Build-AutostartBatchContent -Name "Cashier" -LogFile $cashierLogFile -WorkDir "$PROJECT_ROOT\cashier" -NpmScript "preview:host" -NpmDir $npmDir |
+            Out-File -FilePath $cashierBatScript -Encoding ASCII
 
         New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -TargetPath $cashierBatScript
         Write-Host "[OK] Cashier auto-start configured: $cashierBatScript" -ForegroundColor Green
+        Write-Host "[INFO] Cashier will now auto-restart if it crashes or exits unexpectedly" -ForegroundColor Green
         if ($npmPath) {
             Write-Host "[OK] Using npm: $npmPath" -ForegroundColor Green
         } else {
@@ -770,6 +758,7 @@ $RoomName = ""
 $Rooms = ""
 $BillingEnabled = ""
 $PricePerHour = ""
+$Packages = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
 if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
@@ -789,6 +778,12 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
 
     $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
     if ($input -ne "") { $PricePerHour = $input }
+
+    Write-Host "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak" -ForegroundColor Cyan
+    Write-Host "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa." -ForegroundColor Cyan
+    Write-Host "Contoh: [{`"id`":`"p2j`",`"name`":`"Paket 2 Jam`",`"durationMinutes`":120,`"price`":150000}]" -ForegroundColor Cyan
+    $input = Read-Host "Packages JSON (kosongkan untuk skip)"
+    if ($input -ne "") { $Packages = $input }
 }
 
 # Kasir mode - only needs Rooms JSON
@@ -954,7 +949,7 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
 # Normal mode - continue with service start
 
 # Apply .env configuration for existing project
-Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
+Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
 
 $nodeExePath = Find-NodeJS
 
@@ -1076,7 +1071,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     $PROJECT_ROOT = $destDir
 
     # Apply .env configuration AFTER PROJECT_ROOT is set correctly
-    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow

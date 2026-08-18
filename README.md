@@ -11,8 +11,9 @@ Sistem manajemen playlist video real-time dengan integrasi YouTube untuk karaoke
 - **Monitoring Kesehatan** - Health check otomatis untuk browser, player, dan network
 - **Auto-recovery** - Sistem recovery cerdas untuk menangani failure scenarios
 - **Billing Otomatis** - Perhitungan biaya berdasarkan durasi dan tarif per ruangan
+- **Paket Harga Tetap** - Opsional per ruangan (mis. "Paket 2 Jam"), kelebihan waktu tetap ditagih per jam di atas harga paket
 - **Multi-room** - Kelola multiple ruangan karaoke secara bersamaan
-- **Status Ruangan** - Monitoring real-time status ruangan (OFFLINE, AKTIF, UNPAID, PAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
+- **Status Ruangan** - Monitoring real-time status ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Pindah Ruangan** - Pindahkan billing customer ke ruangan lain saat ingin pindah kamar
 - **Full Page Loading** - Feedback visual untuk setiap proses operasi
 
@@ -97,29 +98,32 @@ Setiap komponen memiliki file `.env` sendiri:
 
 | File | Komponen | Deskripsi |
 |------|----------|-----------|
-| `server/.env` | Server | PORT, YouTube API Key, Billing |
-| `agent/.env` | Agent | ROOM_ID, ROOM_NAME, Browser options |
-| `web/.env` | Web | SERVER_URL |
-| `cashier/.env` | Cashier | Rooms config, harga per jam |
+| `server/.env` | Server | PORT, YOUTUBE_API_KEY, BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES (opsional) |
+| `agent/.env` | Agent | ROOM_ID, ROOM_NAME, BILLING_ENABLED, SERVER_IP/SERVER_PORT, Browser options |
+| `web/.env` | Web | VITE_SERVER_IP, VITE_SERVER_PORT, VITE_BILLING_ENABLED |
+| `cashier/.env` | Cashier | VITE_ROOMS, VITE_BILLING_ENABLED |
 
 ### Room ID Matching
 
-Server mendukung fuzzy matching untuk room ID:
-1. Coba `roomId` (exact match)
-2. Coba `altRoomId` (jika ada)
-3. Coba `roomName` (fuzzy match)
+Server **tidak** melakukan fuzzy matching. `AgentRegistry` menyimpan agent dengan key = `roomId` (exact match). `agent.id` disimpan sebagai secondary index untuk lookup fallback (mis. dari REST `/api/command`), tapi ini bukan fuzzy match berdasarkan nama.
+
+Karena itu, `roomId` di `agent/.env` (`ROOM_ID`) **harus identik** dengan `roomId` pada entry `VITE_ROOMS` di `cashier/.env` yang menunjuk ke PC ruangan tersebut - tidak ada toleransi penulisan berbeda.
 
 Contoh konfigurasi:
 ```bash
-# Agent (.env)
-ROOM_ID=room-002
-ROOM_NAME=Room 2
+# Agent (.env, PC Ruangan 1)
+ROOM_ID=room-001
+ROOM_NAME=Room 1
+SERVER_IP=192.168.1.10
+SERVER_PORT=53331
 
 # Server (.env, PC ruangan yang sama)
 PRICE_PER_HOUR=50000
+# Opsional - daftar paket harga tetap untuk ruangan ini
+PACKAGES=[{"id":"p2j","name":"Paket 2 Jam","durationMinutes":120,"price":150000}]
 
-# Cashier (.env)
-VITE_ROOMS=[{"name":"Room 1","ip":"192.168.1.10","port":53331}]
+# Cashier (.env, PC Kasir)
+VITE_ROOMS=[{"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331}]
 ```
 
 ## Development
@@ -146,8 +150,8 @@ npm run dev
 
 Services akan tersedia di:
 - **Server API**: http://localhost:53331
-- **Web UI**: http://localhost:5173
-- **Cashier UI**: http://localhost:5174
+- **Web UI**: http://localhost:53332
+- **Cashier UI**: http://localhost:53334
 
 ## Cara Menjalankan (Production)
 
@@ -165,30 +169,49 @@ cd agent && npm start  # untuk setiap ruangan
 
 ## Socket Events
 
-### Client → Server
+Protokol real-time selengkapnya ada di `server/src/socket/SocketEvents.ts` dan `server/src/socket/SocketServer.ts`. Ringkasan event yang benar-benar aktif:
 
-| Event | Payload | Deskripsi |
-|-------|---------|-----------|
-| `agent:register` | `{ roomId, roomName }` | Agent register ke server |
-| `agent:heartbeat` | `{ roomId, status }` | Heartbeat dari agent |
-| `agent:state` | `{ roomId, state }` | Update state agent |
-| `command:execute` | `{ roomId, command, payload }` | Eksekusi perintah |
+### Agent ↔ Server
 
-### Server → Client
+| Event | Arah | Payload | Deskripsi |
+|-------|------|---------|-----------|
+| `agent:register` | Agent → Server | `AgentInfo` (id, roomId, roomName, ...) | Agent register saat connect |
+| `agent:heartbeat` | Agent → Server | `{ id }` | Heartbeat periodik dari agent |
+| `player:state` | Agent → Server | `AgentSnapshot` | Push state player terbaru |
+| `playlist:state` | Agent → Server | `PlaylistSnapshot` | Push state playlist terbaru |
+| `agent:error` | Agent ↔ Server | `{ agentId, roomId, type, message, ... }` | Agent lapor error; server simpan + broadcast ulang |
+| `command` | Server → Agent | `CommandPayload` | Perintah yang dieksekusi agent |
+| `agent:activation` | Server → Agent | `{ isActive, expiresAt?, ... }` | Server memberi tahu agent statusnya aktif/nonaktif |
+| `agent:clear-data` | Server → Agent | `{}` | Server minta agent kosongkan player/playlist |
 
-| Event | Payload | Deskripsi |
-|-------|---------|-----------|
-| `agents:update` | `Agent[]` | Broadcast semua agent state |
-| `command:result` | `{ success, result }` | Result dari perintah |
-| `error` | `{ message }` | Error message |
+### Cashier/Web ↔ Server
+
+| Event | Arah | Payload | Deskripsi |
+|-------|------|---------|-----------|
+| `agents:update` | Server → Client | `AgentInfo[]` | Broadcast semua agent state (juga dikirim saat client baru connect) |
+| `client:request-state` | Web → Server | - | Web PWA minta ulang `agents:update` |
+| `cashier:request-agents` | Cashier → Server | - | Cashier minta ulang `agents:update` |
+| `player:command` | Web/Cashier → Server | `CommandPayload` | Kirim perintah kontrol video ke sebuah agent |
+| `player:update` / `playlist:update` | Server → Client | `AgentSnapshot` / `PlaylistSnapshot` | Broadcast state player/playlist terbaru ke semua client |
+| `cashier:activate-room` | Cashier → Server | `{ roomId, roomName, durationMinutes?, packageId?, customerName?, ... }` | Aktivasi ruangan (mulai sesi billing). `packageId` divalidasi server-side terhadap `PACKAGES`; kalau valid, durasi & harga paket menggantikan `durationMinutes` |
+| `cashier:deactivate-room` | Cashier → Server | `{ roomId, reason? }` | Nonaktifkan ruangan (akhiri sesi, catat transaksi) |
+| `cashier:extend-time` | Cashier → Server | `{ roomId, additionalMinutes }` | Perpanjang waktu sesi yang sedang aktif |
+| `cashier:mark-room-cleaned` | Cashier → Server | `{ roomId }` | Tandai ruangan (hasil Move Room) sudah dibersihkan |
+| `room:activation` | Server → Client | `{ roomId, isActive, expiresAt, ... }` | Broadcast perubahan status aktivasi ruangan |
+| `room:expiry-warning` | Server → Client | `{ roomId, secondsRemaining, expiresAt }` | Peringatan sebelum sesi ruangan habis |
+| `transaction:get` | Client ↔ Server | `Transaction[]` | Minta/terima daftar transaksi |
+| `transaction:save` | Cashier → Server | `Transaction` | Update field pembayaran/customer pada transaksi (server menolak perubahan harga) |
+| `transaction:delete` | Cashier → Server | `transactionId` | Hapus satu transaksi |
+| `transaction:clear` | Cashier → Server | `{ roomId? }` | Hapus semua transaksi (atau per ruangan) |
 
 ## REST Endpoints
 
-- `GET /health` - Health check
-- `GET /api/rooms` - Get semua room
-- `GET /api/rooms/:roomId` - Get room tertentu
-- `GET /api/youtube/search?q=query` - Search YouTube
-- `GET /api/youtube/video/:videoId` - Get video info
+- `GET /health` - Health check lengkap (uptime, memory, daftar agent)
+- `GET /health/live` - Liveness check sederhana
+- `GET /health/ready` - Readiness check
+- `GET /api/agents` - Get semua agent yang terdaftar di server ini
+- `POST /api/command` - Kirim command ke agent (`{ agentId, command }`)
+- `GET /api/search?keyword=query` - Search YouTube
 
 ## Struktur Project
 
@@ -196,41 +219,50 @@ cd agent && npm start  # untuk setiap ruangan
 video-controller/
 ├── agent/           # Agent (browser automation)
 │   ├── src/
-│   │   ├── browser/    # Playwright browser management
-│   │   ├── commands/   # Command handlers
-│   │   ├── config/     # Configuration
-│   │   ├── health/     # Health check
-│   │   ├── player/     # YouTube player control
-│   │   ├── playlist/   # Playlist management
-│   │   ├── socket/     # Socket.io client
-│   │   └── index.ts    # Entry point
+│   │   ├── browser/     # Playwright browser management
+│   │   ├── commands/    # Command handlers
+│   │   ├── config/      # Configuration
+│   │   ├── core/        # Agent core logic
+│   │   ├── health/      # Health check
+│   │   ├── network/     # Socket client, local IP detection
+│   │   ├── player/      # YouTube player control
+│   │   ├── playlist/    # Playlist management
+│   │   ├── recovery/    # Auto-recovery
+│   │   ├── repositories/ # Local persistence (player/playlist)
+│   │   ├── services/    # Services (incl. logging)
+│   │   ├── socket/      # Socket.io event names
+│   │   └── index.ts     # Entry point
 │   ├── data/          # Browser profile
-│   └── .env           # ROOM_ID, ROOM_NAME, dll
+│   └── .env           # ROOM_ID, ROOM_NAME, SERVER_IP/SERVER_PORT, dll
 ├── server/          # Socket.io server
 │   ├── src/
+│   │   ├── bootstrap/    # Route registration
+│   │   ├── container/    # DI container
 │   │   ├── controllers/  # HTTP controllers
 │   │   ├── routes/      # API routes
 │   │   ├── services/    # Backend services
 │   │   ├── socket/      # Socket.io handlers
+│   │   ├── types/       # TypeScript types
 │   │   ├── youtube/     # YouTube API helpers
 │   │   └── index.ts     # Entry point
 │   ├── data/           # SQLite database
-│   └── .env            # PORT, YOUTUBE_API_KEY
-├── web/              # React PWA frontend
+│   └── .env            # PORT, YOUTUBE_API_KEY, PRICE_PER_HOUR, PACKAGES (opsional)
+├── web/              # React PWA frontend (1 instance per PC ruangan, kontrol room-nya sendiri)
 │   ├── src/
-│   │   ├── components/  # React components
 │   │   ├── context/     # React Context (loading state)
+│   │   ├── features/    # Feature modules (player, playlist, search, agent)
 │   │   ├── hooks/       # Custom hooks
 │   │   ├── pages/       # Page components
-│   │   └── services/    # API services (juga pemilik agent/player/playlist state)
-│   └── .env            # SERVER_URL
+│   │   ├── shared/      # Shared components
+│   │   └── services/    # Socket + API services (juga pemilik agent/player/playlist state)
+│   └── .env            # VITE_SERVER_IP, VITE_SERVER_PORT, VITE_BILLING_ENABLED
 ├── cashier/          # React cashier frontend
 │   ├── src/
 │   │   ├── components/  # UI components
 │   │   ├── context/     # React Context (room config, loading state)
 │   │   ├── pages/       # Pages
 │   │   └── services/    # Socket service (juga pemilik data transaksi)
-│   └── .env            # VITE_ROOMS, BILLING_ENABLED
+│   └── .env            # VITE_ROOMS, VITE_BILLING_ENABLED
 ├── install.sh          # Linux installation script
 ├── install.ps1        # Windows installation script
 └── README.md
@@ -248,10 +280,20 @@ Sistem billing menghitung biaya berdasarkan:
 - `pricePerHour` - Tarif per jam ruangan (dari env `PRICE_PER_HOUR` di `server/.env` PC ruangan tsb)
 - `activeTime` - Waktu aktif ruangan
 
-Rumus:
+Rumus (hourly, default):
 ```
-biaya = (activeTime dalam jam) × pricePerHour
+biaya = (activeTime dalam jam, dibulatkan ke atas, minimum 1 jam) × pricePerHour
 ```
+
+### Paket Harga Tetap (opsional)
+
+Kalau ruangan punya `PACKAGES` terkonfigurasi (lihat env `PACKAGES` di `server/.env`), cashier bisa memilih paket saat aktivasi alih-alih mengisi durasi bebas. Durasi & harga paket **divalidasi dan disimpan di server**, tidak pernah dipercaya dari client. Kalau sesi diperpanjang melebihi durasi paket (via "Tambah Waktu"), kelebihannya ditagih per jam dengan `pricePerHour` normal ruangan tsb:
+
+```
+biaya = packagePrice + (kelebihan waktu dalam jam, dibulatkan ke atas) × pricePerHour
+```
+
+Paket tidak ikut pindah saat Move Room - ruangan tujuan default kembali ke billing hourly kecuali cashier memilih paket lagi secara eksplisit.
 
 ## Status Ruangan (Cashier)
 
@@ -261,17 +303,18 @@ Sistem cashier menampilkan status ruangan secara real-time:
 |--------|-----------|
 | OFFLINE | Ruangan tidak terhubung ke server |
 | AKTIF | Ruangan sedang digunakan |
-| UNPAID | Transaksi belum lunas |
-| PAID | Transaksi lunas, fase pembersihan belum dimulai |
-| BERSIHKAN | Fase pembersihan (3 menit setelah payment) |
-| SUDAH DIBERSIHKAN | Pembersihan selesai, siap digunakan |
-| ONLINE | Terhubung tapi tidak aktif |
+| UNPAID | Ada transaksi belum lunas (`paidAt === 0`) |
+| BERSIHKAN | Sudah dibayar, dalam 30 menit pertama setelah `paidAt` |
+| SUDAH DIBERSIHKAN | 30-60 menit setelah `paidAt`, atau transaksi sudah ditandai `cleanedAt` |
+| ONLINE | Terhubung, tidak aktif, dan lebih dari 60 menit sejak `paidAt` |
+
+Prioritas evaluasi status (lihat `cashier/src/utils/roomStatus.ts`): OFFLINE > AKTIF > UNPAID > BERSIHKAN/SUDAH DIBERSIHKAN > ONLINE. Tidak ada status `PAID` tersendiri - begitu lunas, ruangan langsung masuk fase BERSIHKAN.
 
 ### Transisi Status
-- **PAID → BERSIHKAN**: Otomatis 3 menit setelah payment
-- **BERSIHKAN → SUDAH DIBERSIHKAN**: Otomatis 1 menit kemudian
-- **SUDAH DIBERSIHKAN → ONLINE**: Siap diaktifkan kembali
-- Manual: Tombol "Sudah Bersih" untuk加速 pembersihan
+- **UNPAID → BERSIHKAN**: Otomatis begitu `paidAt` terisi (pembayaran dikonfirmasi)
+- **BERSIHKAN → SUDAH DIBERSIHKAN**: Otomatis 30 menit setelah `paidAt` (atau lebih cepat kalau ditandai manual)
+- **SUDAH DIBERSIHKAN → ONLINE**: Otomatis 60 menit setelah `paidAt`
+- Manual: Tombol "Sudah Bersih" pada transaksi (set `cleanedAt`) langsung memindahkan ke SUDAH DIBERSIHKAN
 
 ### Pemblokiran Aktivasi
 Ruangan dengan status BERSIHKAN tidak dapat diaktifkan sampai status berubah ke SUDAH DIBERSIHKAN.
@@ -294,9 +337,9 @@ Ruangan dengan status BERSIHKAN tidak dapat diaktifkan sampai status berubah ke 
 - Review server logs
 
 ### Room tidak terdeteksi
-- Cek `ROOM_ID` dan `ROOM_NAME` di agent .env
-- Cek konfigurasi room di cashier `.env`
-- Server melakukan fuzzy matching - coba restart server
+- Cek `ROOM_ID` di agent `.env` harus **persis sama** dengan `roomId` pada entry `VITE_ROOMS` di cashier `.env` (server hanya exact-match, bukan fuzzy)
+- Cek `ip`/`port` entry `VITE_ROOMS` menunjuk ke PC ruangan yang benar
+- Restart agent/server kalau baru mengubah `ROOM_ID`
 
 ## License
 

@@ -6,16 +6,26 @@ import { createServer } from "http";
 import { createApp } from "./app";
 import { ServiceContainer } from "./container/ServiceContainer";
 import { registerRoutes } from "./bootstrap/registerRoutes";
+import { Package } from "./types/Agent";
 
 const PORT = process.env.PORT || 53331;
 const BILLING_ENABLED = process.env.BILLING_ENABLED !== 'false';
 const PRICE_PER_HOUR = process.env.PRICE_PER_HOUR ? Number(process.env.PRICE_PER_HOUR) : 50000;
 
+let PACKAGES: Package[] = [];
+if (process.env.PACKAGES) {
+    try {
+        PACKAGES = JSON.parse(process.env.PACKAGES);
+    } catch (err) {
+        console.error("[SERVER] Failed to parse PACKAGES env var, ignoring:", err);
+    }
+}
+
 const app = createApp();
 
 const httpServer = createServer(app);
 
-const container = new ServiceContainer(httpServer, BILLING_ENABLED, PRICE_PER_HOUR);
+const container = new ServiceContainer(httpServer, BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES);
 
 // Initialize database
 container.initialize().then(() => {

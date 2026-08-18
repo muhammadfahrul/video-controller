@@ -1,14 +1,15 @@
 # Web Application
 
-Aplikasi web untuk mengontrol pemutaran video di ruangan karaoke. Aplikasi ini terhubung ke server pusat dan dapat mengontrol semua ruangan yang aktif.
+Aplikasi web (PWA) untuk mengontrol pemutaran video di **satu ruangan karaoke**. Web ini terinstall di PC ruangan itu sendiri (1 instance per PC, lihat topologi di README root) dan terhubung ke server lokal di PC yang sama - bukan dashboard multi-ruangan (itu tugas `cashier/`).
 
 ## Fitur
 
-- **Monitoring Ruangan**: Melihat status semua ruangan secara real-time
-- **Kontrol Video**: Play, pause, stop, next, previous untuk setiap ruangan
-- **Playlist Management**: Menambah dan mengelola queue video
-- **Dashboard**: Tampilan ringkasan semua ruangan
-- **Responsif**: Tampilan yang bisa diakses dari berbagai device
+- **Kontrol Video**: Play, pause, stop, next, previous, seek, volume, mute, fullscreen untuk room ini
+- **Playlist Management**: Menambah, memutar, menghapus, shuffle, dan mengatur repeat mode queue video
+- **Pencarian YouTube**: Cari video langsung dari halaman Search
+- **Status Real-time**: Melihat state player/playlist room ini secara real-time via Socket.IO
+- **Offline Overlay**: Menampilkan overlay saat agent room ini terputus dari server
+- **Responsif & Installable (PWA)**: Bisa di-install di desktop/tablet PC ruangan
 
 ## Cara Menjalankan
 
@@ -27,20 +28,23 @@ npm run preview:host
 
 ## Konfigurasi Environment
 
-Buat file `.env` di root folder web:
+Buat file `.env` di root folder web (atau copy dari `.env.example`). Karena web terinstall di PC ruangan itu sendiri, `VITE_SERVER_IP` harus menunjuk ke IP PC ruangan itu sendiri (server jalan di PC yang sama):
 
 ```bash
 # Server Configuration
-VITE_SERVER_URL=http://localhost:53331
+VITE_SERVER_IP=127.0.0.1
+VITE_SERVER_PORT=53331
 
-# App Configuration
-VITE_APP_TITLE=Video Controller
+# Billing Configuration
+VITE_BILLING_ENABLED=true
 ```
+
+Jika `VITE_SERVER_PORT` dikosongkan, `getServerUrl()` (`src/utils/getServerUrl.ts`) fallback otomatis: kalau app diakses dari port dev (53332) atau preview (53333), API server diasumsikan di port 53331.
 
 ## Konfigurasi Port
 
-- Development: `http://localhost:5173`
-- Production Preview: `http://localhost:4173`
+- Development: `http://localhost:53332`
+- Production Preview: `http://localhost:53333`
 
 ## Arsitektur
 
@@ -79,77 +83,88 @@ web/
 │   ├── App.tsx        # Main app component
 │   └── main.tsx       # Entry point
 ├── public/             # Public assets
-│   ├── manifest.json  # PWA manifest
-│   └── sw.js          # Service worker
+│   ├── manifest.json  # PWA manifest (custom, dipakai VitePWA)
+│   └── icon-*.png     # PWA icons
 ├── dist/              # Build output
 └── package.json
 ```
 
 ## Fitur Utama
 
-### Dashboard
-- Tampilan semua ruangan dengan status real-time
-- Quick actions untuk kontrol langsung
+### Home (Player)
+- Kontrol video room ini: play, pause, stop, next, previous, seek, volume, mute, fullscreen
+- Menampilkan state player real-time
 
-### Room Control
-- Kontrol video per ruangan
-- Kelola playlist/queue
-- Atur volume
+### Playlist
+- Tambah video ke queue, hapus, play item tertentu
+- Shuffle dan repeat mode (off/one/all)
 
-### Playlist Management
-- Tambah video ke queue
-- Urutkan ulang
-- Hapus dari queue
+### Search
+- Cari video YouTube dan mainkan/tambahkan langsung ke queue
+
+### Settings
+- Pengaturan aplikasi web (mis. toggle billing)
 
 ## Koneksi Socket
 
-Web app terhubung ke server via Socket.io:
+Web app terhubung ke server (di PC ruangan yang sama) via Socket.io (`src/services/socket/SocketService.ts`):
 
 ```typescript
 import { io } from 'socket.io-client';
 
-const socket = io(SERVER_URL);
+const socket = io(getServerUrl());
 
-// Events yang perlu di-listen:
-// - 'agents:update' - Update status semua agent
-// - 'command:result' - Result dari perintah yang dikirim
+// Events utama yang di-listen:
+// - 'agents:update'  - Update state semua agent (untuk resolve agent room ini)
+// - 'player:update'  - Update state player
+// - 'playlist:update'- Update state playlist
+
+// Saat connect, web mengirim:
+// - 'client:request-state' - minta ulang 'agents:update'
 ```
+
+Selengkapnya lihat tabel Socket Events di README root.
 
 ## Perintah yang Dikirim
 
-| Perintah | Deskripsi |
-|----------|-----------|
-| `play` | Memutar video |
-| `pause` | Jeda video |
-| `stop` | Stop video |
-| `next` | Video berikutnya |
-| `previous` | Video sebelumnya |
-| `playUrl` | Mainkan URL YouTube |
-| `addToQueue` | Tambah ke queue |
-| `clearQueue` | Clear queue |
-| `setVolume` | Atur volume |
+Web mengirim command lewat event `player:command`, dengan `type` sesuai `CommandType` di agent (`agent/src/commands/CommandType.ts`):
+
+| Command | Deskripsi |
+|---------|-----------|
+| `PLAY` / `PAUSE` / `STOP` | Kontrol pemutaran |
+| `NEXT` / `PREVIOUS` | Navigasi playlist |
+| `OPEN_VIDEO` | Mainkan video/URL YouTube tertentu |
+| `SEEK` | Lompat ke posisi tertentu |
+| `VOLUME` | Atur volume (0-100) |
+| `MUTE` / `UNMUTE` | Bisukan/nyalakan suara |
+| `FULLSCREEN` / `EXIT_FULLSCREEN` / `TOGGLE_FULLSCREEN` | Kontrol fullscreen |
+| `ADD_PLAYLIST` / `REMOVE_PLAYLIST` / `CLEAR_PLAYLIST` | Kelola queue |
+| `PLAY_PLAYLIST_ITEM` | Mainkan item queue tertentu |
+| `SHUFFLE_PLAYLIST` | Acak urutan queue |
+| `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | Atur mode repeat |
+| `SKIP_AD` / `SET_AUTO_SKIP_ADS` | Kontrol iklan YouTube |
 
 ## PWA Support
 
-Aplikasi ini mendukung Progressive Web App:
+Aplikasi ini mendukung Progressive Web App via `vite-plugin-pwa` (lihat `vite.config.ts`):
 
-- Installable di desktop dan mobile
-- Offline support (basic)
-- Service worker untuk caching
+- Installable di desktop dan tablet (manifest custom di `public/manifest.json`)
+- Service worker di-generate otomatis oleh Workbox (`registerType: 'autoUpdate'`) - bukan file `sw.js` manual
+- Caching untuk font Google (`fonts.googleapis.com`/`fonts.gstatic.com`) dan static assets
 
 ## Cara Install
 
 ### Development
 ```bash
 npm run dev
-# Buka http://localhost:5173
+# Buka http://localhost:53332
 ```
 
 ### Production
 ```bash
 npm run build
 npm run preview:host
-# Buka http://localhost:4173
+# Buka http://localhost:53333
 ```
 
 ### Deploy ke Server
@@ -177,7 +192,7 @@ npm run build
 ## Troubleshooting
 
 ### Tidak terhubung ke server
-- Cek `VITE_SERVER_URL` di .env
+- Cek `VITE_SERVER_IP` dan `VITE_SERVER_PORT` di .env
 - Cek server sedang berjalan di port yang benar
 
 ### Socket connection failed

@@ -8,6 +8,8 @@ import { DatabaseService } from "../services/DatabaseService";
 
 import { Server as HttpServer } from "http";
 
+import { Package } from "../types/Agent";
+
 export class ServiceContainer {
 
     private readonly agentManager: AgentManager;
@@ -20,16 +22,21 @@ export class ServiceContainer {
 
     private readonly pricePerHour: number;
 
+    private readonly packages: Package[];
+
     private readonly database: DatabaseService;
 
     constructor(
         httpServer: HttpServer,
         billingEnabled: boolean = true,
-        pricePerHour: number = 50000
+        pricePerHour: number = 50000,
+        packages: Package[] = []
     ) {
         this.billingEnabled = billingEnabled;
 
         this.pricePerHour = pricePerHour;
+
+        this.packages = packages;
 
         this.database = new DatabaseService();
 
@@ -42,7 +49,8 @@ export class ServiceContainer {
                 this.agentManager,
                 this.billingEnabled,
                 this.database,
-                this.pricePerHour
+                this.pricePerHour,
+                this.packages
             );
 
         this.commandService =

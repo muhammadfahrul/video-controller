@@ -26,6 +26,8 @@ export * from "./handlers/StopHandler";
 
 export * from "./handlers/SkipAdHandler";
 
+export * from "./handlers/SetAutoSkipAdsHandler";
+
 export * from "./handlers/NextHandler";
 
 export * from "./handlers/PreviousHandler";

@@ -19,4 +19,6 @@ export interface CommandPayload {
 
     item?: PlaylistItemPayload;
 
+    enabled?: boolean;
+
 }

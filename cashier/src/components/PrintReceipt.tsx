@@ -95,7 +95,10 @@ export function PrintReceipt({ transaction, onClose }: PrintReceiptProps) {
           <div class="row"><span class="lbl">Keluar</span><span>${formatTime(transaction.endTime)}</span></div>
           <div class="row"><span class="lbl">Durasi</span><span>${formatDuration(transaction.duration)}</span></div>
           <div class="div"></div>
-          <div class="row"><span class="lbl">Tarif</span><span>${formatPrice(transaction.pricePerHour)}/jam</span></div>
+          ${transaction.packageName
+            ? `<div class="row"><span class="lbl">Paket</span><span>${transaction.packageName}</span></div>
+          <div class="row"><span class="lbl">Lebih Waktu</span><span>${formatPrice(transaction.pricePerHour)}/jam</span></div>`
+            : `<div class="row"><span class="lbl">Tarif</span><span>${formatPrice(transaction.pricePerHour)}/jam</span></div>`}
           <div class="tot"><div class="tot-lbl">TOTAL BAYAR</div><div class="tot-prc">${formatPrice(transaction.totalPrice)}</div></div>
           ${transaction.customerName ? `<div class="row"><span class="lbl">Pelanggan</span><span>${transaction.customerName}</span></div>` : ''}
           ${transaction.customerPhone ? `<div class="row"><span class="lbl">HP</span><span>${transaction.customerPhone}</span></div>` : ''}
@@ -179,10 +182,23 @@ export function PrintReceipt({ transaction, onClose }: PrintReceiptProps) {
 
             {/* Price */}
             <div className="mb-2">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Tarif</span>
-                <span>{formatPrice(transaction.pricePerHour)}/jam</span>
-              </div>
+              {transaction.packageName ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Paket</span>
+                    <span>{transaction.packageName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Lebih Waktu</span>
+                    <span>{formatPrice(transaction.pricePerHour)}/jam</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tarif</span>
+                  <span>{formatPrice(transaction.pricePerHour)}/jam</span>
+                </div>
+              )}
             </div>
 
             {/* Total */}
