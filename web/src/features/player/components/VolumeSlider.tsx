@@ -1,4 +1,4 @@
-import { Volume2 } from "lucide-react";
+import { Minus, Plus, Volume2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface Props {
@@ -12,6 +12,8 @@ interface Props {
     ):void;
 
 }
+
+const STEP = 5;
 
 export default function VolumeSlider({
 
@@ -36,6 +38,24 @@ export default function VolumeSlider({
         setLocalValue(value);
 
     }, [value]);
+
+    const applyStep = (delta: number) => {
+
+        if (disabled) return;
+
+        const next = Math.min(
+            100,
+            Math.max(
+                0,
+                localValue + delta
+            )
+        );
+
+        setLocalValue(next);
+
+        onChange(next);
+
+    };
 
     return(
 
@@ -78,56 +98,122 @@ export default function VolumeSlider({
 
             </div>
 
-            <input
+            <div
+                className="
+                    flex
+                    items-center
+                    gap-2
+                "
+            >
 
-                type="range"
+                <button
 
-                min={0}
+                    type="button"
 
-                max={100}
+                    disabled={disabled || localValue <= 0}
 
-                value={localValue}
+                    onClick={()=> applyStep(-STEP)}
 
-                disabled={disabled}
+                    className="
+                        flex
+                        items-center
+                        justify-center
+                        w-8
+                        h-8
+                        shrink-0
+                        rounded-lg
+                        bg-[#1a1a2e]
+                        border border-[#2a2a4a]
+                        disabled:opacity-50
+                        disabled:cursor-not-allowed
+                    "
 
-                onChange={e=>
+                >
 
-                    setLocalValue(
+                    <Minus size={14}/>
 
-                        Number(
-                            e.target.value
+                </button>
+
+                <input
+
+                    type="range"
+
+                    min={0}
+
+                    max={100}
+
+                    value={localValue}
+
+                    disabled={disabled}
+
+                    onChange={e=>
+
+                        setLocalValue(
+
+                            Number(
+                                e.target.value
+                            )
+
                         )
 
-                    )
-
-                }
-
-                onMouseUp={()=>{
-
-                    if (!disabled) {
-
-                        onChange(localValue);
-
                     }
 
-                }}
+                    onMouseUp={()=>{
 
-                onTouchEnd={()=>{
+                        if (!disabled) {
 
-                    if (!disabled) {
+                            onChange(localValue);
 
-                        onChange(localValue);
+                        }
 
-                    }
+                    }}
 
-                }}
+                    onTouchEnd={()=>{
 
-                className={`
-                    w-full
-                    ${disabled ? "opacity-50 cursor-not-allowed" : ""}
-                `}
+                        if (!disabled) {
 
-            />
+                            onChange(localValue);
+
+                        }
+
+                    }}
+
+                    className={`
+                        w-full
+                        ${disabled ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
+
+                />
+
+                <button
+
+                    type="button"
+
+                    disabled={disabled || localValue >= 100}
+
+                    onClick={()=> applyStep(STEP)}
+
+                    className="
+                        flex
+                        items-center
+                        justify-center
+                        w-8
+                        h-8
+                        shrink-0
+                        rounded-lg
+                        bg-[#1a1a2e]
+                        border border-[#2a2a4a]
+                        disabled:opacity-50
+                        disabled:cursor-not-allowed
+                    "
+
+                >
+
+                    <Plus size={14}/>
+
+                </button>
+
+            </div>
 
         </section>
 
