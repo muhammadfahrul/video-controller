@@ -35,6 +35,7 @@ prompt_env_config() {
     local rooms_json=""
     local billing_enabled=""
     local price_per_hour=""
+    local packages_json=""
 
     # Room App mode - needs Server IP, Room ID, Room Name
     if [[ "$mode" == "room" || "$mode" == "all" ]]; then
@@ -49,6 +50,11 @@ prompt_env_config() {
         read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
 
         read -p "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip): " price_per_hour
+
+        echo "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak"
+        echo "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa."
+        echo "Contoh: [{\"id\":\"p2j\",\"name\":\"Paket 2 Jam\",\"durationMinutes\":120,\"price\":150000}]"
+        read -p "Packages JSON (kosongkan untuk skip): " packages_json
     fi
 
     # Kasir mode - only needs Rooms JSON
@@ -80,7 +86,23 @@ prompt_env_config() {
     fi
 
     # Apply configuration - only non-empty values will be applied
-    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode" "$price_per_hour"
+    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode" "$price_per_hour" "$packages_json"
+}
+
+# Set a KEY=VALUE line in an .env file: replace it if it already exists
+# (regardless of position), append it if the key isn't present yet. Plain
+# sed replace (used for the other vars below) only works when the line
+# already exists, which isn't guaranteed for PACKAGES since it's a newer,
+# optional var absent from most existing .env files.
+set_env_var() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
 }
 
 apply_env_config() {
@@ -91,9 +113,10 @@ apply_env_config() {
     local billing_enabled="$5"
     local mode="$6"
     local price_per_hour="$7"
+    local packages_json="$8"
 
     # Skip if all values are empty
-    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" && -z "$price_per_hour" ]]; then
+    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" && -z "$price_per_hour" && -z "$packages_json" ]]; then
         echo "[INFO] Tidak ada konfigurasi yang diubah"
         return
     fi
@@ -166,6 +189,9 @@ apply_env_config() {
         fi
         if [[ -n "$price_per_hour" ]]; then
             sed -i "s|PRICE_PER_HOUR=.*|PRICE_PER_HOUR=$price_per_hour|" "$server_env"
+        fi
+        if [[ -n "$packages_json" ]]; then
+            set_env_var "$server_env" "PACKAGES" "$packages_json"
         fi
     fi
 

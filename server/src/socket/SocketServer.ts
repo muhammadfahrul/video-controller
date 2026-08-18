@@ -24,7 +24,8 @@ import {
 } from "../services/DatabaseService";
 
 import {
-    AgentInfo
+    AgentInfo,
+    Package
 } from "../types/Agent";
 
 
@@ -43,6 +44,9 @@ export class SocketServer {
 
 
     private readonly pricePerHour: number;
+
+
+    private readonly packages: Package[];
 
 
     private readonly database: DatabaseService;
@@ -64,7 +68,8 @@ export class SocketServer {
         manager: AgentManager,
         billingEnabled: boolean = true,
         database?: DatabaseService,
-        pricePerHour: number = 50000
+        pricePerHour: number = 50000,
+        packages: Package[] = []
     ){
 
         this.manager =
@@ -73,6 +78,8 @@ export class SocketServer {
         this.billingEnabled = billingEnabled;
 
         this.pricePerHour = pricePerHour;
+
+        this.packages = packages;
 
         // Initialize database if not provided
         this.database = database || new DatabaseService();
@@ -219,6 +226,8 @@ export class SocketServer {
                             isActive: initialActive,
 
                             pricePerHour: this.pricePerHour,
+
+                            packages: this.packages,
 
                             startTime: null,
 
@@ -462,6 +471,7 @@ export class SocketServer {
                         roomId: string;
                         roomName: string;
                         durationMinutes?: number;
+                        packageId?: string;
                         customerName?: string;
                         customerPhone?: string;
                         customerEmail?: string;
@@ -477,9 +487,23 @@ export class SocketServer {
                         // Use ref method for mutation
                         const agent = registry.getByRoomIdRef(data.roomId);
 
+                        // Look up the package server-side only - never trust price/duration
+                        // sent by the client, same principle as the totalPrice fix below.
+                        const selectedPackage = data.packageId
+                            ? this.packages.find(p => p.id === data.packageId)
+                            : undefined;
+                        if (data.packageId && !selectedPackage) {
+                            console.warn("[SERVER] Unknown packageId, falling back to hourly:", data.packageId);
+                        }
+
+                        // Package duration overrides any client-supplied duration.
+                        const effectiveDurationMinutes = selectedPackage
+                            ? selectedPackage.durationMinutes
+                            : data.durationMinutes;
+
                         // Calculate expiry time if duration is provided
-                        const expiresAt = data.durationMinutes
-                            ? Date.now() + (data.durationMinutes * 60 * 1000)
+                        const expiresAt = effectiveDurationMinutes
+                            ? Date.now() + (effectiveDurationMinutes * 60 * 1000)
                             : null;
 
                         // On a Move Room, keep the original session's start time so the
@@ -495,6 +519,14 @@ export class SocketServer {
                             customerNote: data.customerNote,
                         };
 
+                        // Snapshot the package's price/duration onto the session now, so later
+                        // edits to server config can't retroactively change an in-progress bill.
+                        const packageInfo = {
+                            activePackageId: selectedPackage?.id ?? null,
+                            packagePrice: selectedPackage?.price ?? null,
+                            packageDurationMinutes: selectedPackage?.durationMinutes ?? null,
+                        };
+
                         if (agent) {
                             agent.isActive = true;
                             agent.expiresAt = expiresAt;
@@ -503,6 +535,7 @@ export class SocketServer {
                             agent.lastTransactionEndTime = null;
                             // Store customer info
                             Object.assign(agent, customerInfo);
+                            Object.assign(agent, packageInfo);
 
                             // Change status from WAITING to ONLINE when activated
                             if (agent.status === "WAITING") {
@@ -513,7 +546,8 @@ export class SocketServer {
                                 isActive: true,
                                 expiresAt: expiresAt,
                                 serverTime: Date.now(),
-                                ...customerInfo
+                                ...customerInfo,
+                                ...packageInfo
                             });
                             this.broadcastAgents(registry.getAll());
                         } else {
@@ -521,8 +555,8 @@ export class SocketServer {
                         }
 
                         // Set up auto-expiry timer if duration is provided
-                        if (data.durationMinutes && data.durationMinutes > 0) {
-                            this.setupRoomTimer(data.roomId, data.durationMinutes, agent?.socketId);
+                        if (effectiveDurationMinutes && effectiveDurationMinutes > 0) {
+                            this.setupRoomTimer(data.roomId, effectiveDurationMinutes, agent?.socketId);
                         }
 
                         // Broadcast activation to all clients
@@ -532,7 +566,8 @@ export class SocketServer {
                             isActive: true,
                             expiresAt: expiresAt,
                             startTime: startTime,
-                            ...customerInfo
+                            ...customerInfo,
+                            ...packageInfo
                         });
                     }
                 );
@@ -627,6 +662,12 @@ export class SocketServer {
                             (agent as any).customerPhone = undefined;
                             (agent as any).customerEmail = undefined;
                             (agent as any).customerNote = undefined;
+
+                            // Clear package info - a moved-out room doesn't carry its
+                            // package to whatever session activates this room next.
+                            agent.activePackageId = null;
+                            agent.packagePrice = null;
+                            agent.packageDurationMinutes = null;
 
                             // Broadcast deactivation to all clients (include expiresAt so cashier can calculate correct duration)
                             this.io.emit("room:activation", {
@@ -932,25 +973,49 @@ export class SocketServer {
             return;
         }
 
-        // Per-block/jam: minimum 1 jam, dibulatkan ke atas
-        const totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * agent.pricePerHour);
+        // Per-block/jam: minimum 1 jam, dibulatkan ke atas - unless this session was
+        // started as a fixed-price package, in which case only time beyond the
+        // package's included duration is billed hourly on top of the package price.
+        let totalPrice: number;
+        let packageId: string | null = null;
+        let packageName: string | null = null;
+        let packagePrice: number | null = null;
 
-        const agentAny = agent as any;
+        if (agent.packagePrice != null && agent.packageDurationMinutes != null) {
+            const packageSeconds = agent.packageDurationMinutes * 60;
+            const overageSeconds = Math.max(0, durationSeconds - packageSeconds);
+            totalPrice = agent.packagePrice + Math.ceil(overageSeconds / 3600) * agent.pricePerHour;
+            packageId = agent.activePackageId ?? null;
+            packageName = this.packages.find(p => p.id === packageId)?.name ?? null;
+            packagePrice = agent.packagePrice;
+        } else {
+            totalPrice = Math.max(0, Math.ceil(durationSeconds / 3600) * agent.pricePerHour);
+        }
+
         const transaction: TransactionData = {
             id: Date.now().toString(36) + Math.random().toString(36).substring(2, 9),
             roomId: agent.roomId,
             roomName: agent.roomName,
-            customerName: agentAny.customerName,
-            customerPhone: agentAny.customerPhone,
-            customerEmail: agentAny.customerEmail,
-            customerNote: agentAny.customerNote,
+            customerName: agent.customerName,
+            customerPhone: agent.customerPhone,
+            customerEmail: agent.customerEmail,
+            customerNote: agent.customerNote,
             startTime,
             endTime,
             duration: durationSeconds,
             pricePerHour: agent.pricePerHour,
             totalPrice,
+            packageId,
+            packageName,
+            packagePrice,
             paidAt: 0
         };
+
+        // Reset package state so the room defaults back to hourly billing
+        // next time it's activated, until a package is explicitly chosen again.
+        agent.activePackageId = null;
+        agent.packagePrice = null;
+        agent.packageDurationMinutes = null;
 
         console.log("[SERVER] Recording transaction:", transaction.id, "room:", transaction.roomId, "totalPrice:", totalPrice);
 

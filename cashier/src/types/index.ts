@@ -25,6 +25,14 @@ export interface Room {
 
 export type RoomStatus = 'idle' | 'playing' | 'paused';
 
+// Paket harga tetap untuk sebuah ruangan (dari server/.env PACKAGES ruangan tsb)
+export interface Package {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
+}
+
 export interface RoomBilling {
   roomId: string;
   roomName: string;
@@ -42,6 +50,10 @@ export interface RoomBilling {
   customerPhone?: string;
   customerEmail?: string;
   customerNote?: string;
+  activePackageId?: string | null; // Paket yang dipilih untuk sesi berjalan saat ini
+  packagePrice?: number | null;
+  packageDurationMinutes?: number | null;
+  packages?: Package[]; // Daftar paket tersedia di ruangan ini (untuk selector saat aktivasi)
 }
 
 // Transaction for payment recording
@@ -58,6 +70,9 @@ export interface Transaction {
   duration: number; // in seconds
   pricePerHour: number;
   totalPrice: number;
+  packageId?: string | null;
+  packageName?: string | null;
+  packagePrice?: number | null;
   paymentMethod?: 'cash' | 'transfer' | 'other';
   paidAt: number; // 0 = unpaid, > 0 = paid (timestamp when payment was confirmed)
   cleanedAt?: number; // timestamp when room was marked as cleaned (BERSIHKAN → SUDAH DIBERSIHKAN)
@@ -95,4 +110,8 @@ export interface AgentInfo {
   customerPhone?: string;
   customerEmail?: string;
   customerNote?: string;
+  packages?: Package[]; // Daftar paket tersedia di ruangan ini, dari server/.env PACKAGES
+  activePackageId?: string | null;
+  packagePrice?: number | null;
+  packageDurationMinutes?: number | null;
 }

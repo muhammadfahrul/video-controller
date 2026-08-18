@@ -39,6 +39,10 @@ PORT=53331
 
 # Billing Configuration
 BILLING_ENABLED=true
+PRICE_PER_HOUR=50000
+
+# Opsional - daftar paket harga tetap untuk ruangan ini (JSON array)
+PACKAGES=[{"id":"p2j","name":"Paket 2 Jam","durationMinutes":120,"price":150000}]
 ```
 
 ### Konfigurasi Parameter
@@ -49,6 +53,7 @@ BILLING_ENABLED=true
 | `YOUTUBE_API_KEY` | - | API key untuk YouTube Data API v3 |
 | `BILLING_ENABLED` | `true` | Aktifkan fitur billing |
 | `PRICE_PER_HOUR` | `50000` | Tarif per jam ruangan ini (Rupiah). Wajib beda tiap PC ruangan sesuai tarif ruangan tsb - sumber kebenaran satu-satunya untuk harga (dikirim ke cashier lewat `pricePerHour` pada `AgentInfo`) |
+| `PACKAGES` | `[]` | Opsional. JSON array paket harga tetap ruangan ini: `{ id, name, durationMinutes, price }[]`. Dikirim ke cashier lewat `packages` pada `AgentInfo`; JSON invalid di-log dan diabaikan (fallback ke `[]`), server tidak crash |
 
 ## Topologi
 
@@ -120,7 +125,7 @@ Didefinisikan di `src/socket/SocketEvents.ts`, diimplementasi di `src/socket/Soc
 | `client:request-state` | - | Web minta ulang `agents:update` |
 | `cashier:request-agents` | - | Cashier minta ulang `agents:update` |
 | `player:command` | `CommandPayload` | Kirim perintah kontrol video ke agent tertentu (`agentId`) |
-| `cashier:activate-room` | `{ roomId, roomName, durationMinutes?, customerName?, customerPhone?, customerEmail?, customerNote?, originalStartTime? }` | Aktivasi ruangan (mulai sesi billing) |
+| `cashier:activate-room` | `{ roomId, roomName, durationMinutes?, packageId?, customerName?, customerPhone?, customerEmail?, customerNote?, originalStartTime? }` | Aktivasi ruangan (mulai sesi billing). `packageId` dicocokkan ke `PACKAGES` server-side; kalau ditemukan, durasi & harga paket dipakai (override `durationMinutes`), kalau tidak dikenal fallback ke billing hourly |
 | `cashier:deactivate-room` | `{ roomId, reason?: "manual" \| "move" }` | Nonaktifkan ruangan; server menghitung & menyimpan transaksi di sini |
 | `cashier:extend-time` | `{ roomId, additionalMinutes }` | Perpanjang waktu sesi yang sedang aktif |
 | `cashier:mark-room-cleaned` | `{ roomId }` | Tandai ruangan hasil Move Room sudah dibersihkan (clear `needsCleaning`) |
@@ -183,17 +188,28 @@ Server menghitung biaya berdasarkan:
 - `pricePerHour` - Tarif per jam ruangan ini (dari env `PRICE_PER_HOUR` di `.env` server ini)
 - `activeTime` - Waktu aktif ruangan
 
-Rumus:
+Rumus (hourly, default):
 ```
-biaya = (activeTime dalam jam) × pricePerHour
+biaya = ceil(activeTime dalam jam) × pricePerHour  # minimum 1 jam
 ```
+
+### Paket Harga Tetap (opsional)
+
+Kalau `PACKAGES` diisi, `AgentInfo.packages` membawa daftar paket ke cashier. Saat `cashier:activate-room` menyertakan `packageId` yang valid, server men-snapshot `activePackageId`/`packagePrice`/`packageDurationMinutes` ke agent (bukan re-lookup saat sesi berakhir), lalu `durationMinutes` efektif jadi durasi paket. `recordTransaction()` menghitung:
+
+```
+biaya = packagePrice + ceil(max(0, durationSeconds - packageDurationMinutes*60) / 3600) × pricePerHour
+```
+
+Field paket ikut disimpan di transaksi (`packageId`, `packageName`, `packagePrice`) dan **tidak** termasuk field yang bisa diubah lewat `transaction:save` - sama seperti `totalPrice`/`pricePerHour`, ini di-set sekali saat `recordTransaction()` dan final. Package state di-reset ke `null` di agent setiap kali sesi berakhir (baik lewat deaktivasi manual, auto-expiry, maupun Move Room) sehingga aktivasi berikutnya default ke hourly lagi sampai paket dipilih ulang.
 
 ### Transaksi dan Status Ruangan
 
 Server menyimpan data transaksi dengan field (`TransactionData`):
 - `paidAt` - Timestamp saat transaksi lunas (0 = unpaid)
 - `cleanedAt` - Timestamp saat transaksi ditandai sudah bersih (diset via `transaction:save`, tombol "Sudah Bersih" di cashier)
-- `totalPrice` - Dihitung server-side saja, di `recordTransaction()`: `ceil(durationSeconds / 3600) * pricePerHour` (dibulatkan ke atas per blok jam, minimum 1 jam)
+- `totalPrice` - Dihitung server-side saja, di `recordTransaction()`: hourly `ceil(durationSeconds / 3600) * pricePerHour`, atau formula paket di atas kalau sesi pakai paket (dibulatkan ke atas per blok jam, minimum 1 jam)
+- `packageId` / `packageName` / `packagePrice` - Terisi kalau sesi diaktifkan dengan paket, `null` kalau hourly biasa
 
 Status ruangan yang ditampilkan di cashier **dihitung di client** (`cashier/src/utils/roomStatus.ts`), bukan dikirim server, dengan prioritas OFFLINE > AKTIF > UNPAID > BERSIHKAN/SUDAH DIBERSIHKAN > ONLINE:
 - Tidak terhubung → OFFLINE

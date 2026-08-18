@@ -24,6 +24,7 @@ function formatPrice(price: number): string {
 
 export function RoomCard({ roomBilling }: RoomCardProps) {
   const [durationInput, setDurationInput] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState<string | undefined>(undefined);
   const [extendTimeInput, setExtendTimeInput] = useState('');
   const [customerNameInput, setCustomerNameInput] = useState('');
   const [customerPhoneInput, setCustomerPhoneInput] = useState('');
@@ -89,6 +90,13 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
       setCustomerNoteInput('');
     }
   }, [roomBilling.isActive]);
+
+  // Clear package selection when room is deactivated (package never carries over)
+  useEffect(() => {
+    if (!roomBilling.isActive && selectedPackageId) {
+      setSelectedPackageId(undefined);
+    }
+  }, [roomBilling.isActive]);
   
   const handleToggleActive = async () => {
     const loadingType: LoadingMessage = roomBilling.isActive ? 'deactivating' : 'activating';
@@ -133,22 +141,31 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
     
     setGlobalLoading(true, loadingType);
     try {
+      // A selected package's duration is authoritative once picked - the
+      // server ignores/overrides durationMinutes when packageId is valid, but
+      // keep the manual minutes input as a fallback for non-package activation.
       const minutes = durationInput ? parseInt(durationInput, 10) : undefined;
       const customerName = customerNameInput.trim() || undefined;
       const customerPhone = customerPhoneInput.trim() || undefined;
       const customerEmail = customerEmailInput.trim() || undefined;
       const customerNote = customerNoteInput.trim() || undefined;
-      
-      if (minutes && minutes > 0) {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, minutes, customerName, customerPhone, customerEmail, customerNote, () => {
+
+      await multiSocketService.activateRoom(
+        roomBilling.roomId,
+        roomBilling.roomName,
+        minutes && minutes > 0 ? minutes : undefined,
+        customerName,
+        customerPhone,
+        customerEmail,
+        customerNote,
+        () => {
           setGlobalLoading(false);
-        });
-      } else {
-        await multiSocketService.activateRoom(roomBilling.roomId, roomBilling.roomName, undefined, customerName, customerPhone, customerEmail, customerNote, () => {
-          setGlobalLoading(false);
-        });
-      }
+        },
+        undefined,
+        selectedPackageId
+      );
       setDurationInput('');
+      setSelectedPackageId(undefined);
     } catch (error) {
       setGlobalLoading(false);
     }
@@ -215,8 +232,13 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   
   // Price comes from the room's server (AgentInfo.pricePerHour), broadcast via socket
   const pricePerHour = roomBilling.pricePerHour ?? 50000;
-  // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas
-  const currentPrice = Math.ceil(totalSeconds / 3600) * pricePerHour;
+  // Per-block/jam: minimum 1 jam, lalu dibulatkan ke atas. If a package is
+  // active, only time beyond the package's included duration is billed this
+  // way, on top of the package's fixed price - mirrors the server's
+  // recordTransaction() so the live estimate matches the eventual bill.
+  const currentPrice = roomBilling.packagePrice != null && roomBilling.packageDurationMinutes != null
+    ? roomBilling.packagePrice + Math.ceil(Math.max(0, totalSeconds - roomBilling.packageDurationMinutes * 60) / 3600) * pricePerHour
+    : Math.ceil(totalSeconds / 3600) * pricePerHour;
 
   const isLocked = billingConfig.enabled ? !roomBilling.isConnected : false;
   const status = roomBilling.status;
@@ -229,6 +251,10 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   );
   const latestTransaction = roomTransactions[0]; // Most recent transaction (added to front)
   const hasUnpaid = roomTransactions.some(t => t.paidAt === 0);
+
+  const activePackage = roomBilling.activePackageId
+    ? roomBilling.packages?.find(p => p.id === roomBilling.activePackageId)
+    : undefined;
 
   const roomStatus = getRoomStatus(roomBilling, allTransactions);
   const borderColor = roomStatus.borderColor;
@@ -355,9 +381,19 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Wallet className="w-3.5 h-3.5 text-pink-400" />
-                <span className="text-[10px] text-gray-400">Tarif:</span>
+                <span className="text-[10px] text-gray-400">{activePackage ? 'Paket:' : 'Tarif:'}</span>
               </div>
-              <span className="text-xs font-semibold text-white">{formatPrice(pricePerHour)}/jam</span>
+              <span className="text-xs font-semibold text-white">
+                {activePackage
+                  ? `${activePackage.name} (${formatPrice(activePackage.price)})`
+                  : `${formatPrice(pricePerHour)}/jam`}
+              </span>
+            </div>
+          )}
+          {activePackage && (
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-gray-400 pl-5">Lebih waktu:</span>
+              <span className="text-xs text-gray-400">{formatPrice(pricePerHour)}/jam</span>
             </div>
           )}
         </div>
@@ -471,20 +507,48 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
             />
           </div>
           
-          {/* Duration Input */}
-          <div className="flex items-center gap-2">
-            <Timer className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-            <input
-              type="number"
-              min="1"
-              max="480"
-              placeholder="Menit"
-              value={durationInput}
-              onChange={(e) => setDurationInput(e.target.value)}
-              className="w-20 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
-            />
-            <span className="text-[10px] text-gray-500">(menit)</span>
-          </div>
+          {/* Package Selector */}
+          {roomBilling.packages && roomBilling.packages.length > 0 && (
+            <div className="space-y-1">
+              <div className="flex flex-wrap gap-1">
+                {roomBilling.packages.map(pkg => (
+                  <button
+                    key={pkg.id}
+                    type="button"
+                    onClick={() => setSelectedPackageId(prev => prev === pkg.id ? undefined : pkg.id)}
+                    className={`px-2 py-1 rounded text-[10px] font-medium border ${
+                      selectedPackageId === pkg.id
+                        ? 'bg-orange-500/20 border-orange-500 text-orange-300'
+                        : 'bg-[#0f0f1a] border-white/10 text-gray-400 hover:border-orange-500/50'
+                    }`}
+                    title={`${pkg.durationMinutes} menit - ${formatPrice(pkg.price)}`}
+                  >
+                    {pkg.name}
+                  </button>
+                ))}
+              </div>
+              {selectedPackageId && (
+                <p className="text-[9px] text-gray-500">Durasi & harga mengikuti paket yang dipilih.</p>
+              )}
+            </div>
+          )}
+
+          {/* Duration Input (manual/hourly - hidden while a package is selected) */}
+          {!selectedPackageId && (
+            <div className="flex items-center gap-2">
+              <Timer className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+              <input
+                type="number"
+                min="1"
+                max="480"
+                placeholder="Menit"
+                value={durationInput}
+                onChange={(e) => setDurationInput(e.target.value)}
+                className="w-20 bg-[#0f0f1a] border border-white/10 rounded px-2 py-1 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+              />
+              <span className="text-[10px] text-gray-500">(menit)</span>
+            </div>
+          )}
         </div>
       )}
       

@@ -10,6 +10,7 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 - **Status Real-time**: Menampilkan status pemutaran video (playing/paused/idle)
 - **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
 - **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`, dikonfigurasi di `server/.env` PC ruangan tsb, bukan di cashier)
+- **Paket Harga Tetap**: Kalau ruangan punya paket terkonfigurasi (`PACKAGES` di `server/.env` ruangan tsb), cashier bisa memilih paket saat aktivasi alih-alih mengisi durasi manual
 - **Full Page Loading**: Setiap proses menampilkan loading screen dengan estimasi waktu
 - **Pindah Ruangan**: Memindahkan billing dari satu ruangan ke ruangan lain saat customer ingin pindah
 
@@ -70,6 +71,8 @@ VITE_ROOMS=[
 | `port` | number | Port server (default: 53331) |
 
 Tarif per jam (`pricePerHour`) dikonfigurasi lewat env `PRICE_PER_HOUR` di `server/.env` PC ruangan tersebut (default 50000), bukan lagi di cashier.
+
+Paket harga tetap juga sepenuhnya dikonfigurasi di server (env `PACKAGES` di `server/.env` ruangan tsb), bukan di cashier - cashier hanya menampilkan daftar paket yang dikirim server (`AgentInfo.packages`) sebagai pilihan saat mengaktifkan ruangan. Kalau ruangan tidak punya `PACKAGES`, form aktivasi tetap seperti biasa (input menit manual).
 
 ## Konfigurasi Port
 

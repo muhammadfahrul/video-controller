@@ -131,11 +131,12 @@ function Set-EnvConfig {
         [string]$RoomName,
         [string]$Rooms,
         [string]$BillingEnabled,
-        [string]$PricePerHour
+        [string]$PricePerHour,
+        [string]$Packages
     )
 
     # Skip if all values are empty
-    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour) {
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour -and -not $Packages) {
         Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
         return
     }
@@ -214,8 +215,8 @@ function Set-EnvConfig {
         }
     }
     
-    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR
-    if ($BillingEnabled -or $PricePerHour) {
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES
+    if ($BillingEnabled -or $PricePerHour -or $Packages) {
         $serverEnvPath = Join-Path $ProjectRoot "server\.env"
         if (Test-Path $serverEnvPath) {
             $envContent = Get-Content $serverEnvPath -Raw
@@ -224,6 +225,16 @@ function Set-EnvConfig {
             }
             if ($PricePerHour) {
                 $envContent = $envContent -replace 'PRICE_PER_HOUR=.*', "PRICE_PER_HOUR=$PricePerHour"
+            }
+            if ($Packages) {
+                # PACKAGES is a newer, optional var that may not exist yet in
+                # older .env files - replace it if present, append if not
+                # (plain -replace is a no-op when the line doesn't exist).
+                if ($envContent -match '(?m)^PACKAGES=.*') {
+                    $envContent = $envContent -replace '(?m)^PACKAGES=.*', "PACKAGES=$Packages"
+                } else {
+                    $envContent = $envContent.TrimEnd() + "`r`nPACKAGES=$Packages`r`n"
+                }
             }
             Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
             Write-Host "[OK] Updated server/.env" -ForegroundColor Green
@@ -747,6 +758,7 @@ $RoomName = ""
 $Rooms = ""
 $BillingEnabled = ""
 $PricePerHour = ""
+$Packages = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
 if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
@@ -766,6 +778,12 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
 
     $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
     if ($input -ne "") { $PricePerHour = $input }
+
+    Write-Host "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak" -ForegroundColor Cyan
+    Write-Host "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa." -ForegroundColor Cyan
+    Write-Host "Contoh: [{`"id`":`"p2j`",`"name`":`"Paket 2 Jam`",`"durationMinutes`":120,`"price`":150000}]" -ForegroundColor Cyan
+    $input = Read-Host "Packages JSON (kosongkan untuk skip)"
+    if ($input -ne "") { $Packages = $input }
 }
 
 # Kasir mode - only needs Rooms JSON
@@ -931,7 +949,7 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
 # Normal mode - continue with service start
 
 # Apply .env configuration for existing project
-Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
+Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
 
 $nodeExePath = Find-NodeJS
 
@@ -1053,7 +1071,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     $PROJECT_ROOT = $destDir
 
     # Apply .env configuration AFTER PROJECT_ROOT is set correctly
-    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
 }
 
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow

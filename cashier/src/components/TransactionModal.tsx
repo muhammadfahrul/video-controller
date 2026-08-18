@@ -277,6 +277,11 @@ export function TransactionModal({ roomId, roomName, onClose }: TransactionModal
                           {transaction.customerPhone}
                         </span>
                       )}
+                      {transaction.packageName && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-300">
+                          {transaction.packageName}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       <span>{formatDuration(transaction.duration)}</span>

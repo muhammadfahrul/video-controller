@@ -49,6 +49,9 @@ export interface TransactionData {
     duration: number;
     pricePerHour: number;
     totalPrice: number;
+    packageId?: string | null;
+    packageName?: string | null;
+    packagePrice?: number | null;
     paymentMethod?: 'cash' | 'transfer' | 'other';
     paidAt: number;
     cleanedAt?: number;
@@ -138,16 +141,36 @@ export class DatabaseService {
                 duration INTEGER NOT NULL,
                 pricePerHour REAL NOT NULL,
                 totalPrice REAL NOT NULL,
+                packageId TEXT,
+                packageName TEXT,
+                packagePrice REAL,
                 paymentMethod TEXT,
                 paidAt INTEGER DEFAULT 0,
                 cleanedAt INTEGER,
                 notes TEXT
             )
         `);
-        
+
         // Migration: Add cleanedAt column if it doesn't exist (for existing databases)
         try {
             this.db.run(`ALTER TABLE transactions ADD COLUMN cleanedAt INTEGER`);
+        } catch (e) {
+            // Column already exists, ignore
+        }
+
+        // Migration: Add package columns if they don't exist (for existing databases)
+        try {
+            this.db.run(`ALTER TABLE transactions ADD COLUMN packageId TEXT`);
+        } catch (e) {
+            // Column already exists, ignore
+        }
+        try {
+            this.db.run(`ALTER TABLE transactions ADD COLUMN packageName TEXT`);
+        } catch (e) {
+            // Column already exists, ignore
+        }
+        try {
+            this.db.run(`ALTER TABLE transactions ADD COLUMN packagePrice REAL`);
         } catch (e) {
             // Column already exists, ignore
         }
@@ -304,11 +327,12 @@ export class DatabaseService {
         
         if (existing.length > 0 && existing[0].values.length > 0) {
             // Financial/identity fields (roomId, roomName, startTime, endTime,
-            // duration, pricePerHour, totalPrice) are deliberately excluded here.
-            // They're set once at creation from server-authoritative data and
-            // must never be overwritable by a later client-supplied update
-            // (e.g. marking a transaction paid/cleaned) - only the fields below
-            // are legitimately mutable after creation.
+            // duration, pricePerHour, totalPrice, packageId/Name/Price) are
+            // deliberately excluded here. They're set once at creation from
+            // server-authoritative data and must never be overwritable by a
+            // later client-supplied update (e.g. marking a transaction
+            // paid/cleaned) - only the fields below are legitimately mutable
+            // after creation.
             this.db.run(`
                 UPDATE transactions SET
                     customerName = ?, customerPhone = ?,
@@ -327,13 +351,15 @@ export class DatabaseService {
                 INSERT INTO transactions (
                     id, roomId, roomName, customerName, customerPhone, customerEmail,
                     customerNote, startTime, endTime, duration, pricePerHour, totalPrice,
+                    packageId, packageName, packagePrice,
                     paymentMethod, paidAt, cleanedAt, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `, [
                 transaction.id, transaction.roomId, transaction.roomName, transaction.customerName || null,
                 transaction.customerPhone || null, transaction.customerEmail || null,
                 transaction.customerNote || null, transaction.startTime, transaction.endTime,
                 transaction.duration, transaction.pricePerHour, transaction.totalPrice,
+                transaction.packageId ?? null, transaction.packageName ?? null, transaction.packagePrice ?? null,
                 transaction.paymentMethod || null, transaction.paidAt, transaction.cleanedAt || null, transaction.notes || null
             ]);
         }

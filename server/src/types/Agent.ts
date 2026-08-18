@@ -1,6 +1,18 @@
 import { PlayerState } from "./PlayerState";
 import { PlaylistSnapshot } from "./PlaylistSnapshot";
 
+export interface Package {
+
+    id: string;
+
+    name: string;
+
+    durationMinutes: number;
+
+    price: number;
+
+}
+
 export type AgentStatus =
 
     | "ONLINE"
@@ -46,5 +58,21 @@ export interface AgentInfo {
     needsCleaning?: boolean; // Room was vacated (e.g. via move) and hasn't been marked cleaned yet
 
     lastTransactionEndTime?: number | null; // Timestamp when the room was last vacated, used for cleaning status thresholds
+
+    packages?: Package[]; // Daftar paket tersedia di ruangan ini, dari server/.env PACKAGES
+
+    activePackageId?: string | null; // Paket yang dipilih untuk sesi berjalan saat ini
+
+    packagePrice?: number | null; // Harga tetap paket aktif, di-snapshot saat aktivasi
+
+    packageDurationMinutes?: number | null; // Durasi tetap paket aktif, di-snapshot saat aktivasi
+
+    customerName?: string;
+
+    customerPhone?: string;
+
+    customerEmail?: string;
+
+    customerNote?: string;
 
 }

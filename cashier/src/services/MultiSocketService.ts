@@ -176,7 +176,8 @@ class MultiSocketService {
     customerEmail?: string,
     customerNote?: string,
     onComplete?: () => void,
-    originalStartTime?: number
+    originalStartTime?: number,
+    packageId?: string
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
@@ -218,6 +219,7 @@ class MultiSocketService {
       roomId: agentRoomId,
       roomName,
       durationMinutes: durationMinutes ?? undefined,
+      packageId: packageId ?? undefined,
       customerName: customerName ?? undefined,
       customerPhone: customerPhone ?? undefined,
       customerEmail: customerEmail ?? undefined,
@@ -732,7 +734,7 @@ class MultiSocketService {
     });
 
     // Listen for room activation updates (includes expiry info)
-    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string; needsCleaning?: boolean; lastTransactionEndTime?: number | null }) => {
+    socket.on('room:activation', (data: { roomId: string; roomName?: string; isActive: boolean; expiresAt?: number | null; reason?: string; startTime?: number; customerName?: string; customerPhone?: string; customerEmail?: string; customerNote?: string; needsCleaning?: boolean; lastTransactionEndTime?: number | null; activePackageId?: string | null; packagePrice?: number | null; packageDurationMinutes?: number | null }) => {
       console.log('[MultiSocket] Room activation update:', config.name, {
         ...data,
         expiresAtFormatted: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
@@ -809,6 +811,19 @@ class MultiSocketService {
           (merged as any).lastTransactionEndTime = data.lastTransactionEndTime ?? null;
         }
 
+        // Package info - only sent by the server on activation. On deactivation
+        // the session is over, so clear it (a package never carries across
+        // reactivations/moves - server resets it too, see recordTransaction).
+        if (data.isActive) {
+          (merged as any).activePackageId = data.activePackageId ?? null;
+          (merged as any).packagePrice = data.packagePrice ?? null;
+          (merged as any).packageDurationMinutes = data.packageDurationMinutes ?? null;
+        } else {
+          (merged as any).activePackageId = null;
+          (merged as any).packagePrice = null;
+          (merged as any).packageDurationMinutes = null;
+        }
+
         return merged;
       });
     });
@@ -857,9 +872,20 @@ class MultiSocketService {
       currentDuration = agent.player.currentTime;
     }
 
-    // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas)
+    // Calculate price per block/jam (minimum 1 jam, dibulatkan ke atas).
+    // If a package is active, this is just a live estimate for display - the
+    // server recomputes the real, authoritative totalPrice the same way when
+    // the session actually ends (recordTransaction on the server).
     const pricePerHour = agent.pricePerHour ?? 50000;
-    const totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
+    const packagePrice = agent.packagePrice ?? null;
+    const packageDurationMinutes = agent.packageDurationMinutes ?? null;
+    let totalPrice: number;
+    if (packagePrice != null && packageDurationMinutes != null) {
+      const overageSeconds = Math.max(0, currentDuration - packageDurationMinutes * 60);
+      totalPrice = packagePrice + Math.ceil(overageSeconds / 3600) * pricePerHour;
+    } else {
+      totalPrice = Math.ceil(currentDuration / 3600) * pricePerHour;
+    }
 
     const agentAny = agent as any;
     return {
@@ -879,6 +905,10 @@ class MultiSocketService {
       customerPhone: agentAny.customerPhone,
       customerEmail: agentAny.customerEmail,
       customerNote: agentAny.customerNote,
+      activePackageId: agentAny.activePackageId ?? null,
+      packagePrice,
+      packageDurationMinutes,
+      packages: agent.packages,
     };
   }
 

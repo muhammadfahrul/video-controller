@@ -11,6 +11,7 @@ Sistem manajemen playlist video real-time dengan integrasi YouTube untuk karaoke
 - **Monitoring Kesehatan** - Health check otomatis untuk browser, player, dan network
 - **Auto-recovery** - Sistem recovery cerdas untuk menangani failure scenarios
 - **Billing Otomatis** - Perhitungan biaya berdasarkan durasi dan tarif per ruangan
+- **Paket Harga Tetap** - Opsional per ruangan (mis. "Paket 2 Jam"), kelebihan waktu tetap ditagih per jam di atas harga paket
 - **Multi-room** - Kelola multiple ruangan karaoke secara bersamaan
 - **Status Ruangan** - Monitoring real-time status ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Pindah Ruangan** - Pindahkan billing customer ke ruangan lain saat ingin pindah kamar
@@ -97,7 +98,7 @@ Setiap komponen memiliki file `.env` sendiri:
 
 | File | Komponen | Deskripsi |
 |------|----------|-----------|
-| `server/.env` | Server | PORT, YOUTUBE_API_KEY, BILLING_ENABLED, PRICE_PER_HOUR |
+| `server/.env` | Server | PORT, YOUTUBE_API_KEY, BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES (opsional) |
 | `agent/.env` | Agent | ROOM_ID, ROOM_NAME, BILLING_ENABLED, SERVER_IP/SERVER_PORT, Browser options |
 | `web/.env` | Web | VITE_SERVER_IP, VITE_SERVER_PORT, VITE_BILLING_ENABLED |
 | `cashier/.env` | Cashier | VITE_ROOMS, VITE_BILLING_ENABLED |
@@ -118,6 +119,8 @@ SERVER_PORT=53331
 
 # Server (.env, PC ruangan yang sama)
 PRICE_PER_HOUR=50000
+# Opsional - daftar paket harga tetap untuk ruangan ini
+PACKAGES=[{"id":"p2j","name":"Paket 2 Jam","durationMinutes":120,"price":150000}]
 
 # Cashier (.env, PC Kasir)
 VITE_ROOMS=[{"roomId":"room-001","name":"Room 1","ip":"192.168.1.10","port":53331}]
@@ -190,7 +193,7 @@ Protokol real-time selengkapnya ada di `server/src/socket/SocketEvents.ts` dan `
 | `cashier:request-agents` | Cashier → Server | - | Cashier minta ulang `agents:update` |
 | `player:command` | Web/Cashier → Server | `CommandPayload` | Kirim perintah kontrol video ke sebuah agent |
 | `player:update` / `playlist:update` | Server → Client | `AgentSnapshot` / `PlaylistSnapshot` | Broadcast state player/playlist terbaru ke semua client |
-| `cashier:activate-room` | Cashier → Server | `{ roomId, roomName, durationMinutes?, customerName?, ... }` | Aktivasi ruangan (mulai sesi billing) |
+| `cashier:activate-room` | Cashier → Server | `{ roomId, roomName, durationMinutes?, packageId?, customerName?, ... }` | Aktivasi ruangan (mulai sesi billing). `packageId` divalidasi server-side terhadap `PACKAGES`; kalau valid, durasi & harga paket menggantikan `durationMinutes` |
 | `cashier:deactivate-room` | Cashier → Server | `{ roomId, reason? }` | Nonaktifkan ruangan (akhiri sesi, catat transaksi) |
 | `cashier:extend-time` | Cashier → Server | `{ roomId, additionalMinutes }` | Perpanjang waktu sesi yang sedang aktif |
 | `cashier:mark-room-cleaned` | Cashier → Server | `{ roomId }` | Tandai ruangan (hasil Move Room) sudah dibersihkan |
@@ -243,7 +246,7 @@ video-controller/
 │   │   ├── youtube/     # YouTube API helpers
 │   │   └── index.ts     # Entry point
 │   ├── data/           # SQLite database
-│   └── .env            # PORT, YOUTUBE_API_KEY, PRICE_PER_HOUR
+│   └── .env            # PORT, YOUTUBE_API_KEY, PRICE_PER_HOUR, PACKAGES (opsional)
 ├── web/              # React PWA frontend (1 instance per PC ruangan, kontrol room-nya sendiri)
 │   ├── src/
 │   │   ├── context/     # React Context (loading state)
@@ -277,10 +280,20 @@ Sistem billing menghitung biaya berdasarkan:
 - `pricePerHour` - Tarif per jam ruangan (dari env `PRICE_PER_HOUR` di `server/.env` PC ruangan tsb)
 - `activeTime` - Waktu aktif ruangan
 
-Rumus:
+Rumus (hourly, default):
 ```
-biaya = (activeTime dalam jam) × pricePerHour
+biaya = (activeTime dalam jam, dibulatkan ke atas, minimum 1 jam) × pricePerHour
 ```
+
+### Paket Harga Tetap (opsional)
+
+Kalau ruangan punya `PACKAGES` terkonfigurasi (lihat env `PACKAGES` di `server/.env`), cashier bisa memilih paket saat aktivasi alih-alih mengisi durasi bebas. Durasi & harga paket **divalidasi dan disimpan di server**, tidak pernah dipercaya dari client. Kalau sesi diperpanjang melebihi durasi paket (via "Tambah Waktu"), kelebihannya ditagih per jam dengan `pricePerHour` normal ruangan tsb:
+
+```
+biaya = packagePrice + (kelebihan waktu dalam jam, dibulatkan ke atas) × pricePerHour
+```
+
+Paket tidak ikut pindah saat Move Room - ruangan tujuan default kembali ke billing hourly kecuali cashier memilih paket lagi secara eksplisit.
 
 ## Status Ruangan (Cashier)
 
