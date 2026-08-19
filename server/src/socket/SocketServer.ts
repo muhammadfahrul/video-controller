@@ -200,10 +200,18 @@ export class SocketServer {
 
                         // Check if room was previously activated by cashier (persists across reconnections)
                         const wasActivated = this.activatedRooms.get(data.roomId) === true;
-                        
+
                         // If billing is disabled OR room was already activated, agent is active immediately
                         const initialStatus = (!this.billingEnabled || wasActivated) ? "ONLINE" : "WAITING";
                         const initialActive = !this.billingEnabled || wasActivated;
+
+                        // Re-registration (agent restart / reconnect) must not wipe an
+                        // in-progress paid session - carry over the billing/customer
+                        // fields from the existing entry instead of resetting them to
+                        // null, otherwise every reconnect during an active session
+                        // (e.g. right after a Move Room activation) loses the room's
+                        // remaining time.
+                        const existing = registry.getByRoomIdRef(data.roomId);
 
                         registry.register({
 
@@ -229,15 +237,38 @@ export class SocketServer {
 
                             packages: this.packages,
 
-                            startTime: null,
+                            startTime: existing?.startTime ?? null,
 
-                            expiresAt: null
+                            expiresAt: existing?.expiresAt ?? null,
+
+                            needsCleaning: existing?.needsCleaning,
+
+                            lastTransactionEndTime: existing?.lastTransactionEndTime,
+
+                            activePackageId: existing?.activePackageId,
+
+                            packagePrice: existing?.packagePrice,
+
+                            packageDurationMinutes: existing?.packageDurationMinutes,
+
+                            customerName: existing?.customerName,
+
+                            customerPhone: existing?.customerPhone,
+
+                            customerEmail: existing?.customerEmail,
+
+                            customerNote: existing?.customerNote
 
                         });
 
-                        // If room was activated, notify the agent
+                        // If room was activated, notify the agent (include expiresAt so
+                        // a reconnecting agent's local watchdog re-syncs to the real
+                        // remaining time instead of treating the session as unlimited)
                         if (initialActive && data.roomId) {
-                            this.io.to(socket.id).emit("agent:activation", { isActive: true });
+                            this.io.to(socket.id).emit("agent:activation", {
+                                isActive: true,
+                                expiresAt: existing?.expiresAt ?? null
+                            });
                         }
 
                         // Load saved player/playlist data from database and send to agent
