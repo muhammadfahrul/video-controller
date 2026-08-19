@@ -104,7 +104,9 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
           billing.customerEmail,
           billing.customerNote ? `${billing.customerNote} (Pindahan dari ${roomBilling.roomName})` : `Pindahan dari ${roomBilling.roomName}`,
           () => {},
-          billing.startTime ?? undefined
+          billing.startTime ?? undefined,
+          undefined,
+          billing.expiresAt ?? undefined
         );
       } else {
         await multiSocketService.activateRoom(
@@ -116,7 +118,9 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
           undefined,
           `Pindahan dari ${roomBilling.roomName}`,
           () => {},
-          billing.startTime ?? undefined
+          billing.startTime ?? undefined,
+          undefined,
+          billing.expiresAt ?? undefined
         );
       }
 

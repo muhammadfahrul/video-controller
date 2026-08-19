@@ -177,7 +177,8 @@ class MultiSocketService {
     customerNote?: string,
     onComplete?: () => void,
     originalStartTime?: number,
-    packageId?: string
+    packageId?: string,
+    originalExpiresAt?: number
   ): Promise<void> {
     console.log('[MultiSocket] activateRoom called with roomId:', roomId, 'duration:', durationMinutes, 'customerName:', customerName);
     console.log('[MultiSocket] Available connections:', Array.from(this.connections.entries()).map(([k, v]) => ({ key: k, configId: v.config.id, configName: v.config.name, agentRoomId: v.agents[0]?.roomId })));
@@ -225,6 +226,7 @@ class MultiSocketService {
       customerEmail: customerEmail ?? undefined,
       customerNote: customerNote ?? undefined,
       originalStartTime: originalStartTime ?? undefined,
+      originalExpiresAt: originalExpiresAt ?? undefined,
     });
     console.log('[MultiSocket] Activating room:', roomId, '-> agentRoomId:', agentRoomId, 'duration:', durationMinutes, 'customerName:', customerName);
   }

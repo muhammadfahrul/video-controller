@@ -508,6 +508,7 @@ export class SocketServer {
                         customerEmail?: string;
                         customerNote?: string;
                         originalStartTime?: number; // carried over from the source room on a Move Room
+                        originalExpiresAt?: number; // carried over from the source room on a Move Room
                     }) => {
                         console.log("[SERVER] Cashier activates room:", data);
 
@@ -532,10 +533,16 @@ export class SocketServer {
                             ? selectedPackage.durationMinutes
                             : data.durationMinutes;
 
-                        // Calculate expiry time if duration is provided
-                        const expiresAt = effectiveDurationMinutes
-                            ? Date.now() + (effectiveDurationMinutes * 60 * 1000)
-                            : null;
+                        // On a Move Room (no package involved), reuse the source room's exact
+                        // expiresAt instead of recomputing "now + remaining minutes" - that
+                        // recomputation leaked the move's own wall-clock overhead (socket
+                        // round-trips, UI delay) into the billed duration and could tip it
+                        // over an hour boundary, overbilling the customer. See MoveRoomModal.tsx.
+                        const expiresAt = data.originalExpiresAt && !selectedPackage
+                            ? data.originalExpiresAt
+                            : effectiveDurationMinutes
+                                ? Date.now() + (effectiveDurationMinutes * 60 * 1000)
+                                : null;
 
                         // On a Move Room, keep the original session's start time so the
                         // eventual transaction bills the full session once (at this room's
@@ -585,9 +592,14 @@ export class SocketServer {
                             console.log("[SERVER] Agent not found for room:", data.roomId);
                         }
 
-                        // Set up auto-expiry timer if duration is provided
-                        if (effectiveDurationMinutes && effectiveDurationMinutes > 0) {
-                            this.setupRoomTimer(data.roomId, effectiveDurationMinutes, agent?.socketId);
+                        // Set up auto-expiry timer sized to the actual time left until
+                        // expiresAt (rather than always the full duration) so a carried-over
+                        // Move Room expiresAt still fires the timer at the right moment.
+                        if (expiresAt) {
+                            const remainingMinutes = (expiresAt - Date.now()) / 60000;
+                            if (remainingMinutes > 0) {
+                                this.setupRoomTimer(data.roomId, remainingMinutes, agent?.socketId);
+                            }
                         }
 
                         // Broadcast activation to all clients
