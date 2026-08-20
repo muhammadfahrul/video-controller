@@ -4,10 +4,6 @@ import { YouTubeDOM } from "./YouTubeDOM";
 import { PlayerState } from "./PlayerState";
 import { PlayerStatus } from "./PlayerStatus";
 import { LoggerService } from "../services/LoggerService";
-import { PlayerEventPayload } from "./PlayerEventPayload";
-import {
-    PlayerEventListener
-} from "./PlayerEventListener";
 import { PlayerSnapshot } from "../types/PlayerSnapshot";
 import { ConfigService } from "../services/ConfigService";
 
@@ -15,7 +11,6 @@ import { ConfigService } from "../services/ConfigService";
 export class YouTubePlayer {
 
     private readonly dom: YouTubeDOM;
-    private readonly eventListener: PlayerEventListener;
 
     private state: PlayerState = PlayerState.IDLE;
 
@@ -48,11 +43,6 @@ export class YouTubePlayer {
 
         this.dom =
             new YouTubeDOM(page);
-
-
-
-        this.eventListener =
-            new PlayerEventListener();
 
     }
 
@@ -134,8 +124,6 @@ export class YouTubePlayer {
             // Reset ended listener to ensure it's attached to the new video
             this.endedListenerInitialized = false;
             await this.setupEndedListener();
-
-            await this.attachEvents();
 
             this.state = PlayerState.READY;
 
@@ -518,44 +506,6 @@ export class YouTubePlayer {
     }
 
 
-    public async onEvent(
-        callback:
-        (payload:PlayerEventPayload)=>void
-    ):Promise<void>{
-
-
-        this.eventListener
-            .setCallback(callback);
-
-
-
-        await this.attachEvents();
-
-
-    }
-
-
-    private async attachEvents()
-    :Promise<void>{
-
-
-        await this.dom.listenEvents(
-
-            async(payload)=>{
-
-
-                await this.eventListener.handle(
-                    payload
-                );
-
-
-            }
-
-        );
-
-
-    }
-
     public async getSnapshot(): Promise<PlayerSnapshot> {
 
         if (this.navigating) {
@@ -798,6 +748,29 @@ export class YouTubePlayer {
                 (event) => {
 
                     if ((event.target as HTMLElement | null)?.tagName !== "VIDEO") {
+                        return;
+                    }
+
+                    // A pre/mid-roll ad reaching its own end also fires
+                    // "ended" on the <video> element before the real
+                    // content plays or resumes. Treating that as "video
+                    // finished" would skip to the next playlist item while
+                    // the actual content hasn't even played yet. Use the
+                    // same ad-indicator heuristic as skipAd() and ignore
+                    // the event while an ad is showing - the real content
+                    // will fire its own "ended" once it actually finishes.
+                    const player = document.querySelector("#movie_player");
+                    const hasAdClass = player?.classList.contains("ad-showing") ?? false;
+                    const hasAdOverlay = !!document.querySelector(".ytp-ad-overlay-close-button");
+                    const hasAdText = !!document.querySelector(".ytp-ad-text");
+                    const hasVideoAdUi = !!document.querySelector(".videoAdUi");
+                    const adIndicatorCount =
+                        (hasAdClass ? 1 : 0) +
+                        (hasAdOverlay ? 1 : 0) +
+                        (hasAdText ? 1 : 0) +
+                        (hasVideoAdUi ? 1 : 0);
+
+                    if (adIndicatorCount >= 2) {
                         return;
                     }
 

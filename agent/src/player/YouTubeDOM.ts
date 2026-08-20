@@ -1,25 +1,10 @@
-declare global {
-
-    interface Window {
-
-        playerEventCallback:
-        (payload:any)=>void;
-
-    }
-
-}
-
 import { Page } from "playwright";
 import { YouTubeSelectors } from "./YouTubeSelectors";
-import { PlayerEvents } from "./PlayerEvents";
-import { PlayerEventPayload } from "./PlayerEventPayload";
 import { VideoSnapshot } from "../types/VideoSnapshot";
 
 
 
 export class YouTubeDOM {
-
-    private callbackRegistered = false;
 
     constructor(
         private readonly page: Page
@@ -338,14 +323,33 @@ export class YouTubeDOM {
 
         try {
 
-            await this.page.evaluate(
+            // The toggle renders shortly after the player controls mount,
+            // not immediately with the rest of the DOM - give it a short
+            // grace period instead of a single immediate lookup, since a
+            // missed attempt here leaves YouTube's autoplay racing our
+            // playlist advance for the entire video.
+            await this.page.waitForSelector(
+                YouTubeSelectors.autoplayToggle,
+                { timeout: 5000 }
+            );
+
+        } catch (err) {
+
+            console.log("[YouTubeDOM] disableAutoplay: toggle never appeared, skipping:", err);
+            return;
+
+        }
+
+        try {
+
+            const clicked = await this.page.evaluate(
                 (selector) => {
 
                     const toggle =
                         document.querySelector(selector) as HTMLElement | null;
 
                     if (!toggle) {
-                        return;
+                        return false;
                     }
 
                     const isOn =
@@ -355,8 +359,16 @@ export class YouTubeDOM {
                         toggle.click();
                     }
 
+                    return isOn;
+
                 },
                 YouTubeSelectors.autoplayToggle
+            );
+
+            console.log(
+                clicked
+                    ? "[YouTubeDOM] disableAutoplay: toggle was on, turned off"
+                    : "[YouTubeDOM] disableAutoplay: toggle already off"
             );
 
         } catch (err) {
@@ -566,116 +578,6 @@ export class YouTubeDOM {
 
         );
 
-
-    }
-
-    public async listenEvents(
-        callback: (payload: PlayerEventPayload)=>void
-    ): Promise<void> {
-
-
-        if (!this.callbackRegistered) {
-
-            await this.page.exposeFunction(
-                "playerEventCallback",
-                callback
-            );
-
-            this.callbackRegistered = true;
-        }
-
-
-        await this.page.evaluate(
-            `
-            (selector) => {
-
-                const video =
-                    document.querySelector(selector);
-
-
-                if(!video){
-                    return;
-                }
-
-
-                if(video.dataset.agentListener === "true"){
-                    return;
-                }
-
-
-                video.dataset.agentListener = "true";
-
-
-                function sendEvent(eventName){
-
-
-                    const element = video;
-
-
-                    window.playerEventCallback({
-
-                        event:eventName,
-
-                        videoId:
-                            new URL(window.location.href)
-                            .searchParams
-                            .get("v"),
-
-
-                        currentTime:
-                            element.currentTime,
-
-
-                        duration:
-                            element.duration,
-
-
-                        timestamp:
-                            Date.now()
-
-                    });
-
-
-                }
-
-
-
-                video.addEventListener(
-                    "play",
-                    function(){
-
-                        sendEvent("player.play");
-
-                    }
-                );
-
-
-
-                video.addEventListener(
-                    "pause",
-                    function(){
-
-                        sendEvent("player.pause");
-
-                    }
-                );
-
-
-
-                video.addEventListener(
-                    "ended",
-                    function(){
-
-                        sendEvent("player.end");
-
-                    }
-                );
-
-
-            }
-            `,
-            YouTubeSelectors.video
-        );
 
     }
 

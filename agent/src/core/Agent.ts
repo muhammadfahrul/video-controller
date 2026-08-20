@@ -300,8 +300,15 @@ export class Agent {
             if (!next) {
 
                 console.log(
-                    "[PLAYLIST] No next item"
+                    "[PLAYLIST] No next item, playlist finished"
                 );
+
+                // Settle into an explicit end state rather than leaving
+                // playback wherever the video naturally ended - navigate
+                // back to the start image, same as the idle screen shown
+                // on startup/reset, instead of sitting on YouTube's own
+                // end-of-video UI.
+                await this.player!.showStartImage();
 
                 return;
 

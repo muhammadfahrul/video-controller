@@ -10,8 +10,6 @@ export enum PlayerState {
 
     PAUSED = "PAUSED",
 
-    ENDED = "ENDED",
-
     ERROR = "ERROR"
 
 }
