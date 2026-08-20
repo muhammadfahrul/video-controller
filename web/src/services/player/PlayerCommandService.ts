@@ -214,7 +214,14 @@ export class PlayerCommandService {
 
         agentId: string,
 
-        videoId: string
+        videoId: string,
+
+        metadata?: {
+            title?: string;
+            thumbnail?: string;
+            channel?: string;
+            duration?: string;
+        }
 
     ): void {
 
@@ -224,7 +231,12 @@ export class PlayerCommandService {
 
             type: "OPEN_VIDEO",
 
-            videoId
+            videoId,
+
+            item:
+                metadata
+                    ? { videoId, ...metadata }
+                    : undefined
 
         });
 

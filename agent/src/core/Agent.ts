@@ -480,7 +480,8 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.OPEN_VIDEO,
             new OpenVideoHandler(
-                this.player!
+                this.player!,
+                this.playlist
             )
         );
 
@@ -524,6 +525,7 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.ADD_PLAYLIST,
             new AddPlaylistHandler(
+                this.player!,
                 this.playlist
             )
         );

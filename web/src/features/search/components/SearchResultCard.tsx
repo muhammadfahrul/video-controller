@@ -57,7 +57,23 @@ export default function SearchResultCard({
 
             agent.id,
 
-            result.videoId
+            result.videoId,
+
+            {
+
+                title:
+                    result.title,
+
+                channel:
+                    result.channel,
+
+                thumbnail:
+                    result.thumbnail,
+
+                duration:
+                    result.duration
+
+            }
 
         );
 

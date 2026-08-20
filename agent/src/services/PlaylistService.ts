@@ -167,6 +167,66 @@ export class PlaylistService {
 
     }
 
+    /**
+     * Plays a video outside the normal next/previous flow (e.g. the search
+     * page's "Play" button) while keeping the playlist in sync: reuses the
+     * existing entry and jumps to it if this videoId is already in the
+     * playlist, otherwise inserts `item` right after the currently playing
+     * one and makes it current. Inserting there (rather than appending to
+     * the end) means the rest of the queue is just "interrupted", not
+     * skipped - once this video ends, next() naturally continues with
+     * whatever was queued after the item that was playing before.
+     */
+    public async playOrAdd(
+        item: PlaylistItem
+    ): Promise<PlaylistItem> {
+
+        const existingIndex =
+            this.items.findIndex(
+                existing => existing.videoId === item.videoId
+            );
+
+        if (existingIndex !== -1) {
+
+            this.currentIndex = existingIndex;
+
+            // Merge in whatever metadata this call carries (e.g. a "Play"
+            // click has title/thumbnail/channel/duration) onto the
+            // existing entry, which may have been created without it -
+            // otherwise a stale metadata-less entry stays empty forever.
+            const existing = this.items[existingIndex];
+
+            this.items[existingIndex] = {
+                ...existing,
+                title: item.title ?? existing.title,
+                channel: item.channel ?? existing.channel,
+                thumbnail: item.thumbnail ?? existing.thumbnail,
+                duration: item.duration ?? existing.duration
+            };
+
+            await this.persist();
+
+            return this.items[existingIndex];
+
+        }
+
+        const insertIndex =
+            this.currentIndex + 1;
+
+        this.items.splice(
+            insertIndex,
+            0,
+            item
+        );
+
+        this.currentIndex = insertIndex;
+
+        await this.persist();
+
+        return item;
+
+    }
+
     public size() {
 
         return this.items.length;
