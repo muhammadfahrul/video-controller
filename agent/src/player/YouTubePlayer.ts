@@ -125,6 +125,12 @@ export class YouTubePlayer {
 
             await this.dom.waitUntilReady();
 
+            // Prevent YouTube's own "up next" autoplay from racing our
+            // playlist advance (see setupEndedListener below) and hijacking
+            // playback with a suggested video whenever our navigation to
+            // the next playlist item is slower than YouTube's in-page swap.
+            await this.dom.disableAutoplay();
+
             // Reset ended listener to ensure it's attached to the new video
             this.endedListenerInitialized = false;
             await this.setupEndedListener();
@@ -772,24 +778,35 @@ export class YouTubePlayer {
 
         await this.page.evaluate(() => {
 
-            const video =
-                document.querySelector("video");
-
-            if (!video) {
+            // YouTube swaps/recreates the <video> element when transitioning
+            // through an ad break (e.g. a post-roll ad after the content
+            // ends). A listener bound to that specific node is silently lost
+            // when it happens, so the app never learns the video ended and
+            // YouTube's own autoplay/suggestion takes over uncontested.
+            // `ended` doesn't bubble, but capture-phase listeners on
+            // `document` still fire for it regardless of which <video> node
+            // dispatches it, and `document` survives any in-page element
+            // replacement - so attach there instead of on the video element.
+            if (document.documentElement.dataset.endedAttached === "true") {
                 return;
             }
 
-            // Check if listener already attached to this video element
-            if (video.dataset.endedAttached === "true") {
-                return;
-            }
+            document.documentElement.dataset.endedAttached = "true";
 
-            video.dataset.endedAttached = "true";
+            document.addEventListener(
+                "ended",
+                (event) => {
 
-            video.addEventListener("ended", () => {
-                // @ts-ignore
-                window.youtubeEnded();
-            });
+                    if ((event.target as HTMLElement | null)?.tagName !== "VIDEO") {
+                        return;
+                    }
+
+                    // @ts-ignore
+                    window.youtubeEnded();
+
+                },
+                true
+            );
 
         });
 

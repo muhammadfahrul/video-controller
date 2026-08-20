@@ -328,6 +328,45 @@ export class YouTubeDOM {
 
     }
 
+    /**
+     * Turns off YouTube's native "Autoplay" toggle (auto-advance to a
+     * suggested video), if currently on. Best-effort: the toggle only
+     * exists once the player controls have rendered, so a missing element
+     * is not an error.
+     */
+    public async disableAutoplay(): Promise<void> {
+
+        try {
+
+            await this.page.evaluate(
+                (selector) => {
+
+                    const toggle =
+                        document.querySelector(selector) as HTMLElement | null;
+
+                    if (!toggle) {
+                        return;
+                    }
+
+                    const isOn =
+                        toggle.getAttribute("aria-checked") === "true";
+
+                    if (isOn) {
+                        toggle.click();
+                    }
+
+                },
+                YouTubeSelectors.autoplayToggle
+            );
+
+        } catch (err) {
+
+            console.log("[YouTubeDOM] disableAutoplay skipped:", err);
+
+        }
+
+    }
+
     public async skipAd(): Promise<boolean> {
 
         // Check for skip button directly - this is the most reliable indicator

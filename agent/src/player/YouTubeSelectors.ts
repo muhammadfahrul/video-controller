@@ -4,6 +4,8 @@ export const YouTubeSelectors = {
 
     title: "h1.ytd-watch-metadata yt-formatted-string",
 
-    player: "#movie_player"
+    player: "#movie_player",
+
+    autoplayToggle: ".ytp-autonav-toggle-button"
 
 } as const;
