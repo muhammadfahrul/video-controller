@@ -1202,7 +1202,11 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
     
     # Wait for server to be ready before starting agent
-    Wait-ForServer -ServerIP $ServerIP -Port 53331 -MaxWaitSeconds 30
+    # Always probe localhost here, not $ServerIP - this script and the server
+    # run on the same machine, while $ServerIP is the LAN-facing address
+    # (often left blank by the user for auto-detect) and may not be reachable
+    # or even resolvable from the machine that's hosting it.
+    Wait-ForServer -ServerIP "127.0.0.1" -Port 53331 -MaxWaitSeconds 30
     
     # Check if server is still running after wait
     if ($serverProcess.HasExited) {

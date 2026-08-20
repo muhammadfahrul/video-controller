@@ -783,26 +783,61 @@ echo "▶️ Starting services..."
 # PIDs for cleanup
 PIDS=""
 
+# Poll the server's /health endpoint on localhost (this script and the
+# server always run on the same machine, so localhost is correct here
+# regardless of what SERVER_IP was configured for LAN access) before
+# starting the agent - without this, the agent can try to connect before
+# the server is listening.
+wait_for_server() {
+    local port="${1:-53331}"
+    local max_wait_seconds="${2:-30}"
+    local url="http://127.0.0.1:${port}/health"
+
+    echo "   Waiting for server to be ready..."
+    local waited=0
+    while [ "$waited" -lt "$max_wait_seconds" ]; do
+        if curl -fsS -o /dev/null --max-time 2 "$url" 2>/dev/null; then
+            echo "   ✅ Server is ready!"
+            return 0
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    echo "   ⚠️ Server may not be ready, but continuing..."
+    return 1
+}
+
 # Start Room App services
 if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
     echo "▶️ Starting Room App services..."
-    
+
     cd "$PROJECT_ROOT/server" && npm run start &
     SERVER_PID=$!
     PIDS="$PIDS $SERVER_PID"
     echo "   - Server: PID $SERVER_PID"
-    
-    # Start agent with xvfb if no display
-    if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
-        cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
-        AGENT_PID=$!
+
+    wait_for_server 53331 30
+
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo "   ✅ Server is running"
     else
-        cd "$PROJECT_ROOT/agent" && npm run start &
-        AGENT_PID=$!
+        echo "   ❌ Server exited unexpectedly"
     fi
-    PIDS="$PIDS $AGENT_PID"
-    echo "   - Agent: PID $AGENT_PID"
-    
+
+    # Start agent (only if server is still running) with xvfb if no display
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
+            cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
+            AGENT_PID=$!
+        else
+            cd "$PROJECT_ROOT/agent" && npm run start &
+            AGENT_PID=$!
+        fi
+        PIDS="$PIDS $AGENT_PID"
+        echo "   - Agent: PID $AGENT_PID"
+    fi
+
     cd "$PROJECT_ROOT/web" && npm run preview:host &
     WEB_PID=$!
     PIDS="$PIDS $WEB_PID"
