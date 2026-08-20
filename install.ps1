@@ -439,12 +439,12 @@ function Setup-Autostart {
         $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
 
         $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
-        Build-AutostartBatchContent -Name "Server" -LogFile $logFile -WorkDir "$PROJECT_ROOT\server" -NpmScript "start" -NpmDir $npmDir |
+        Build-AutostartBatchContent -Name "Server" -LogFile $logFile -WorkDir "$PROJECT_ROOT\server" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set NODE_ENV=production" |
             Out-File -FilePath $serverStartupScript -Encoding ASCII
         Write-Host "[OK] Script dibuat: $serverStartupScript" -ForegroundColor Green
 
         $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
-        Build-AutostartBatchContent -Name "Agent" -LogFile $logFile -WorkDir "$PROJECT_ROOT\agent" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set BROWSER_HEADLESS=false" |
+        Build-AutostartBatchContent -Name "Agent" -LogFile $logFile -WorkDir "$PROJECT_ROOT\agent" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set NODE_ENV=production`r`nset BROWSER_HEADLESS=false" |
             Out-File -FilePath $agentStartupScript -Encoding ASCII
         Write-Host "[OK] Script dibuat: $agentStartupScript" -ForegroundColor Green
 
@@ -1248,7 +1248,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
 
     # Start Server first
-    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Minimized -PassThru
+    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Minimized -PassThru
     $processes += $serverProcess
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
     
@@ -1268,7 +1268,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
 
     # Start Agent (only if server is still running)
     if (-not $serverProcess.HasExited) {
-        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Minimized -PassThru
+        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Minimized -PassThru
         $processes += $agentProcess
         Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
         Start-Sleep -Seconds 2

@@ -795,7 +795,7 @@ wait_for_server() {
 if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
     echo "▶️ Starting Room App services..."
 
-    cd "$PROJECT_ROOT/server" && npm run start &
+    cd "$PROJECT_ROOT/server" && NODE_ENV=production npm run start &
     SERVER_PID=$!
     PIDS="$PIDS $SERVER_PID"
     echo "   - Server: PID $SERVER_PID"
@@ -811,10 +811,10 @@ if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
     # Start agent (only if server is still running) with xvfb if no display
     if kill -0 "$SERVER_PID" 2>/dev/null; then
         if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
-            cd "$PROJECT_ROOT/agent" && xvfb-run -a npm run start &
+            cd "$PROJECT_ROOT/agent" && NODE_ENV=production xvfb-run -a npm run start &
             AGENT_PID=$!
         else
-            cd "$PROJECT_ROOT/agent" && npm run start &
+            cd "$PROJECT_ROOT/agent" && NODE_ENV=production npm run start &
             AGENT_PID=$!
         fi
         PIDS="$PIDS $AGENT_PID"
@@ -910,6 +910,7 @@ Wants=video-controller-server.service
 [Service]
 Type=simple
 WorkingDirectory=$PROJECT_ROOT/agent
+Environment=NODE_ENV=production
 Environment=BROWSER_HEADLESS=false
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=%h/.Xauthority
