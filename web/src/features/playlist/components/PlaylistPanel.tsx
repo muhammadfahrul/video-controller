@@ -66,6 +66,9 @@ export default function PlaylistPanel() {
                                 active={(startIndex + index) === playlist.currentIndex}
                                 removing={removingItemId === item.id}
                                 disabled={!agent.online || processing.removeFromPlaylist}
+                                canMoveUp={(startIndex + index) > 0}
+                                canMoveDown={(startIndex + index) < totalItems - 1}
+                                moving={processing.movePlaylistItem}
                                 onPlay={() => {
                                     if (!agent.online) return;
                                     setProcessing("playPlaylistItem", true);
@@ -81,6 +84,18 @@ export default function PlaylistPanel() {
                                         setRemovingItemId(null);
                                         setProcessing("removeFromPlaylist", false);
                                     }, 500);
+                                }}
+                                onMoveUp={() => {
+                                    if (!agent.online) return;
+                                    setProcessing("movePlaylistItem", true);
+                                    playerCommandService.movePlaylistItem(agent.id, item.id, "up");
+                                    setTimeout(() => setProcessing("movePlaylistItem", false), 500);
+                                }}
+                                onMoveDown={() => {
+                                    if (!agent.online) return;
+                                    setProcessing("movePlaylistItem", true);
+                                    playerCommandService.movePlaylistItem(agent.id, item.id, "down");
+                                    setTimeout(() => setProcessing("movePlaylistItem", false), 500);
                                 }}
                             />
                         ))}

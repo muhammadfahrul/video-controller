@@ -354,6 +354,56 @@ export class PlaylistService {
 
     }
     
+    public async move(
+        id: string,
+        direction: "up" | "down"
+    ): Promise<boolean> {
+
+        const index = this.items.findIndex(
+            item => item.id === id
+        );
+
+        if (index === -1) {
+            return false;
+        }
+
+        const targetIndex =
+            direction === "up"
+                ? index - 1
+                : index + 1;
+
+        if (
+            targetIndex < 0 ||
+            targetIndex >= this.items.length
+        ) {
+            return false;
+        }
+
+        const currentId =
+            this.currentIndex >= 0
+                ? this.items[this.currentIndex]?.id
+                : undefined;
+
+        [
+            this.items[index],
+            this.items[targetIndex]
+        ] = [
+            this.items[targetIndex],
+            this.items[index]
+        ];
+
+        if (currentId) {
+            this.currentIndex = this.items.findIndex(
+                item => item.id === currentId
+            );
+        }
+
+        await this.persist();
+
+        return true;
+
+    }
+
     private isSameOrder(
         original: PlaylistItem[],
         shuffled: PlaylistItem[]

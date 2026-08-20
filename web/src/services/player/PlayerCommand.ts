@@ -18,6 +18,8 @@ export interface PlayerCommand {
 
         | "SHUFFLE_PLAYLIST"
 
+        | "MOVE_PLAYLIST_ITEM"
+
         | "REPEAT_OFF"
 
         | "REPEAT_ONE"
@@ -70,5 +72,7 @@ export interface PlayerCommand {
     repeatMode?: string;
 
     id?:string;
+
+    direction?: "up" | "down";
 
 }

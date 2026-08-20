@@ -20,6 +20,7 @@ export interface ProcessingState {
   shufflePlaylist: boolean;
   openVideo: boolean;
   playPlaylistItem: boolean;
+  movePlaylistItem: boolean;
 }
 
 const initialProcessing: ProcessingState = {
@@ -41,6 +42,7 @@ const initialProcessing: ProcessingState = {
   seek: false,
   openVideo: false,
   playPlaylistItem: false,
+  movePlaylistItem: false,
 };
 
 interface LoadingContextValue {

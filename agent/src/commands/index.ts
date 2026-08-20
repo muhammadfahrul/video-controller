@@ -48,4 +48,6 @@ export * from "./handlers/PlayPlaylistItemHandler";
 
 export * from "./handlers/ShufflePlaylistHandler";
 
+export * from "./handlers/MovePlaylistItemHandler";
+
 export * from "./handlers/RepeatModeHandler";

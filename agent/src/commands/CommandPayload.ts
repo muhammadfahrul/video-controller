@@ -21,4 +21,6 @@ export interface CommandPayload {
 
     enabled?: boolean;
 
+    direction?: "up" | "down";
+
 }

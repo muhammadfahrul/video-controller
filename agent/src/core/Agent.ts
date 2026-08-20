@@ -41,7 +41,8 @@ import {
     RemovePlaylistHandler,
     ClearPlaylistHandler,
     PlayPlaylistItemHandler,
-    ShufflePlaylistHandler
+    ShufflePlaylistHandler,
+    MovePlaylistItemHandler
 } from "../commands";
 import { FullscreenHandler } from "../commands/handlers/FullscreenHandler";
 import { ExitFullscreenHandler } from "../commands/handlers/ExitFullscreenHandler";
@@ -545,6 +546,13 @@ export class Agent {
         this.commandDispatcher.register(
             CommandType.SHUFFLE_PLAYLIST,
             new ShufflePlaylistHandler(
+                this.playlist
+            )
+        );
+
+        this.commandDispatcher.register(
+            CommandType.MOVE_PLAYLIST_ITEM,
+            new MovePlaylistItemHandler(
                 this.playlist
             )
         );

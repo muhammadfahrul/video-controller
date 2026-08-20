@@ -4,7 +4,11 @@ import {
 
     Play,
 
-    Loader2
+    Loader2,
+
+    ChevronUp,
+
+    ChevronDown
 
 } from "lucide-react";
 
@@ -27,9 +31,19 @@ interface Props {
 
     onRemove(): void;
 
+    onMoveUp(): void;
+
+    onMoveDown(): void;
+
     removing?: boolean;
-    
+
     disabled?: boolean;
+
+    canMoveUp?: boolean;
+
+    canMoveDown?: boolean;
+
+    moving?: boolean;
 
 }
 
@@ -43,9 +57,19 @@ export default function PlaylistItemCard({
 
     onRemove,
 
+    onMoveUp,
+
+    onMoveDown,
+
     removing = false,
-    
-    disabled = false
+
+    disabled = false,
+
+    canMoveUp = false,
+
+    canMoveDown = false,
+
+    moving = false
 
 }: Props) {
 
@@ -162,36 +186,93 @@ export default function PlaylistItemCard({
 
             </div>
 
-            <button
-                onClick={(e)=>{
-
-                    e.stopPropagation();
-
-                    onRemove();
-
-                }}
-
-                disabled={removing || disabled}
-
-                className={`
+            <div
+                className="
+                    flex
+                    items-center
+                    gap-1
                     self-start
-                    rounded-lg
-                    p-2
-                    text-red-500
-                    transition
-                    ${removing || disabled
-                        ? "opacity-50 cursor-not-allowed" 
-                        : "hover:bg-red-50"}
-                `}
+                "
+                onClick={(e) => e.stopPropagation()}
             >
 
-                {removing || disabled ? (
-                    <Loader2 size={18} className="animate-spin" />
-                ) : (
-                    <Trash2 size={18} />
-                )}
+                <button
+                    onClick={() => onMoveUp()}
 
-            </button>
+                    disabled={!canMoveUp || moving || disabled}
+
+                    className={`
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-[#00f0ff]
+                        transition
+                        ${!canMoveUp || moving || disabled
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:bg-[#00f0ff]/10"}
+                    `}
+                >
+
+                    <ChevronUp size={16} />
+
+                </button>
+
+                <button
+                    onClick={() => onMoveDown()}
+
+                    disabled={!canMoveDown || moving || disabled}
+
+                    className={`
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-[#00f0ff]
+                        transition
+                        ${!canMoveDown || moving || disabled
+                            ? "opacity-30 cursor-not-allowed"
+                            : "hover:bg-[#00f0ff]/10"}
+                    `}
+                >
+
+                    <ChevronDown size={16} />
+
+                </button>
+
+                <button
+                    onClick={() => onRemove()}
+
+                    disabled={removing || disabled}
+
+                    className={`
+                        flex
+                        h-8
+                        w-8
+                        items-center
+                        justify-center
+                        rounded-lg
+                        text-red-500
+                        transition
+                        ${removing || disabled
+                            ? "opacity-50 cursor-not-allowed"
+                            : "hover:bg-red-500/10"}
+                    `}
+                >
+
+                    {removing || disabled ? (
+                        <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                        <Trash2 size={18} />
+                    )}
+
+                </button>
+
+            </div>
 
         </Card>
 

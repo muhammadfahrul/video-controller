@@ -358,6 +358,32 @@ export class PlayerCommandService {
 
 
 
+    movePlaylistItem(
+
+        agentId:string,
+
+        playlistId:string,
+
+        direction: "up" | "down"
+
+    ){
+
+        this.emit({
+
+            agentId,
+
+            type:"MOVE_PLAYLIST_ITEM",
+
+            id:playlistId,
+
+            direction
+
+        });
+
+    }
+
+
+
     repeat(
 
         agentId:string,
