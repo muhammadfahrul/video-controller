@@ -745,7 +745,7 @@ if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
     PIDS="$PIDS $SERVER_PID"
     echo "   - Server: PID $SERVER_PID"
 
-    wait_for_server 53331 30
+    wait_for_server 53331 30 || true
 
     if kill -0 "$SERVER_PID" 2>/dev/null; then
         echo "   ✅ Server is running"
