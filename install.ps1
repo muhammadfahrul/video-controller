@@ -556,6 +556,27 @@ function Remove-Autostart {
 }
 
 # ============================================
+# Check whether a Node.js version string (e.g. "v20.19.0") satisfies what
+# this project's tooling actually requires: Vite 8.x needs
+# "^20.19.0 || >=22.12.0" and ESLint 10.x needs "^20.19.0 || ^22.13.0 || >=24"
+# (see web/node_modules/{vite,eslint}/package.json "engines"). Their
+# intersection is 20.19+, 22.13+, or 24+ - Node 21.x and 23.x are NOT
+# supported even though they're newer than 20.
+# ============================================
+function Test-NodeVersionOk {
+    param([string]$Version)
+
+    if ($Version -match 'v(\d+)\.(\d+)') {
+        $major = [int]$matches[1]
+        $minor = [int]$matches[2]
+        if ($major -ge 24) { return $true }
+        if ($major -eq 22 -and $minor -ge 13) { return $true }
+        if ($major -eq 20 -and $minor -ge 19) { return $true }
+    }
+    return $false
+}
+
+# ============================================
 # Find Node.js installation
 # ============================================
 function Find-NodeJS {
@@ -858,10 +879,9 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
     }
 
     $nodeVersion = & $nodeExePath --version 2>$null
-    $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
 
-    if (-not $nodeVersion -or $nodeMajorVersion -lt 22) {
-        Write-Host "[ERROR] Node.js $nodeVersion requires v22+ for this project (Vite 8.x)!" -ForegroundColor Red
+    if (-not $nodeVersion -or -not (Test-NodeVersionOk $nodeVersion)) {
+        Write-Host "[ERROR] Node.js $nodeVersion tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)!" -ForegroundColor Red
         exit 1
     }
 
@@ -967,22 +987,26 @@ if (-not $nodeExePath) {
 
 # Get Node.js version using the found path
 $nodeVersion = & $nodeExePath --version 2>$null
-$nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
 
-# Check if Node.js is too old or below v22 (required by Vite 8.x)
-if (-not $nodeVersion -or $nodeMajorVersion -lt 22) {
-    Write-Host "[ERROR] Node.js $nodeVersion requires v22+ for this project (Vite 8.x)" -ForegroundColor Red
+# Check if Node.js satisfies Vite 8.x / ESLint 10.x (20.19+, 22.13+, or 24+)
+if (-not $nodeVersion -or -not (Test-NodeVersionOk $nodeVersion)) {
+    Write-Host "[ERROR] Node.js $nodeVersion tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)" -ForegroundColor Red
     Write-Host "[INFO] Installing Node.js v22..." -ForegroundColor Yellow
     Install-NodeJS
     $nodeExePath = Find-NodeJS
-    
+
     if (-not $nodeExePath) {
         Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
         Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
         exit 1
     }
     $nodeVersion = & $nodeExePath --version 2>$null
-    $nodeMajorVersion = if ($nodeVersion -match 'v(\d+)') { [int]$matches[1] } else { 0 }
+
+    if (-not (Test-NodeVersionOk $nodeVersion)) {
+        Write-Host "[ERROR] Node.js $nodeVersion masih belum memenuhi syarat setelah instalasi." -ForegroundColor Red
+        Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
+        exit 1
+    }
 }
 
 # Add node directory to PATH for this session

@@ -511,7 +511,7 @@ install_nodejs() {
             ARCH="x86"
         fi
         
-        NODE_VERSION="20.18.1"
+        NODE_VERSION="22.13.1"
         NODE_TAR="node-v${NODE_VERSION}-linux-${ARCH}.tar.xz"
         
         cd /tmp
@@ -523,15 +523,40 @@ install_nodejs() {
     fi
 }
 
-# Check if Node.js version is too old (need 16+)
-NODE_MAJOR_VERSION=$(node -v 2>/dev/null | sed 's/v\([0-9]*\).*/\1/')
+# Check whether a Node.js version string (e.g. "v20.19.0") satisfies what
+# this project's tooling actually requires: Vite 8.x needs
+# "^20.19.0 || >=22.12.0" and ESLint 10.x needs "^20.19.0 || ^22.13.0 || >=24"
+# (see web/node_modules/{vite,eslint}/package.json "engines"). Their
+# intersection is 20.19+, 22.13+, or 24+ - Node 21.x and 23.x are NOT
+# supported even though they're newer than 20.
+node_version_ok() {
+    local ver="${1#v}"
+    local major minor
+    major=$(echo "$ver" | cut -d. -f1)
+    minor=$(echo "$ver" | cut -d. -f2)
+    if [ -z "$major" ]; then
+        return 1
+    fi
+    if [ "$major" -ge 24 ]; then
+        return 0
+    elif [ "$major" -eq 22 ] && [ "$minor" -ge 13 ]; then
+        return 0
+    elif [ "$major" -eq 20 ] && [ "$minor" -ge 19 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if Node.js version satisfies Vite 8.x / ESLint 10.x (need 20.19+, 22.13+, or 24+)
+NODE_CURRENT_VERSION=$(node -v 2>/dev/null)
 
 # Track if we upgraded Node.js
 NODE_UPGRADED=false
 
-# Auto-install Node.js if not present or version too old
-if ! command -v node &> /dev/null || [ "$NODE_MAJOR_VERSION" -lt 16 ]; then
-    echo "❌ Node.js $(node -v 2>/dev/null || echo 'not found') is too old or not installed!"
+# Auto-install Node.js if not present or version doesn't satisfy requirements
+if ! command -v node &> /dev/null || ! node_version_ok "$NODE_CURRENT_VERSION"; then
+    echo "❌ Node.js ${NODE_CURRENT_VERSION:-not found} tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)!"
     install_nodejs
     NODE_UPGRADED=true
 fi
@@ -543,6 +568,12 @@ export PATH="/usr/local/bin:$PATH"
 if ! command -v npm &> /dev/null; then
     echo "❌ npm is not installed!"
     install_nodejs
+fi
+
+if ! node_version_ok "$(node -v 2>/dev/null)"; then
+    echo "❌ Node.js $(node -v 2>/dev/null || echo 'not found') masih belum memenuhi syarat (butuh 20.19+, 22.13+, atau 24+) setelah instalasi."
+    echo "ℹ️ Silakan buka terminal baru lalu jalankan ulang script ini."
+    exit 1
 fi
 
 echo "✅ Node.js $(node -v) and npm $(npm -v) detected"
