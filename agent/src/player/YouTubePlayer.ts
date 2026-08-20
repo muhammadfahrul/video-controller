@@ -27,6 +27,21 @@ export class YouTubePlayer {
 
     private endedListenerInitialized = false;
 
+    // Serializes every method below that touches `this.page` (navigation,
+    // playback control, fullscreen, ...). Multiple independent call paths
+    // (agent startup, server-pushed state restores, incoming commands, the
+    // ended-video callback) can all reach this same Page concurrently; without
+    // a queue two of them racing - e.g. a background restore's page.goto()
+    // overlapping the startup fullscreen() call - throws "Player is
+    // navigating." (fatal, crashes the agent) and can corrupt an in-flight
+    // YouTube page load (seen as a page-context SyntaxError). Queuing forces
+    // them to run one at a time instead of colliding.
+    // getSnapshot() is deliberately NOT queued: it's polled every second for
+    // state sync and already short-circuits to an empty snapshot while
+    // `navigating` is true, so it must stay non-blocking rather than wait in
+    // line behind whatever operation is in flight.
+    private operationQueue: Promise<unknown> = Promise.resolve();
+
     constructor(
         private readonly page: Page
     ){
@@ -41,8 +56,32 @@ export class YouTubePlayer {
 
     }
 
+    private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+
+        const run =
+            this.operationQueue.then(
+                operation,
+                operation
+            );
+
+        this.operationQueue =
+            run.then(
+                () => undefined,
+                () => undefined
+            );
+
+        return run;
+
+    }
+
 
     public async open(videoId: string): Promise<void> {
+
+        return this.enqueue(() => this.doOpen(videoId));
+
+    }
+
+    private async doOpen(videoId: string): Promise<void> {
 
         this.navigating = true;
 
@@ -109,6 +148,12 @@ export class YouTubePlayer {
 
     public async play(): Promise<void> {
 
+        return this.enqueue(() => this.doPlay());
+
+    }
+
+    private async doPlay(): Promise<void> {
+
         this.ensureReady();
 
         console.log(
@@ -116,7 +161,7 @@ export class YouTubePlayer {
             "[YouTube] play()"
 
         );
-        
+
         await this.dom.play();
 
         this.state = PlayerState.PLAYING;
@@ -125,6 +170,12 @@ export class YouTubePlayer {
     }
 
     public async openHome(): Promise<void> {
+
+        return this.enqueue(() => this.doOpenHome());
+
+    }
+
+    private async doOpenHome(): Promise<void> {
 
         this.navigating = true;
 
@@ -164,6 +215,12 @@ export class YouTubePlayer {
 
     public async pause(): Promise<void> {
 
+        return this.enqueue(() => this.doPause());
+
+    }
+
+    private async doPause(): Promise<void> {
+
         this.ensureReady();
 
         await this.dom.pause();
@@ -174,13 +231,25 @@ export class YouTubePlayer {
      * Navigate to any URL (used for showing images).
      */
     public async goto(url: string): Promise<void> {
+
+        return this.enqueue(() => this.doGoto(url));
+
+    }
+
+    private async doGoto(url: string): Promise<void> {
         this.ensureReady();
-        
+
         await this.page.goto(url, { waitUntil: "domcontentloaded" });
         await this.page.waitForTimeout(1000);
     }
 
     public async skipAd(): Promise<boolean> {
+
+        return this.enqueue(() => this.doSkipAd());
+
+    }
+
+    private async doSkipAd(): Promise<boolean> {
 
         this.ensureReady();
 
@@ -193,8 +262,16 @@ export class YouTubePlayer {
         volume: number
     ): Promise<void> {
 
+        return this.enqueue(() => this.doSetVolume(volume));
+
+    }
+
+    private async doSetVolume(
+        volume: number
+    ): Promise<void> {
+
         this.ensureReady();
-        
+
         console.log(
             "YouTubePlayer.setVolume",
             volume
@@ -311,6 +388,14 @@ export class YouTubePlayer {
         seconds: number
     ) {
 
+        return this.enqueue(() => this.doSeek(seconds));
+
+    }
+
+    private async doSeek(
+        seconds: number
+    ) {
+
         this.ensureReady();
 
         await this.dom.seek(
@@ -323,6 +408,12 @@ export class YouTubePlayer {
 
     public async mute() {
 
+        return this.enqueue(() => this.doMute());
+
+    }
+
+    private async doMute() {
+
         this.ensureReady();
 
         await this.dom.mute();
@@ -330,6 +421,12 @@ export class YouTubePlayer {
     }
 
     public async unmute() {
+
+        return this.enqueue(() => this.doUnmute());
+
+    }
+
+    private async doUnmute() {
 
         this.ensureReady();
 
@@ -339,6 +436,12 @@ export class YouTubePlayer {
 
 
     public async stop() {
+
+        return this.enqueue(() => this.doStop());
+
+    }
+
+    private async doStop() {
 
         this.ensureReady();
 
@@ -350,17 +453,29 @@ export class YouTubePlayer {
 
     public async fullscreen() {
 
+        return this.enqueue(() => this.doFullscreen());
+
+    }
+
+    private async doFullscreen() {
+
         this.ensureReady();
 
         console.log(
             "YouTubePlayer.fullscreen"
         );
-        
+
         await this.dom.fullscreen();
 
     }
 
     public async exitFullscreen() {
+
+        return this.enqueue(() => this.doExitFullscreen());
+
+    }
+
+    private async doExitFullscreen() {
 
         this.ensureReady();
 
@@ -370,6 +485,12 @@ export class YouTubePlayer {
 
     public async toggleFullscreen() {
 
+        return this.enqueue(() => this.doToggleFullscreen());
+
+    }
+
+    private async doToggleFullscreen() {
+
         this.ensureReady();
 
         await this.dom.toggleFullscreen();
@@ -377,6 +498,12 @@ export class YouTubePlayer {
     }
 
     public async isFullscreen(): Promise<boolean> {
+
+        return this.enqueue(() => this.doIsFullscreen());
+
+    }
+
+    private async doIsFullscreen(): Promise<boolean> {
 
         this.ensureReady();
 
