@@ -315,124 +315,69 @@ show_menu() {
 # ============================================
 # Parse menu selection
 # ============================================
+# Single alias table shared by all three entry points ($CLI_MODE, the
+# positional $1 legacy format, and the interactive menu) - they used to
+# have divergent alias coverage ($CLI_MODE only understood bare
+# digits/letters with no word aliases and no invalid-input error message;
+# the interactive menu had an undocumented "r/R" -> legacy "remove-autostart"
+# shortcut not available anywhere else). Mirrors install.ps1's
+# Get-InstallMode alias set.
+resolve_install_mode() {
+    local raw
+    raw="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$raw" in
+        1|room) echo "room" ;;
+        2|kasir) echo "kasir" ;;
+        3|all) echo "all" ;;
+        a|autostart|ar|autostart-room) echo "autostart-room" ;;
+        b|autostart-kasir|bk|autostart-cashier) echo "autostart-kasir" ;;
+        c|autostart-all) echo "autostart-all" ;;
+        d|remove-autostart-room|remove-room) echo "remove-autostart-room" ;;
+        e|remove-autostart-kasir|remove-kasir) echo "remove-autostart-kasir" ;;
+        f|remove-autostart-all|remove-all|remove-autostart) echo "remove-autostart-all" ;;
+        *) echo "" ;;
+    esac
+}
+
 INSTALL_MODE=""
 
 # Use CLI mode if provided via arguments
 if [[ -n "$CLI_MODE" ]]; then
-    case $CLI_MODE in
-        1)
-            INSTALL_MODE="room"
-            ;;
-        2)
-            INSTALL_MODE="kasir"
-            ;;
-        3)
-            INSTALL_MODE="all"
-            ;;
-        a|A)
-            INSTALL_MODE="autostart-room"
-            ;;
-        b|B)
-            INSTALL_MODE="autostart-kasir"
-            ;;
-        c|C)
-            INSTALL_MODE="autostart-all"
-            ;;
-        d|D)
-            INSTALL_MODE="remove-autostart-room"
-            ;;
-        e|E)
-            INSTALL_MODE="remove-autostart-kasir"
-            ;;
-        f|F)
-            INSTALL_MODE="remove-autostart-all"
-            ;;
-    esac
+    if [[ "$CLI_MODE" == "0" || "$CLI_MODE" == "exit" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$CLI_MODE")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid: $CLI_MODE"
+        exit 1
+    fi
 elif [[ $# -gt 0 ]]; then
     # Command line argument provided (legacy format)
-    case $1 in
-        1|room)
-            INSTALL_MODE="room"
-            ;;
-        2|kasir)
-            INSTALL_MODE="kasir"
-            ;;
-        3|all)
-            INSTALL_MODE="all"
-            ;;
-        a|autostart|ar|autostart-room)
-            INSTALL_MODE="autostart-room"
-            ;;
-        b|autostart-kasir|bk|autostart-cashier)
-            INSTALL_MODE="autostart-kasir"
-            ;;
-        c|autostart-all|all)
-            INSTALL_MODE="autostart-all"
-            ;;
-        d|remove-autostart-room|remove-room)
-            INSTALL_MODE="remove-autostart-room"
-            ;;
-        e|remove-autostart-kasir|remove-kasir)
-            INSTALL_MODE="remove-autostart-kasir"
-            ;;
-        f|remove-autostart-all|remove-all)
-            INSTALL_MODE="remove-autostart-all"
-            ;;
-        0|exit)
-            echo "Keluar..."
-            exit 0
-            ;;
-        *)
-            echo "Pilihan tidak valid: $1"
-            exit 1
-            ;;
-    esac
+    if [[ "$1" == "0" || "$1" == "exit" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$1")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid: $1"
+        exit 1
+    fi
 else
     # Show interactive menu
     show_menu
     read -r choice
     echo ""
-    
-    case $choice in
-        1)
-            INSTALL_MODE="room"
-            ;;
-        2)
-            INSTALL_MODE="kasir"
-            ;;
-        3)
-            INSTALL_MODE="all"
-            ;;
-        a|A)
-            INSTALL_MODE="autostart-room"
-            ;;
-        b|B)
-            INSTALL_MODE="autostart-kasir"
-            ;;
-        c|C)
-            INSTALL_MODE="autostart-all"
-            ;;
-        d|D)
-            INSTALL_MODE="remove-autostart-room"
-            ;;
-        e|E)
-            INSTALL_MODE="remove-autostart-kasir"
-            ;;
-        f|F)
-            INSTALL_MODE="remove-autostart-all"
-            ;;
-        r|R)
-            INSTALL_MODE="remove-autostart"
-            ;;
-        0)
-            echo "Keluar..."
-            exit 0
-            ;;
-        *)
-            echo "Pilihan tidak valid!"
-            exit 1
-            ;;
-    esac
+
+    if [[ "$choice" == "0" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$choice")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid!"
+        exit 1
+    fi
 fi
 
 # ============================================
@@ -1155,12 +1100,6 @@ if [ "$INSTALL_MODE" = "remove-autostart-kasir" ]; then
 fi
 
 if [ "$INSTALL_MODE" = "remove-autostart-all" ]; then
-    remove_autostart "all"
-    exit 0
-fi
-
-# Legacy support for old remove-autostart mode
-if [ "$INSTALL_MODE" = "remove-autostart" ]; then
     remove_autostart "all"
     exit 0
 fi
