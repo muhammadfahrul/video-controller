@@ -424,6 +424,16 @@ fi
 
 # Download repository archive directly as ZIP when project files are not present
 if [ "$HAS_PROJECT_FILES" = false ]; then
+    echo "⚠️ package.json tidak ditemukan di: $PROJECT_ROOT"
+    echo ""
+    echo -n "❓ Download dari GitHub? [y/N]: "
+    read -r download_confirm
+    if [[ ! "$download_confirm" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "ℹ️ Solusi: Pindahkan install.sh ke dalam folder video-controller"
+        exit 1
+    fi
+
     if ! command -v unzip &> /dev/null; then
         echo "❌ unzip is not installed!"
         install_unzip
