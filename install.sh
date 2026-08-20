@@ -4,8 +4,81 @@
 # Run selected services with a single command
 # Auto-installs dependencies - just run ./install.sh
 
-# Get the project root directory
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+# ============================================
+# Find project root - look in script directory, parent directories, AND
+# sibling directories (mirrors install.ps1's Find-NodeJS-adjacent search so
+# the script still works when run from Downloads, a symlink, etc.)
+# ============================================
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+FOUND_PROJECT=false
+
+# 0. Check current working directory (where user runs the script)
+if [ -f "$PWD/package.json" ]; then
+    PROJECT_ROOT="$PWD"
+    FOUND_PROJECT=true
+fi
+
+# 1. Check script directory (where script file is located)
+if [ "$FOUND_PROJECT" = false ] && [ -f "$SCRIPT_DIR/package.json" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR"
+    FOUND_PROJECT=true
+fi
+
+# 2. If not found, walk up parent directories
+if [ "$FOUND_PROJECT" = false ]; then
+    check_path="$SCRIPT_DIR"
+    for _ in 1 2 3 4 5; do
+        if [ -f "$check_path/package.json" ]; then
+            PROJECT_ROOT="$check_path"
+            FOUND_PROJECT=true
+            break
+        fi
+        parent="$(dirname "$check_path")"
+        if [ "$parent" = "$check_path" ]; then
+            break
+        fi
+        check_path="$parent"
+    done
+fi
+
+# 3. Check for "video-controller" folder in script directory
+if [ "$FOUND_PROJECT" = false ] && [ -f "$SCRIPT_DIR/video-controller/package.json" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR/video-controller"
+    FOUND_PROJECT=true
+fi
+
+# 4. Check for video-controller in parent directory (common case for Downloads)
+if [ "$FOUND_PROJECT" = false ]; then
+    parent_dir="$(dirname "$SCRIPT_DIR")"
+    if [ -f "$parent_dir/video-controller/package.json" ]; then
+        PROJECT_ROOT="$parent_dir/video-controller"
+        FOUND_PROJECT=true
+    fi
+fi
+
+# Show where we found the project
+if [ "$FOUND_PROJECT" = true ]; then
+    echo "📁 Project root: $PROJECT_ROOT"
+else
+    echo "⚠️ Cannot find project root (package.json)"
+    echo ""
+    echo "🔍 Searched locations:"
+    echo "  - $PWD (current directory)"
+    echo "  - $SCRIPT_DIR (script location)"
+    check_path="$SCRIPT_DIR"
+    for i in 1 2 3; do
+        parent="$(dirname "$check_path")"
+        if [ "$parent" = "$check_path" ]; then
+            break
+        fi
+        echo "  - $parent (parent $i)"
+        check_path="$parent"
+    done
+    echo "  - $SCRIPT_DIR/video-controller (sibling)"
+    parent_dir="$(dirname "$SCRIPT_DIR")"
+    echo "  - $parent_dir/video-controller (sibling in parent)"
+fi
 
 # Source NVM for proper Node.js version (hardcoded path for reliability)
 export NVM_DIR="/home/parkee/.nvm"
@@ -415,16 +488,11 @@ install_unzip() {
     fi
 }
 
-# Check if we already have the project files
-HAS_PROJECT_FILES=false
-if [ -f "$PROJECT_ROOT/package.json" ]; then
-    HAS_PROJECT_FILES=true
-    echo "📁 Project files found in current directory"
-fi
+# Project location was already resolved by the root-finding search above
+HAS_PROJECT_FILES="$FOUND_PROJECT"
 
 # Download repository archive directly as ZIP when project files are not present
 if [ "$HAS_PROJECT_FILES" = false ]; then
-    echo "⚠️ package.json tidak ditemukan di: $PROJECT_ROOT"
     echo ""
     echo -n "❓ Download dari GitHub? [y/N]: "
     read -r download_confirm
