@@ -656,23 +656,6 @@ fi
 
 echo "✅ Node.js $(node -v) and npm $(npm -v) detected"
 
-# ============================================
-# Clean node_modules if needed
-# ============================================
-# Always clean web/node_modules to avoid rolldown binding issues
-if [ -d "$PROJECT_ROOT/web/node_modules" ]; then
-    echo "🧹 Cleaning web node_modules..."
-    rm -rf "$PROJECT_ROOT/web/node_modules"
-    rm -f "$PROJECT_ROOT/web/package-lock.json"
-fi
-
-# Clean cashier/node_modules to avoid issues
-if [ -d "$PROJECT_ROOT/cashier/node_modules" ]; then
-    echo "🧹 Cleaning cashier node_modules..."
-    rm -rf "$PROJECT_ROOT/cashier/node_modules"
-    rm -f "$PROJECT_ROOT/cashier/package-lock.json"
-fi
-
 # Clean other node_modules if Node.js was upgraded
 if [ "$NODE_UPGRADED" = true ]; then
     echo "🧹 Removing old node_modules (Node.js upgraded)..."
@@ -1094,39 +1077,62 @@ remove_autostart() {
 }
 
 # Handle auto-start modes
+# Each install is guarded by "node_modules missing" (same as the normal-mode
+# dependency section above) instead of always running npm install - otherwise
+# re-running an autostart mode reinstalls everything from scratch every time.
+# agent/server/web skip if node_modules already exists; cashier's
+# node_modules was already wiped unconditionally above (see the cleaning
+# section, kept there to avoid known native-binding issues), so its install
+# still always runs fresh.
 if [ "$INSTALL_MODE" = "autostart-room" ]; then
     echo "📦 Installing dependencies for Room App auto-start..."
-    cd "$PROJECT_ROOT/agent" && npm install
-    cd "$PROJECT_ROOT/server" && npm install
-    cd "$PROJECT_ROOT/web" && npm install
-    
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+
     echo "🔨 Building Room App..."
     cd "$PROJECT_ROOT/server" && npm run build
     cd "$PROJECT_ROOT/agent" && npm run build
     cd "$PROJECT_ROOT/web" && npm run build
-    
+
     setup_autostart "room"
     exit 0
 fi
 
 if [ "$INSTALL_MODE" = "autostart-kasir" ]; then
     echo "📦 Installing dependencies for Kasir auto-start..."
-    cd "$PROJECT_ROOT/cashier" && npm install
-    
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
     echo "🔨 Building Kasir..."
     cd "$PROJECT_ROOT/cashier" && npm run build
-    
+
     setup_autostart "kasir"
     exit 0
 fi
 
 if [ "$INSTALL_MODE" = "autostart-all" ]; then
     echo "📦 Installing dependencies for all services..."
-    cd "$PROJECT_ROOT/agent" && npm install
-    cd "$PROJECT_ROOT/server" && npm install
-    cd "$PROJECT_ROOT/web" && npm install
-    cd "$PROJECT_ROOT/cashier" && npm install
-    
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
     echo "🔨 Building all services..."
     cd "$PROJECT_ROOT/server" && npm run build
     cd "$PROJECT_ROOT/agent" && npm run build
