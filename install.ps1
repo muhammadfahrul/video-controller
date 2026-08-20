@@ -407,7 +407,7 @@ goto loop
 function Setup-Autostart {
     param([string]$mode)
 
-    Write-Host "[INFO] Setting up auto-start for mode: $mode" -ForegroundColor Yellow
+    Write-Host "[INFO] Membuat auto-start scripts untuk mode: $mode" -ForegroundColor Yellow
 
     # Use Startup folder approach (simpler and more reliable)
     $startupFolder = [Environment]::GetFolderPath('Startup')
@@ -426,70 +426,121 @@ function Setup-Autostart {
             $npmPath = $npmCmd.Source
         }
     } catch {}
-    
+
+    # .bat scripts are always (re)generated - this only writes files on disk,
+    # it doesn't make anything run automatically yet. Activation (the
+    # Startup-folder shortcut, plus starting the processes right now) is
+    # gated behind the confirmation prompt below, mirroring install.sh's
+    # "systemctl enable/start only if confirmed" behavior.
+    $roomScripts = $null
+
     if ($mode -eq "room" -or $mode -eq "all") {
         $logFile = Join-Path $PROJECT_ROOT "room_startup.log"
         $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
 
-        # Server startup script
         $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
         Build-AutostartBatchContent -Name "Server" -LogFile $logFile -WorkDir "$PROJECT_ROOT\server" -NpmScript "start" -NpmDir $npmDir |
             Out-File -FilePath $serverStartupScript -Encoding ASCII
-        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $serverStartupScript
-        Write-Host "[OK] Server auto-start configured: $serverStartupScript" -ForegroundColor Green
+        Write-Host "[OK] Script dibuat: $serverStartupScript" -ForegroundColor Green
 
-        # Agent startup script
         $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
         Build-AutostartBatchContent -Name "Agent" -LogFile $logFile -WorkDir "$PROJECT_ROOT\agent" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set BROWSER_HEADLESS=false" |
             Out-File -FilePath $agentStartupScript -Encoding ASCII
-        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $agentStartupScript
-        Write-Host "[OK] Agent auto-start configured: $agentStartupScript" -ForegroundColor Green
+        Write-Host "[OK] Script dibuat: $agentStartupScript" -ForegroundColor Green
 
-        # Web startup script
         $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
         Build-AutostartBatchContent -Name "Web" -LogFile $logFile -WorkDir "$PROJECT_ROOT\web" -NpmScript "preview:host" -NpmDir $npmDir |
             Out-File -FilePath $webStartupScript -Encoding ASCII
-        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $webStartupScript
-        Write-Host "[OK] Web auto-start configured: $webStartupScript" -ForegroundColor Green
+        Write-Host "[OK] Script dibuat: $webStartupScript" -ForegroundColor Green
 
-        Write-Host "[INFO] Server/Agent/Web will now auto-restart if they crash or exit unexpectedly" -ForegroundColor Green
+        $roomScripts = @{
+            Server = $serverStartupScript
+            Agent  = $agentStartupScript
+            Web    = $webStartupScript
+        }
     }
 
+    $kasirScript = $null
+
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Cashier startup script
         $cashierBatScript = Join-Path $scriptsFolder "VideoController_Cashier.bat"
         $cashierLogFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
         $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
 
         Build-AutostartBatchContent -Name "Cashier" -LogFile $cashierLogFile -WorkDir "$PROJECT_ROOT\cashier" -NpmScript "preview:host" -NpmDir $npmDir |
             Out-File -FilePath $cashierBatScript -Encoding ASCII
+        Write-Host "[OK] Script dibuat: $cashierBatScript" -ForegroundColor Green
 
-        New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -TargetPath $cashierBatScript
-        Write-Host "[OK] Cashier auto-start configured: $cashierBatScript" -ForegroundColor Green
-        Write-Host "[INFO] Cashier will now auto-restart if it crashes or exits unexpectedly" -ForegroundColor Green
         if ($npmPath) {
             Write-Host "[OK] Using npm: $npmPath" -ForegroundColor Green
         } else {
             Write-Host "[WARNING] npm not found in PATH, using default" -ForegroundColor Yellow
         }
         Write-Host "[OK] Log file: $cashierLogFile" -ForegroundColor Green
+
+        $kasirScript = $cashierBatScript
     }
 
     Write-Host ""
-    Write-Host "[INFO] Auto-start menggunakan Windows Startup folder (shortcut minimized)" -ForegroundColor Yellow
-    Write-Host "[INFO] Shortcut (.lnk) terletak di: $startupFolder" -ForegroundColor Yellow
+    Write-Host "[OK] Auto-start scripts ($mode) dibuat." -ForegroundColor Green
+    Write-Host ""
+
+    # Ask to enable now (mirrors install.sh's "Aktifkan auto-start sekarang? [y/N]" prompt)
+    Write-Host "[Q] Aktifkan auto-start sekarang? [y/N]: " -ForegroundColor Cyan -NoNewline
+    $enableNow = Read-Host
+
+    if ($enableNow -eq 'y' -or $enableNow -eq 'Y') {
+        Write-Host ""
+        Write-Host "[INFO] Mengaktifkan auto-start..." -ForegroundColor Yellow
+
+        if ($roomScripts) {
+            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $roomScripts.Server
+            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $roomScripts.Agent
+            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $roomScripts.Web
+            Write-Host "[OK] Shortcut Server/Agent/Web dibuat di Startup folder" -ForegroundColor Green
+            Write-Host "[INFO] Server/Agent/Web will now auto-restart if they crash or exit unexpectedly" -ForegroundColor Green
+
+            Write-Host ""
+            Write-Host "[INFO] Memulai Room App services sekarang..." -ForegroundColor Yellow
+            Start-Process -FilePath $roomScripts.Server -WindowStyle Minimized
+            Start-Sleep -Seconds 2
+            Start-Process -FilePath $roomScripts.Agent -WindowStyle Minimized
+            Start-Sleep -Seconds 1
+            Start-Process -FilePath $roomScripts.Web -WindowStyle Minimized
+        }
+
+        if ($kasirScript) {
+            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -TargetPath $kasirScript
+            Write-Host "[OK] Shortcut Cashier dibuat di Startup folder" -ForegroundColor Green
+            Write-Host "[INFO] Cashier will now auto-restart if it crashes or exits unexpectedly" -ForegroundColor Green
+
+            Write-Host ""
+            Write-Host "[INFO] Memulai Kasir service sekarang..." -ForegroundColor Yellow
+            Start-Process -FilePath $kasirScript -WindowStyle Minimized
+        }
+
+        Write-Host ""
+        Write-Host "[OK] Auto-start diaktifkan!" -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "[INFO] Auto-start belum diaktifkan - shortcut belum dibuat di Startup folder." -ForegroundColor Yellow
+        Write-Host "[INFO] Jalankan ulang script ini dengan mode yang sama untuk mengaktifkan nanti." -ForegroundColor Yellow
+    }
+
+    Write-Host ""
     Write-Host "[INFO] Script asli (.bat) terletak di: $scriptsFolder" -ForegroundColor Yellow
+    Write-Host "[INFO] Shortcut (.lnk), jika diaktifkan, terletak di: $startupFolder" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "[INFO] Untuk testing manual:" -ForegroundColor Yellow
-    Write-Host "  1. Buka folder: $startupFolder" -ForegroundColor Yellow
+    Write-Host "  1. Buka folder: $scriptsFolder" -ForegroundColor Yellow
     if ($mode -eq "room") {
-        Write-Host "  2. Klik dua kali shortcut VideoController_Server / Agent / Web (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Jalankan VideoController_Server.bat / Agent.bat / Web.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\room_startup.log" -ForegroundColor Yellow
     } elseif ($mode -eq "kasir") {
-        Write-Host "  2. Klik dua kali shortcut VideoController_Cashier (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Jalankan VideoController_Cashier.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
     } else {
-        Write-Host "  2. Klik dua kali shortcut VideoController_* (window akan minimize otomatis)" -ForegroundColor Yellow
+        Write-Host "  2. Jalankan VideoController_*.bat" -ForegroundColor Yellow
         Write-Host "  3. Jika cmd langsung close, cek log di $PROJECT_ROOT" -ForegroundColor Yellow
     }
     Write-Host ""
