@@ -1,0 +1,19 @@
+# Kasir stack: standalone cashier app, for the PC Kasir that connects to N
+# separate room servers over the LAN. Headless (just a web UI), so this runs
+# fine on Windows or Linux with Docker.
+#
+# Usage:
+#   docker compose -f docker-compose.cashier.yml up -d --build
+#
+# cashier/.env (VITE_ROOMS, VITE_BILLING_ENABLED) is baked in at build time -
+# edit it (or rerun install.sh/install.ps1) then rebuild to apply changes.
+
+services:
+  cashier:
+    build:
+      context: ./cashier
+    env_file:
+      - ./cashier/.env
+    ports:
+      - "53335:53335"
+    restart: unless-stopped

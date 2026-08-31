@@ -34,10 +34,15 @@ function Show-Menu {
     Write-Host "  [E] Remove Auto-start Kasir" -ForegroundColor Red
     Write-Host "  [F] Remove Auto-start Semua" -ForegroundColor Red
     Write-Host ""
+    Write-Host "  [G] Docker: Room App    - server+web via Docker (agent tetap native, lihat catatan)" -ForegroundColor Cyan
+    Write-Host "  [H] Docker: Kasir       - cashier via Docker" -ForegroundColor Cyan
+    Write-Host "  [I] Docker: Semua       - server+web+kasir via Docker" -ForegroundColor Cyan
+    Write-Host "  [J] Docker: Stop        - hentikan semua service Docker yang jalan" -ForegroundColor Cyan
+    Write-Host ""
     Write-Host "  [0] Keluar" -ForegroundColor White
     Write-Host ""
 
-    $choice = Read-Host "Masukkan pilihan [0-F]"
+    $choice = Read-Host "Masukkan pilihan [0-J]"
     return $choice
 }
 
@@ -69,6 +74,18 @@ function Get-InstallMode {
             'remove-autostart-all' { return 'remove-autostart-all' }
             'remove-all' { return 'remove-autostart-all' }
             'remove-autostart' { return 'remove-autostart-all' }
+            'g' { return 'docker-room' }
+            'docker-room' { return 'docker-room' }
+            'droom' { return 'docker-room' }
+            'h' { return 'docker-kasir' }
+            'docker-kasir' { return 'docker-kasir' }
+            'dkasir' { return 'docker-kasir' }
+            'i' { return 'docker-all' }
+            'docker-all' { return 'docker-all' }
+            'dall' { return 'docker-all' }
+            'j' { return 'docker-down' }
+            'docker-down' { return 'docker-down' }
+            'ddown' { return 'docker-down' }
             '0' { exit 0 }
             default {
                 Write-Host "Pilihan tidak valid: $RequestedMode" -ForegroundColor Red
@@ -95,6 +112,14 @@ function Get-InstallMode {
         'E' { return 'remove-autostart-kasir' }
         'f' { return 'remove-autostart-all' }
         'F' { return 'remove-autostart-all' }
+        'g' { return 'docker-room' }
+        'G' { return 'docker-room' }
+        'h' { return 'docker-kasir' }
+        'H' { return 'docker-kasir' }
+        'i' { return 'docker-all' }
+        'I' { return 'docker-all' }
+        'j' { return 'docker-down' }
+        'J' { return 'docker-down' }
         '0' { exit 0 }
         default {
             Write-Host "Pilihan tidak valid!" -ForegroundColor Red
@@ -347,6 +372,69 @@ function Ensure-PlaywrightBrowsers {
         Write-Host "[INFO] Installing Playwright browsers..." -ForegroundColor Yellow
         Push-Location $agentPath
         & npx playwright install chromium
+        Pop-Location
+    }
+}
+
+# ============================================
+# Docker deploy (alternative to the native npm build+run below - builds and
+# runs each service in a container via docker-compose.yml /
+# docker-compose.cashier.yml instead of installing Node.js on the host).
+#
+# Agent is NOT included here: it opens a visible Chrome/Chromium window that
+# must show up on the room PC's real display, and there is no Windows
+# equivalent of the Linux X11-socket passthrough docker-compose.yml relies
+# on for that. Room mode here only covers server+web; agent stays native
+# (install.ps1 -Mode room / autostart-room).
+# ============================================
+function Test-DockerAvailable {
+    $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+    if (-not $dockerCmd) {
+        Write-Host "[ERROR] Docker tidak ditemukan. Install Docker Desktop dulu: https://www.docker.com/products/docker-desktop/" -ForegroundColor Red
+        exit 1
+    }
+
+    & docker compose version *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Docker Compose plugin tidak ditemukan (butuh 'docker compose' - pastikan Docker Desktop up to date)." -ForegroundColor Red
+        exit 1
+    }
+}
+
+function Invoke-DockerDeploy {
+    param([string]$mode)
+
+    Test-DockerAvailable
+    Push-Location $PROJECT_ROOT
+
+    try {
+        if ($mode -eq "docker-down") {
+            Write-Host "[INFO] Menghentikan semua service Docker (room + kasir, kalau ada)..." -ForegroundColor Yellow
+            & docker compose down 2>$null
+            & docker compose -f docker-compose.cashier.yml down 2>$null
+            Write-Host "[OK] Docker services dihentikan." -ForegroundColor Green
+            return
+        }
+
+        if ($mode -eq "docker-room" -or $mode -eq "docker-all") {
+            Write-Host "[WARNING] Di Windows, agent TIDAK ikut di-Docker-kan (butuh display X11 yang tidak ada di Windows)." -ForegroundColor Yellow
+            Write-Host "[INFO] Cuma server+web yang dijalankan lewat Docker di sini." -ForegroundColor Yellow
+            Write-Host "[INFO] Jalankan agent secara native: install.ps1 -Mode room (atau -Mode autostart-room)" -ForegroundColor Yellow
+            Write-Host "[INFO] Building & starting server+web via Docker..." -ForegroundColor Yellow
+            & docker compose up -d --build server web
+        }
+
+        if ($mode -eq "docker-kasir" -or $mode -eq "docker-all") {
+            Write-Host "[INFO] Building & starting Kasir via Docker..." -ForegroundColor Yellow
+            & docker compose -f docker-compose.cashier.yml up -d --build
+        }
+
+        Write-Host ""
+        Write-Host "[OK] Docker deployment ($mode) selesai." -ForegroundColor Green
+        Write-Host "[INFO] Cek status: docker compose ps   (dan: docker compose -f docker-compose.cashier.yml ps)" -ForegroundColor Yellow
+        Write-Host "[INFO] Lihat log:  docker compose logs -f" -ForegroundColor Yellow
+        Write-Host "[INFO] Stop:       install.ps1 -Mode docker-down" -ForegroundColor Yellow
+    } finally {
         Pop-Location
     }
 }
@@ -833,7 +921,7 @@ $PricePerHour = ""
 $Packages = ""
 
 # Room App mode - needs Server IP, Room ID, Room Name
-if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
+if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-room" -or $INSTALL_MODE -eq "docker-all") {
     Write-Host "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama." -ForegroundColor Cyan
     Write-Host "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)." -ForegroundColor Cyan
     $input = Read-Host "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto)"
@@ -859,7 +947,7 @@ if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all") {
 }
 
 # Kasir mode - only needs Rooms JSON
-if ($INSTALL_MODE -eq "kasir") {
+if ($INSTALL_MODE -eq "kasir" -or $INSTALL_MODE -eq "docker-kasir") {
     Write-Host "Topologi: PC Kasir konek ke N server ruangan yg terpisah." -ForegroundColor Cyan
     Write-Host "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)." -ForegroundColor Cyan
     Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat" -ForegroundColor Cyan
@@ -873,7 +961,7 @@ if ($INSTALL_MODE -eq "kasir") {
 }
 
 # All mode - also needs Rooms JSON
-if ($INSTALL_MODE -eq "all") {
+if ($INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-all") {
     Write-Host "Untuk mode all, jika PC ini handle KASIR sekaligus:" -ForegroundColor Cyan
     Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat" -ForegroundColor Cyan
     Write-Host "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
@@ -914,9 +1002,28 @@ switch ($INSTALL_MODE) {
     'remove-autostart-all' {
         Write-Host "[INFO] Mode: Remove Auto-start Semua" -ForegroundColor Red
     }
+    'docker-room' {
+        Write-Host "[INFO] Mode: Docker Room App" -ForegroundColor Cyan
+    }
+    'docker-kasir' {
+        Write-Host "[INFO] Mode: Docker Kasir" -ForegroundColor Cyan
+    }
+    'docker-all' {
+        Write-Host "[INFO] Mode: Docker Semua" -ForegroundColor Cyan
+    }
+    'docker-down' {
+        Write-Host "[INFO] Mode: Docker Stop" -ForegroundColor Cyan
+    }
 }
 
 Write-Host ""
+
+# Handle Docker modes - build/run via docker compose, no local Node.js needed
+if ($INSTALL_MODE -match "^docker-") {
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
+    Invoke-DockerDeploy -mode $INSTALL_MODE
+    exit 0
+}
 
 # Handle auto-start modes - skip service start
 if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart-") {

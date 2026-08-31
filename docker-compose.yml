@@ -1,0 +1,70 @@
+# Room App stack: server + agent + web, for 1 PC = 1 Ruangan.
+#
+# Linux only. The agent needs a visible browser on the room's real display,
+# so it needs the host's X11 socket - there's no Windows equivalent. On
+# Windows rooms, run only server+web here (`docker compose up server web`)
+# and keep the agent native via install.ps1 (autostart-room mode).
+#
+# One-time host setup before first run:
+#   xhost +si:localuser:$(whoami)
+# (allows containers to draw on your X11 display; needed again after reboot
+# unless you add it to your session startup)
+#
+# Usage:
+#   docker compose up -d --build        # full room stack (Linux)
+#   docker compose up -d --build server web   # headless-only (e.g. Windows)
+#
+# .env files are read directly from agent/.env, server/.env, web/.env -
+# edit those (or rerun install.sh/install.ps1 to fill them in) before
+# building, same as the native flow.
+
+services:
+  server:
+    build:
+      context: ./server
+    env_file:
+      - ./server/.env
+    ports:
+      - "53331:53331"
+    volumes:
+      - server-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:53331/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  agent:
+    build:
+      context: ./agent
+    depends_on:
+      server:
+        condition: service_healthy
+    env_file:
+      - ./agent/.env
+    environment:
+      # Reach the server container by its compose service name instead of
+      # the LAN IP in agent/.env (that IP is for web/cashier clients outside
+      # the docker network, not for agent-to-server traffic).
+      SERVER_IP: server
+      DISPLAY: ${DISPLAY}
+      XAUTHORITY: /root/.Xauthority
+    volumes:
+      - agent-profile:/app/data/browser-profile
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    env_file:
+      - ./web/.env
+    ports:
+      - "53333:53333"
+    restart: unless-stopped
+
+volumes:
+  server-data:
+  agent-profile:

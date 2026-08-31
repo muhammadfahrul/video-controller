@@ -167,6 +167,49 @@ cd server && npm start
 cd agent && npm start  # untuk setiap ruangan
 ```
 
+## Docker Deployment
+
+Alternatif untuk build+run native. Setiap service (`agent`, `server`, `web`, `cashier`) punya `Dockerfile` sendiri, dan `install.sh` / `install.ps1` punya mode `docker-*` bawaan yang menjalankannya (prompt konfigurasi `.env`-nya sama seperti mode native).
+
+**Catatan penting soal agent:** agent membuka browser Chrome/Chromium yang benar-benar tampil di layar PC ruangan (`BROWSER_HEADLESS=false`) - bukan service headless biasa. Ini cuma bisa jalan di Docker pada **Linux** (lewat X11 socket passthrough ke display host). Di **Windows**, tidak ada padanan X11-nya, jadi agent tetap harus native lewat `install.ps1` (mode `room`/`autostart-room`); `server` dan `web` tetap bisa di-Docker-kan di Windows karena keduanya headless.
+
+### Lewat install script (disarankan)
+
+```bash
+# Linux - Room App (server+agent+web)
+./install.sh docker-room
+
+# Linux/Windows - Kasir saja
+./install.sh docker-kasir        # atau: .\install.ps1 -Mode docker-kasir
+
+# Room App + Kasir sekaligus
+./install.sh docker-all          # atau: .\install.ps1 -Mode docker-all
+
+# Stop semua service Docker yang lagi jalan
+./install.sh docker-down         # atau: .\install.ps1 -Mode docker-down
+```
+
+Atau jalankan `install.sh`/`install.ps1` tanpa argumen dan pilih menu `[G]`-`[J]`. Di Windows, mode `docker-room`/`docker-all` cuma menjalankan `server`+`web` lewat Docker (agent tetap native) - script akan cetak pengingat ini di layar.
+
+### Lewat docker compose langsung
+
+```bash
+# Sekali saja per sesi X di Linux (izinkan container gambar ke display host)
+xhost +si:localuser:$(whoami)
+
+# Isi agent/.env, server/.env, web/.env dulu (lihat bagian Konfigurasi di atas)
+docker compose up -d --build              # Room App (server+agent+web), Linux
+docker compose up -d --build server web   # Room App headless-only, Windows
+docker compose -f docker-compose.cashier.yml up -d --build   # Kasir
+```
+
+### Catatan
+
+- `web`/`cashier` adalah Vite app - variabel `VITE_*` di-*bake* ke bundle JS saat build image. Ubah `.env` lalu **rebuild** (`docker compose up -d --build`), restart container saja tidak cukup.
+- `server`/`agent` baca `.env` langsung lewat `env_file:` - ubah `.env` lalu restart container sudah cukup, tidak perlu rebuild.
+- Data persisten (`server/data/database.sqlite`, profil browser agent yang menyimpan sesi login YouTube) disimpan di named volume Docker, aman lintas `docker compose up`/`down` (bukan `down -v`).
+- Untuk mengganti `SERVER_IP` yang dipakai agent menghubungi server, override sudah otomatis diarahkan ke nama service Docker (`server`) di `docker-compose.yml` - field `SERVER_IP` di `agent/.env` sendiri tetap dipakai apa adanya oleh `web`/`cashier` karena mereka diakses dari luar jaringan Docker (LAN).
+
 ## Socket Events
 
 Protokol real-time selengkapnya ada di `server/src/socket/SocketEvents.ts` dan `server/src/socket/SocketServer.ts`. Ringkasan event yang benar-benar aktif:

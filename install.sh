@@ -111,7 +111,7 @@ prompt_env_config() {
     local packages_json=""
 
     # Room App mode - needs Server IP, Room ID, Room Name
-    if [[ "$mode" == "room" || "$mode" == "all" ]]; then
+    if [[ "$mode" == "room" || "$mode" == "all" || "$mode" == "docker-room" || "$mode" == "docker-all" ]]; then
         echo "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama."
         echo "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)."
         read -p "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto): " server_ip
@@ -131,7 +131,7 @@ prompt_env_config() {
     fi
 
     # Kasir mode - only needs Rooms JSON
-    if [[ "$mode" == "kasir" ]]; then
+    if [[ "$mode" == "kasir" || "$mode" == "docker-kasir" ]]; then
         echo "Topologi: PC Kasir konek ke N server ruangan yg terpisah."
         echo "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)."
         echo "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat"
@@ -143,7 +143,7 @@ prompt_env_config() {
     fi
 
     # All mode - needs everything
-    if [[ "$mode" == "all" ]]; then
+    if [[ "$mode" == "all" || "$mode" == "docker-all" ]]; then
         echo "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama."
         echo "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)."
         read -p "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto): " server_ip
@@ -286,6 +286,62 @@ apply_env_config() {
 }
 
 # ============================================
+# Docker deploy (alternative to the native npm build+run below - builds and
+# runs each service in a container via docker-compose.yml /
+# docker-compose.cashier.yml instead of installing Node.js on the host).
+# ============================================
+check_docker_available() {
+    if ! command -v docker &> /dev/null; then
+        echo "❌ Docker tidak ditemukan. Install dulu: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+    if ! docker compose version &> /dev/null; then
+        echo "❌ Docker Compose plugin tidak ditemukan (butuh 'docker compose', bukan 'docker-compose' lama)."
+        exit 1
+    fi
+}
+
+run_docker_deploy() {
+    local mode="$1"  # docker-room, docker-kasir, docker-all, docker-down
+
+    check_docker_available
+    cd "$PROJECT_ROOT"
+
+    if [[ "$mode" == "docker-down" ]]; then
+        echo "🐳 Menghentikan semua service Docker (room + kasir, kalau ada)..."
+        docker compose down 2>/dev/null || true
+        docker compose -f docker-compose.cashier.yml down 2>/dev/null || true
+        echo "✅ Docker services dihentikan."
+        return
+    fi
+
+    if [[ "$mode" == "docker-room" || "$mode" == "docker-all" ]]; then
+        # Agent membuka browser bervisual di layar - butuh akses ke X11 host.
+        # Lihat catatan Linux-only di docker-compose.yml.
+        if [[ -z "$DISPLAY" ]]; then
+            echo "⚠️ \$DISPLAY kosong - agent butuh display X11 aktif buat nampilin browser video."
+            echo "   Jalankan script ini dari sesi desktop (bukan SSH tanpa X forwarding)."
+        fi
+        echo "🔑 Mengizinkan container Docker akses ke display X11 (xhost)..."
+        xhost +si:localuser:"$(whoami)" 2>/dev/null || echo "⚠️ 'xhost' gagal/tidak ada - agent mungkin tidak bisa nampilin browser. Install paket x11-xserver-utils kalau perlu."
+
+        echo "🐳 Building & starting Room App (server + agent + web) via Docker..."
+        docker compose up -d --build
+    fi
+
+    if [[ "$mode" == "docker-kasir" || "$mode" == "docker-all" ]]; then
+        echo "🐳 Building & starting Kasir via Docker..."
+        docker compose -f docker-compose.cashier.yml up -d --build
+    fi
+
+    echo ""
+    echo "✅ Docker deployment ($mode) selesai."
+    echo "ℹ️ Cek status: docker compose ps   (dan: docker compose -f docker-compose.cashier.yml ps)"
+    echo "ℹ️ Lihat log:  docker compose logs -f"
+    echo "ℹ️ Stop:       ./install.sh docker-down"
+}
+
+# ============================================
 # Interactive menu
 # ============================================
 show_menu() {
@@ -307,9 +363,14 @@ show_menu() {
     echo "  [E] Remove Auto-start Kasir"
     echo "  [F] Remove Auto-start Semua"
     echo ""
+    echo "  [G] Docker: Room App    - server+agent+web via Docker (Linux, butuh display X11)"
+    echo "  [H] Docker: Kasir       - cashier via Docker"
+    echo "  [I] Docker: Semua       - Room App + Kasir via Docker"
+    echo "  [J] Docker: Stop        - hentikan semua service Docker yang jalan"
+    echo ""
     echo "  [0] Keluar"
     echo ""
-    echo -n "Masukkan pilihan [0-F]: "
+    echo -n "Masukkan pilihan [0-J]: "
 }
 
 # ============================================
@@ -335,6 +396,10 @@ resolve_install_mode() {
         d|remove-autostart-room|remove-room) echo "remove-autostart-room" ;;
         e|remove-autostart-kasir|remove-kasir) echo "remove-autostart-kasir" ;;
         f|remove-autostart-all|remove-all|remove-autostart) echo "remove-autostart-all" ;;
+        g|docker-room|droom) echo "docker-room" ;;
+        h|docker-kasir|dkasir) echo "docker-kasir" ;;
+        i|docker-all|dall) echo "docker-all" ;;
+        j|docker-down|ddown) echo "docker-down" ;;
         *) echo "" ;;
     esac
 }
@@ -412,6 +477,18 @@ case $INSTALL_MODE in
         ;;
     remove-autostart-all)
         echo "📦 Mode: Hapus Auto-start Semua"
+        ;;
+    docker-room)
+        echo "📦 Mode: Docker Room App"
+        ;;
+    docker-kasir)
+        echo "📦 Mode: Docker Kasir"
+        ;;
+    docker-all)
+        echo "📦 Mode: Docker Semua"
+        ;;
+    docker-down)
+        echo "📦 Mode: Docker Stop"
         ;;
 esac
 echo ""
@@ -497,6 +574,14 @@ fi
 
 # Prompt for .env configuration AFTER PROJECT_ROOT is set correctly
 prompt_env_config "$INSTALL_MODE"
+
+# ============================================
+# Docker mode - build/run in containers, no local Node.js needed on the host
+# ============================================
+if [[ "$INSTALL_MODE" == docker-* ]]; then
+    run_docker_deploy "$INSTALL_MODE"
+    exit 0
+fi
 
 # ============================================
 # Auto-install Node.js if not present
