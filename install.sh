@@ -371,8 +371,16 @@ run_docker_deploy() {
         echo "🔑 Mengizinkan container Docker akses ke display X11 (xhost)..."
         xhost +si:localuser:"$(whoami)" 2>/dev/null || echo "⚠️ 'xhost' gagal/tidak ada - agent mungkin tidak bisa nampilin browser. Install paket x11-xserver-utils kalau perlu."
 
-        echo "🐳 Building & starting Room App (server + agent + web) via Docker..."
-        $DOCKER_COMPOSE_CMD up -d --build
+        # Build one service at a time instead of "up --build" (Compose
+        # builds all services in parallel by default via buildx bake) -
+        # concurrent "npm run build"/tsc processes can exhaust available
+        # memory and crash with "JavaScript heap out of memory" (exit 134).
+        echo "🐳 Building Room App services satu per satu (biar hemat memori)..."
+        $DOCKER_COMPOSE_CMD build server
+        $DOCKER_COMPOSE_CMD build agent
+        $DOCKER_COMPOSE_CMD build web
+        echo "🐳 Starting Room App (server + agent + web)..."
+        $DOCKER_COMPOSE_CMD up -d
     fi
 
     if [[ "$mode" == "docker-kasir" || "$mode" == "docker-all" ]]; then

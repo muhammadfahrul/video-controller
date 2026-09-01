@@ -387,13 +387,30 @@ function Ensure-PlaywrightBrowsers {
 # on for that. Room mode here only covers server+web; agent stays native
 # (install.ps1 -Mode room / autostart-room).
 # ============================================
+function Test-IsAdministrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
 function Install-Docker {
     Write-Host "[INFO] Docker tidak ditemukan. Mencoba auto-install Docker Desktop..." -ForegroundColor Yellow
 
+    # Docker Desktop's installer always elevates via UAC. If this shell isn't
+    # already Administrator, that UAC prompt has to be accepted manually or
+    # the install silently aborts (winget then reports a generic "cancelled"
+    # exit code).
+    if (-not (Test-IsAdministrator)) {
+        Write-Host "[WARNING] Docker Desktop installer butuh hak Administrator (akan muncul prompt UAC)." -ForegroundColor Yellow
+        Write-Host "[WARNING] Klik 'Yes' saat prompt UAC muncul, jangan di-cancel/close." -ForegroundColor Yellow
+    }
+
+    $installFailed = $false
     $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
     if ($wingetCmd) {
         Write-Host "[INFO] Installing Docker Desktop via winget..." -ForegroundColor Yellow
         & winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { $installFailed = $true }
     } else {
         Write-Host "[INFO] winget tidak ditemukan, download installer Docker Desktop..." -ForegroundColor Yellow
         $dockerInstaller = "$env:TEMP\DockerDesktopInstaller.exe"
@@ -403,9 +420,20 @@ function Install-Docker {
             Start-Process -FilePath $dockerInstaller -ArgumentList "install", "--quiet", "--accept-license" -Wait
         } catch {
             Write-Host "[ERROR] Gagal download/install Docker Desktop: $_" -ForegroundColor Red
+            $installFailed = $true
         } finally {
             Remove-Item -Path $dockerInstaller -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    if ($installFailed) {
+        Write-Host ""
+        Write-Host "[ERROR] Instalasi Docker Desktop gagal atau dibatalkan (kemungkinan prompt UAC di-'No'/ditutup)." -ForegroundColor Red
+        Write-Host "[INFO] Solusi:" -ForegroundColor Yellow
+        Write-Host "  1. Klik kanan PowerShell/Terminal -> 'Run as Administrator', lalu jalankan ulang install.ps1" -ForegroundColor Yellow
+        Write-Host "  2. Saat muncul jendela 'User Account Control', klik 'Yes' (jangan cancel)" -ForegroundColor Yellow
+        Write-Host "  3. Kalau masih gagal, install manual: https://www.docker.com/products/docker-desktop/" -ForegroundColor Yellow
+        exit 1
     }
 
     Write-Host ""
@@ -448,8 +476,18 @@ function Invoke-DockerDeploy {
             Write-Host "[WARNING] Di Windows, agent TIDAK ikut di-Docker-kan (butuh display X11 yang tidak ada di Windows)." -ForegroundColor Yellow
             Write-Host "[INFO] Cuma server+web yang dijalankan lewat Docker di sini." -ForegroundColor Yellow
             Write-Host "[INFO] Jalankan agent secara native: install.ps1 -Mode room (atau -Mode autostart-room)" -ForegroundColor Yellow
-            Write-Host "[INFO] Building & starting server+web via Docker..." -ForegroundColor Yellow
-            & docker compose up -d --build server web
+            # Build one service at a time instead of "up --build server web"
+            # (Compose builds requested services in parallel by default via
+            # buildx bake) - two concurrent "npm run build"/tsc processes can
+            # exhaust Docker Desktop's WSL2 memory limit and crash with
+            # "JavaScript heap out of memory" (exit code 134).
+            Write-Host "[INFO] Building server+web via Docker (satu per satu, biar hemat memori)..." -ForegroundColor Yellow
+            & docker compose build server
+            if ($LASTEXITCODE -ne 0) { throw "docker compose build server failed" }
+            & docker compose build web
+            if ($LASTEXITCODE -ne 0) { throw "docker compose build web failed" }
+            Write-Host "[INFO] Starting server+web..." -ForegroundColor Yellow
+            & docker compose up -d server web
         }
 
         if ($mode -eq "docker-kasir" -or $mode -eq "docker-all") {
