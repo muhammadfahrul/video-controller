@@ -290,12 +290,58 @@ apply_env_config() {
 # runs each service in a container via docker-compose.yml /
 # docker-compose.cashier.yml instead of installing Node.js on the host).
 # ============================================
+install_docker() {
+    echo "🔧 Docker tidak ditemukan. Mencoba auto-install..."
+
+    if ! command -v curl &> /dev/null; then
+        echo "❌ curl tidak ditemukan, tidak bisa auto-install Docker."
+        return 1
+    fi
+
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sudo sh /tmp/get-docker.sh
+    rm -f /tmp/get-docker.sh
+
+    # Start & enable the Docker daemon on distros that use systemd
+    if command -v systemctl &> /dev/null; then
+        sudo systemctl enable --now docker 2>/dev/null || true
+    fi
+
+    # Add current user to the 'docker' group so 'docker' can run without sudo
+    # (only takes effect after logout/login - handled below via sudo fallback
+    # for the rest of THIS run)
+    if ! groups "$(whoami)" 2>/dev/null | grep -qw docker; then
+        sudo usermod -aG docker "$(whoami)" 2>/dev/null || true
+        echo "⚠️ User $(whoami) ditambahkan ke group 'docker'. Logout/login ulang agar bisa jalankan docker tanpa sudo nanti."
+    fi
+}
+
+# Set once by check_docker_available: "docker compose" normally, or
+# "sudo docker compose" when the user was just added to the docker group
+# by install_docker but hasn't re-logged in yet for it to take effect.
+DOCKER_COMPOSE_CMD="docker compose"
+
 check_docker_available() {
     if ! command -v docker &> /dev/null; then
-        echo "❌ Docker tidak ditemukan. Install dulu: https://docs.docker.com/engine/install/"
+        install_docker
+    fi
+
+    if ! command -v docker &> /dev/null; then
+        echo "❌ Gagal auto-install Docker. Install manual: https://docs.docker.com/engine/install/"
         exit 1
     fi
-    if ! docker compose version &> /dev/null; then
+
+    if docker info &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+    elif sudo docker info &> /dev/null; then
+        echo "ℹ️ User belum bisa akses docker tanpa sudo (perlu re-login setelah instalasi). Pakai 'sudo docker' untuk sesi ini."
+        DOCKER_COMPOSE_CMD="sudo docker compose"
+    else
+        echo "❌ Docker terinstall tapi tidak bisa diakses - cek apakah Docker daemon sudah jalan."
+        exit 1
+    fi
+
+    if ! $DOCKER_COMPOSE_CMD version &> /dev/null; then
         echo "❌ Docker Compose plugin tidak ditemukan (butuh 'docker compose', bukan 'docker-compose' lama)."
         exit 1
     fi
@@ -309,8 +355,8 @@ run_docker_deploy() {
 
     if [[ "$mode" == "docker-down" ]]; then
         echo "🐳 Menghentikan semua service Docker (room + kasir, kalau ada)..."
-        docker compose down 2>/dev/null || true
-        docker compose -f docker-compose.cashier.yml down 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f docker-compose.cashier.yml down 2>/dev/null || true
         echo "✅ Docker services dihentikan."
         return
     fi
@@ -326,12 +372,12 @@ run_docker_deploy() {
         xhost +si:localuser:"$(whoami)" 2>/dev/null || echo "⚠️ 'xhost' gagal/tidak ada - agent mungkin tidak bisa nampilin browser. Install paket x11-xserver-utils kalau perlu."
 
         echo "🐳 Building & starting Room App (server + agent + web) via Docker..."
-        docker compose up -d --build
+        $DOCKER_COMPOSE_CMD up -d --build
     fi
 
     if [[ "$mode" == "docker-kasir" || "$mode" == "docker-all" ]]; then
         echo "🐳 Building & starting Kasir via Docker..."
-        docker compose -f docker-compose.cashier.yml up -d --build
+        $DOCKER_COMPOSE_CMD -f docker-compose.cashier.yml up -d --build
     fi
 
     echo ""

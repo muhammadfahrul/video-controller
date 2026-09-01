@@ -387,10 +387,38 @@ function Ensure-PlaywrightBrowsers {
 # on for that. Room mode here only covers server+web; agent stays native
 # (install.ps1 -Mode room / autostart-room).
 # ============================================
+function Install-Docker {
+    Write-Host "[INFO] Docker tidak ditemukan. Mencoba auto-install Docker Desktop..." -ForegroundColor Yellow
+
+    $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($wingetCmd) {
+        Write-Host "[INFO] Installing Docker Desktop via winget..." -ForegroundColor Yellow
+        & winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+    } else {
+        Write-Host "[INFO] winget tidak ditemukan, download installer Docker Desktop..." -ForegroundColor Yellow
+        $dockerInstaller = "$env:TEMP\DockerDesktopInstaller.exe"
+        try {
+            Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerInstaller -UseBasicParsing
+            Write-Host "[INFO] Installing Docker Desktop (ini bisa makan waktu beberapa menit)..." -ForegroundColor Yellow
+            Start-Process -FilePath $dockerInstaller -ArgumentList "install", "--quiet", "--accept-license" -Wait
+        } catch {
+            Write-Host "[ERROR] Gagal download/install Docker Desktop: $_" -ForegroundColor Red
+        } finally {
+            Remove-Item -Path $dockerInstaller -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host ""
+    Write-Host "[WARNING] Docker Desktop baru saja diinstall. Sebelum lanjut:" -ForegroundColor Yellow
+    Write-Host "  1. Restart komputer kalau diminta (butuh WSL2 aktif)" -ForegroundColor Yellow
+    Write-Host "  2. Buka Docker Desktop secara manual sekali & tunggu sampai statusnya 'running'" -ForegroundColor Yellow
+    Write-Host "  3. Jalankan ulang script ini setelah Docker Desktop siap" -ForegroundColor Yellow
+}
+
 function Test-DockerAvailable {
     $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
     if (-not $dockerCmd) {
-        Write-Host "[ERROR] Docker tidak ditemukan. Install Docker Desktop dulu: https://www.docker.com/products/docker-desktop/" -ForegroundColor Red
+        Install-Docker
         exit 1
     }
 
