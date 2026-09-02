@@ -366,6 +366,30 @@ function Remove-FileIfExists {
     }
 }
 
+# ============================================
+# Stop any node/npm/cmd/wscript processes belonging to this project before
+# wiping node_modules. A previous install/test run can leave a service
+# running - and since it now launches hidden (see New-HiddenLauncherVbs
+# below) there's no window to notice it's still alive - holding a lock on
+# a native binary (e.g. rolldown's win32-x64-msvc .node file) that
+# Remove-Item then can't delete ("Access to the path ... is denied").
+# ============================================
+function Stop-ProjectProcesses {
+    param([string]$ProjectRoot)
+
+    try {
+        $procs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' OR Name = 'cmd.exe' OR Name = 'wscript.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -and $_.CommandLine.Contains($ProjectRoot) }
+        if ($procs) {
+            Write-Host "[INFO] Menghentikan proses Video Controller yang masih jalan (biar node_modules tidak ke-lock)..." -ForegroundColor Yellow
+            foreach ($proc in $procs) {
+                & taskkill /PID $proc.ProcessId /T /F 2>$null | Out-Null
+            }
+            Start-Sleep -Seconds 1
+        }
+    } catch {}
+}
+
 function Ensure-PlaywrightBrowsers {
     $agentPath = Join-Path $PROJECT_ROOT 'agent'
     if (Test-Path $agentPath) {
@@ -506,20 +530,50 @@ function Invoke-DockerDeploy {
 }
 
 # ============================================
-# Create a minimized-window shortcut for a .bat script
+# Launch a .bat with NO visible window at all (not even minimized).
+#
+# A minimized console still shows up in the taskbar - on a room PC that's
+# an open invitation for someone to click it and hit X, which instantly
+# kills that service (no Startup-folder / Task Scheduler equivalent of
+# systemd here to relaunch it). Start-Process itself can hide a process
+# window directly (-WindowStyle Hidden), but a .lnk shortcut's WindowStyle
+# property only supports Normal/Maximized/Minimized (1/3/7) - there's no
+# "hidden" value for a shortcut. So a truly invisible Startup-folder
+# shortcut has to go through a tiny VBScript wrapper instead, which calls
+# WScript.Shell.Run with window style 0 (hidden).
 # ============================================
-function New-MinimizedShortcut {
+function New-HiddenLauncherVbs {
+    param([string]$BatPath)
+
+    $vbsPath = [System.IO.Path]::ChangeExtension($BatPath, '.vbs')
+    @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run Chr(34) & "$BatPath" & Chr(34), 0, False
+"@ | Set-Content -Path $vbsPath -Encoding ASCII
+
+    return $vbsPath
+}
+
+function New-HiddenShortcut {
     param(
         [string]$ShortcutPath,
-        [string]$TargetPath
+        [string]$VbsPath
     )
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($ShortcutPath)
-    $shortcut.TargetPath = $TargetPath
-    $shortcut.WorkingDirectory = Split-Path $TargetPath -Parent
-    $shortcut.WindowStyle = 7  # 7 = Minimized
+    $shortcut.TargetPath = "$env:SystemRoot\System32\wscript.exe"
+    $shortcut.Arguments = "`"$VbsPath`""
+    $shortcut.WorkingDirectory = Split-Path $VbsPath -Parent
     $shortcut.Save()
+}
+
+# Start a .bat hidden right now (used both for the "enable now" step and
+# by anything that wants the same invisible behavior a login-time
+# Startup-folder shortcut would get).
+function Start-Hidden {
+    param([string]$VbsPath)
+    Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$VbsPath`""
 }
 
 # ============================================
@@ -566,7 +620,8 @@ function Setup-Autostart {
     # Use Startup folder approach (simpler and more reliable)
     $startupFolder = [Environment]::GetFolderPath('Startup')
 
-    # Actual .bat scripts live here; Startup folder only gets minimized shortcuts pointing to them
+    # Actual .bat scripts (and their hidden-launcher .vbs wrappers) live here;
+    # Startup folder only gets shortcuts pointing to the .vbs wrappers
     $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
     if (-not (Test-Path $scriptsFolder)) {
         New-Item -ItemType Directory -Path $scriptsFolder -Force | Out-Null
@@ -608,9 +663,12 @@ function Setup-Autostart {
         Write-Host "[OK] Script dibuat: $webStartupScript" -ForegroundColor Green
 
         $roomScripts = @{
-            Server = $serverStartupScript
-            Agent  = $agentStartupScript
-            Web    = $webStartupScript
+            Server    = $serverStartupScript
+            Agent     = $agentStartupScript
+            Web       = $webStartupScript
+            ServerVbs = New-HiddenLauncherVbs -BatPath $serverStartupScript
+            AgentVbs  = New-HiddenLauncherVbs -BatPath $agentStartupScript
+            WebVbs    = New-HiddenLauncherVbs -BatPath $webStartupScript
         }
     }
 
@@ -633,6 +691,7 @@ function Setup-Autostart {
         Write-Host "[OK] Log file: $cashierLogFile" -ForegroundColor Green
 
         $kasirScript = $cashierBatScript
+        $kasirVbs = New-HiddenLauncherVbs -BatPath $cashierBatScript
     }
 
     Write-Host ""
@@ -648,33 +707,37 @@ function Setup-Autostart {
         Write-Host "[INFO] Mengaktifkan auto-start..." -ForegroundColor Yellow
 
         if ($roomScripts) {
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -TargetPath $roomScripts.Server
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -TargetPath $roomScripts.Agent
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -TargetPath $roomScripts.Web
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -VbsPath $roomScripts.ServerVbs
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -VbsPath $roomScripts.AgentVbs
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -VbsPath $roomScripts.WebVbs
             Write-Host "[OK] Shortcut Server/Agent/Web dibuat di Startup folder" -ForegroundColor Green
             Write-Host "[INFO] Server/Agent/Web will now auto-restart if they crash or exit unexpectedly" -ForegroundColor Green
+            Write-Host "[INFO] Jalan tanpa jendela sama sekali (bukan minimized) - jadi tidak ada yang bisa di-close tidak sengaja" -ForegroundColor Green
 
             Write-Host ""
             Write-Host "[INFO] Memulai Room App services sekarang..." -ForegroundColor Yellow
-            Start-Process -FilePath $roomScripts.Server -WindowStyle Minimized
+            Start-Hidden -VbsPath $roomScripts.ServerVbs
             Start-Sleep -Seconds 2
-            Start-Process -FilePath $roomScripts.Agent -WindowStyle Minimized
+            Start-Hidden -VbsPath $roomScripts.AgentVbs
             Start-Sleep -Seconds 1
-            Start-Process -FilePath $roomScripts.Web -WindowStyle Minimized
+            Start-Hidden -VbsPath $roomScripts.WebVbs
         }
 
         if ($kasirScript) {
-            New-MinimizedShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -TargetPath $kasirScript
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -VbsPath $kasirVbs
             Write-Host "[OK] Shortcut Cashier dibuat di Startup folder" -ForegroundColor Green
             Write-Host "[INFO] Cashier will now auto-restart if it crashes or exits unexpectedly" -ForegroundColor Green
+            Write-Host "[INFO] Jalan tanpa jendela sama sekali (bukan minimized) - jadi tidak ada yang bisa di-close tidak sengaja" -ForegroundColor Green
 
             Write-Host ""
             Write-Host "[INFO] Memulai Kasir service sekarang..." -ForegroundColor Yellow
-            Start-Process -FilePath $kasirScript -WindowStyle Minimized
+            Start-Hidden -VbsPath $kasirVbs
         }
 
         Write-Host ""
         Write-Host "[OK] Auto-start diaktifkan!" -ForegroundColor Green
+        Write-Host "[INFO] Karena tidak ada jendela, untuk stop paksa gunakan Task Manager (cari proses node.exe / cmd.exe)," -ForegroundColor Yellow
+        Write-Host "       atau jalankan ulang install.ps1 dengan mode D/E/F untuk copot auto-start-nya." -ForegroundColor Yellow
     } else {
         Write-Host ""
         Write-Host "[INFO] Auto-start belum diaktifkan - shortcut belum dibuat di Startup folder." -ForegroundColor Yellow
@@ -702,6 +765,28 @@ function Setup-Autostart {
 }
 
 # ============================================
+# Stop a currently-running hidden autostart instance.
+#
+# These run as wscript.exe (invisible) -> cmd.exe (the generated .bat,
+# invisible) -> npm.cmd -> node.exe - there's no window to close and no PID
+# tracked anywhere (a Startup-folder shortcut launches it fresh on every
+# login, independent of this script). So find it by matching the .bat's own
+# path inside the process command line instead, and kill the whole tree.
+# ============================================
+function Stop-HiddenBatProcess {
+    param([string]$BatPath)
+
+    try {
+        $procMatches = Get-CimInstance Win32_Process -Filter "Name = 'cmd.exe' OR Name = 'wscript.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BatPath) }
+        foreach ($proc in $procMatches) {
+            Write-Host "[INFO] Menghentikan proses yang sedang jalan (PID $($proc.ProcessId))..." -ForegroundColor Yellow
+            & taskkill /PID $proc.ProcessId /T /F 2>$null | Out-Null
+        }
+    } catch {}
+}
+
+# ============================================
 # Remove auto-start
 # ============================================
 function Remove-Autostart {
@@ -712,18 +797,20 @@ function Remove-Autostart {
     # Use Startup folder approach
     $startupFolder = [Environment]::GetFolderPath('Startup')
 
-    # Actual .bat scripts live here (see Setup-Autostart); Startup folder only has minimized shortcuts
+    # Actual .bat/.vbs scripts live here (see Setup-Autostart); Startup folder only has shortcuts
     $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
 
     if ($mode -eq "room" -or $mode -eq "all") {
-        # Remove Room App shortcuts (.lnk in Startup) + scripts (.bat in scripts folder)
+        # Remove Room App shortcuts (.lnk in Startup) + scripts (.bat/.vbs in scripts folder)
         # Also cleans up legacy .bat files from older installs that wrote directly into Startup
         $baseNames = @("VideoController_Server", "VideoController_Agent", "VideoController_Web")
         foreach ($baseName in $baseNames) {
+            Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "$baseName.bat")
             $pathsToRemove = @(
                 (Join-Path $startupFolder "$baseName.lnk"),
                 (Join-Path $startupFolder "$baseName.bat"),
-                (Join-Path $scriptsFolder "$baseName.bat")
+                (Join-Path $scriptsFolder "$baseName.bat"),
+                (Join-Path $scriptsFolder "$baseName.vbs")
             )
             foreach ($path in $pathsToRemove) {
                 if (Test-Path $path) {
@@ -735,13 +822,15 @@ function Remove-Autostart {
     }
 
     if ($mode -eq "kasir" -or $mode -eq "all") {
-        # Remove Cashier shortcut (.lnk in Startup) + script (.bat in scripts folder)
+        # Remove Cashier shortcut (.lnk in Startup) + script (.bat/.vbs in scripts folder)
         # Also cleans up legacy files from older installs
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Cashier.bat")
         $pathsToRemove = @(
             (Join-Path $startupFolder "VideoController_Cashier.lnk"),
             (Join-Path $startupFolder "VideoController_Cashier.bat"),
             (Join-Path $startupFolder "VideoController_Cashier.ps1"),
-            (Join-Path $scriptsFolder "VideoController_Cashier.bat")
+            (Join-Path $scriptsFolder "VideoController_Cashier.bat"),
+            (Join-Path $scriptsFolder "VideoController_Cashier.vbs")
         )
         foreach ($path in $pathsToRemove) {
             if (Test-Path $path) {
@@ -1122,6 +1211,7 @@ if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart
     }
 
     # Install dependencies if needed
+    Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
     Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
 
     if ($INSTALL_MODE -eq "autostart-room" -or $INSTALL_MODE -eq "autostart-all") {
@@ -1322,6 +1412,7 @@ if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
 }
 
+Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
 Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
 
 # Only remove node_modules if folders exist
@@ -1421,7 +1512,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
 
     # Start Server first
-    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Minimized -PassThru
+    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Hidden -PassThru
     $processes += $serverProcess
     Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
     
@@ -1441,7 +1532,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
 
     # Start Agent (only if server is still running)
     if (-not $serverProcess.HasExited) {
-        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Minimized -PassThru
+        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Hidden -PassThru
         $processes += $agentProcess
         Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
         Start-Sleep -Seconds 2
@@ -1455,7 +1546,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
     }
 
     # Start Web
-    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -WindowStyle Minimized -PassThru
+    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -WindowStyle Hidden -PassThru
     $processes += $webProcess
     Write-Host "   - Web: PID $($webProcess.Id)" -ForegroundColor Cyan
 }
@@ -1463,7 +1554,7 @@ if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
 if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
     Write-Host "[INFO] Starting Kasir service..." -ForegroundColor Yellow
 
-    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -WindowStyle Minimized -PassThru
+    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -WindowStyle Hidden -PassThru
     $processes += $cashierProcess
     Write-Host "   - Cashier: PID $($cashierProcess.Id)" -ForegroundColor Cyan
 }
