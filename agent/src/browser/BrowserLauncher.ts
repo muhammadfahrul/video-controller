@@ -82,16 +82,13 @@ export class BrowserLauncher {
 
                 viewport: viewport,
 
-                args: options.args,
+                args: [
+                    "--disable-blink-features=AutomationControlled",
+                    ...options.args
+                ],
 
                 // Launch in fullscreen/maximized mode
-                locale: "en-US",
-
-                geolocation: { latitude: 0, longitude: 0 },
-
-                permissions: ["geolocation"],
-
-
+                locale: "en-US"
 
             }
 
@@ -117,13 +114,12 @@ export class BrowserLauncher {
 
                 viewport: viewport,
 
-                args: options.args,
+                args: [
+                    "--disable-blink-features=AutomationControlled",
+                    ...options.args
+                ],
 
-                locale: "en-US",
-
-                geolocation: { latitude: 0, longitude: 0 },
-
-                permissions: ["geolocation"]
+                locale: "en-US"
 
             }
 
@@ -172,10 +168,8 @@ export class BrowserLauncher {
 
         const context = await this.launchPersistent(options);
 
-        // Add stealth script to all existing pages
-        for (const page of context.pages()) {
-            await page.addInitScript(this.getStealthScript());
-        }
+        // Applies to every current and future page/tab in this context
+        await context.addInitScript(this.getStealthScript());
 
         return context;
     }
