@@ -265,8 +265,14 @@ export class RecoveryEngine {
 
             try{
 
+                // force:true - this video is exactly the one health checks
+                // just found broken, so the normal "already loaded, skip
+                // redundant reopen" guard in YouTubePlayer must not apply
+                // here (it exists to prevent recovery-style corruption, not
+                // to block the actual recovery).
                 await this.context.player.openVideo(
-                    this.lastSnapshot.videoId
+                    this.lastSnapshot.videoId,
+                    true
                 );
 
                 return;

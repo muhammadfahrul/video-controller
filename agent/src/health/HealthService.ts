@@ -170,6 +170,8 @@ export class HealthService {
                 "[HEALTH] Video element missing"
 
             );
+
+            await this.logVideoDiagnostics();
         }
 
         const playerHealthy =
@@ -361,6 +363,75 @@ export class HealthService {
     public shouldRecover(): boolean {
 
         return this.consecutiveFailures >= 3;
+
+    }
+
+    // Diagnostic-only: dumps what the page actually looks like the moment
+    // VideoHealthCheck/PlayerHealthCheck first report the <video> element
+    // missing, so a real occurrence is diagnosable from the logs alone
+    // instead of guessing blind (mid-roll ad? "still watching?" dialog?
+    // page genuinely crashed/navigated away?). Never throws - this must
+    // not itself affect the health check's own pass/fail outcome.
+    private async logVideoDiagnostics(): Promise<void> {
+
+        try {
+
+            const page = this.browser.getPage();
+
+            const diagnostics = await page.evaluate(() => {
+
+                const has = (selector: string) =>
+                    !!document.querySelector(selector);
+
+                const videos =
+                    Array.from(document.querySelectorAll("video")) as HTMLVideoElement[];
+
+                return {
+                    url: location.href,
+                    title: document.title,
+                    hasMoviePlayer: has("#movie_player"),
+                    hasVideoTag: has("video"),
+                    // How many <video> elements exist and each one's own
+                    // readyState/currentTime/duration/paused - a bare
+                    // querySelector("video") only ever sees the FIRST one,
+                    // which may not be the one actually playing (see the
+                    // matching fix in YouTubeDOM.getVideoSnapshot).
+                    videoCount: videos.length,
+                    videos: videos.map(v => ({
+                        readyState: v.readyState,
+                        currentTime: v.currentTime,
+                        duration: v.duration,
+                        paused: v.paused,
+                        ended: v.ended
+                    })),
+                    hasAdShowingClass:
+                        document.querySelector("#movie_player")
+                            ?.classList.contains("ad-showing") ?? false,
+                    hasAdOverlay: has(".ytp-ad-overlay-close-button"),
+                    hasAdText: has(".ytp-ad-text"),
+                    hasVideoAdUi: has(".videoAdUi"),
+                    hasPauseOverlay: has(".ytp-pause-overlay"),
+                    hasErrorScreen: has(".ytp-error"),
+                    bodyTextSnippet:
+                        document.body?.innerText
+                            ?.slice(0, 300) ?? ""
+                };
+
+            });
+
+            LoggerService.warn(
+                `[HEALTH] Video-missing diagnostics: ${JSON.stringify(diagnostics)}`
+            );
+
+        }
+
+        catch (error) {
+
+            LoggerService.warn(
+                `[HEALTH] Could not capture video-missing diagnostics: ${error}`
+            );
+
+        }
 
     }
 

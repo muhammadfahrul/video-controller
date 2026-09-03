@@ -22,6 +22,21 @@ export class PlayerService {
 
     private restoredSnapshot?: PlayerSnapshot;
 
+    // videoId already opened by restoreState() (the server-push restore
+    // path, driven by SocketClient's "database-restore" listener). Startup
+    // has a SECOND, independent restore path - Agent.start()'s own
+    // `player.restore()` -> restoreLastVideo() - which reads the same
+    // `restoredSnapshot` and would open() the same video again if
+    // restoreState() already got there first. Both calls are individually
+    // correct, but a back-to-back double-navigation to the same just-loaded
+    // YouTube watch page corrupts its internal player.js state, leaving the
+    // <video> element permanently stuck at readyState 0 (never actually
+    // starts loading/playing) - exactly the "stuck paused, won't advance"
+    // symptom, with no error anywhere since neither open() call itself
+    // fails. Whichever of the two restore paths runs first "claims" the
+    // videoId here so the other skips its own open().
+    private videoOpenedForRestore?: string;
+
     private lastHealthySnapshot?: PlayerSnapshot;
     private lastHealthySnapshotAt?: number;
 
@@ -118,9 +133,14 @@ export class PlayerService {
                 fullscreen: playerState.fullscreen || false
             };
             
-            // Open the video but don't auto-play yet
-            await this.player.open(playerState.videoId);
-            
+            // Open the video but don't auto-play yet - unless
+            // restoreLastVideo() (the other restore path) already got here
+            // first for this same videoId.
+            if (this.videoOpenedForRestore !== playerState.videoId) {
+                await this.player.open(playerState.videoId);
+                this.videoOpenedForRestore = playerState.videoId;
+            }
+
             console.log("[PlayerService] Player state restored successfully");
         } catch (error) {
             console.error("[PlayerService] Error restoring player state:", error);
@@ -166,17 +186,19 @@ export class PlayerService {
 
 
     async open(
-        videoId:string
+        videoId: string,
+        force = false
     ){
 
-        await this.player.open(videoId);
+        await this.player.open(videoId, force);
 
         await this.persist();
 
     }
 
     public async openVideo(
-        videoId: string
+        videoId: string,
+        force = false
     ) {
 
         // If empty videoId, navigate to YouTube home
@@ -187,7 +209,8 @@ export class PlayerService {
         }
 
         await this.open(
-            videoId
+            videoId,
+            force
         );
 
         await this.play();
@@ -428,6 +451,17 @@ export class PlayerService {
 
         }
 
+        // Already opened by the server-push restore path (SocketClient's
+        // "database-restore" listener -> restoreState()) racing ahead of
+        // this one - see videoOpenedForRestore's declaration for why a
+        // second open() here would corrupt playback instead of being a
+        // harmless no-op.
+        if (this.videoOpenedForRestore === snapshot.videoId) {
+
+            return true;
+
+        }
+
         this.restoring = true;
 
         try {
@@ -437,6 +471,8 @@ export class PlayerService {
                 snapshot.videoId
 
             );
+
+            this.videoOpenedForRestore = snapshot.videoId;
 
         }
 

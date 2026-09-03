@@ -406,21 +406,33 @@ export class YouTubeDOM {
         if (!hasSkipButton) {
             
             const isAdPlaying = await this.page.evaluate(() => {
-                
+
                 const player = document.querySelector("#movie_player");
-                
+
+                // YouTube hides ad UI elements with CSS (display: none)
+                // once an ad ends rather than removing them from the DOM,
+                // so a plain presence check stays true long after the ad
+                // is gone. Require the element to actually be visible.
+                const isVisible = (el: Element | null): boolean => {
+                    if (!el) return false;
+                    const rect = (el as HTMLElement).getBoundingClientRect();
+                    if (rect.width === 0 && rect.height === 0) return false;
+                    const style = window.getComputedStyle(el);
+                    return style.display !== "none" && style.visibility !== "hidden";
+                };
+
                 // Check various ad indicators
                 const hasAdClass = player?.classList.contains("ad-showing");
-                const hasAdOverlay = !!document.querySelector(".ytp-ad-overlay-close-button");
-                const hasAdText = !!document.querySelector(".ytp-ad-text");
-                const hasVideoAdUi = !!document.querySelector(".videoAdUi");
-                
+                const hasAdOverlay = isVisible(document.querySelector(".ytp-ad-overlay-close-button"));
+                const hasAdText = isVisible(document.querySelector(".ytp-ad-text"));
+                const hasVideoAdUi = isVisible(document.querySelector(".videoAdUi"));
+
                 // Consider as ad if multiple indicators present
-                const indicatorCount = (hasAdClass ? 1 : 0) + (hasAdOverlay ? 1 : 0) + 
+                const indicatorCount = (hasAdClass ? 1 : 0) + (hasAdOverlay ? 1 : 0) +
                                      (hasAdText ? 1 : 0) + (hasVideoAdUi ? 1 : 0);
-                
+
                 return indicatorCount >= 2;
-                
+
             });
 
             if (!isAdPlaying) {
@@ -586,18 +598,47 @@ export class YouTubeDOM {
 
         return this.page.evaluate(() => {
 
+            // YouTube can have more than one <video> element in the page at
+            // once (e.g. a preloaded/background element for the next
+            // suggested video, or miniplayer/PIP support) - a bare
+            // querySelector("video") returns document order's FIRST match,
+            // which isn't necessarily the one actually playing. That
+            // mismatched element can report a stale/never-advancing
+            // readyState, making a perfectly healthy, actively-playing
+            // video look "unhealthy" and trigger an unwanted
+            // RecoveryEngine reload. Scope to #movie_player first, and
+            // among any matches there prefer one that's actually made
+            // progress (currentTime > 0) over one sitting at 0.
+            const candidates = Array.from(
+                document.querySelectorAll(
+                    "#movie_player video, video"
+                )
+            ) as HTMLVideoElement[];
+
             const video =
-                document.querySelector(
-                    "video"
-                ) as HTMLVideoElement | null;
+                candidates.find(v => v.currentTime > 0) ??
+                candidates[0] ??
+                null;
 
             if (!video) {
 
+                // YouTube can briefly swap/detach the <video> element during
+                // an ad transition (pre/mid-roll) without the page actually
+                // being broken. #movie_player is the stable outer player
+                // container that survives those swaps - if it's still
+                // there, this is a live watch page mid-transition, not a
+                // crash, so report healthy instead of tripping
+                // VideoHealthCheck/PlayerHealthCheck (which would otherwise
+                // have RecoveryEngine reload the page and reopen the
+                // current video from scratch after a few seconds of this).
+                const stillOnWatchPage =
+                    !!document.querySelector("#movie_player");
+
                 return {
 
-                    exists: false,
+                    exists: stillOnWatchPage,
 
-                    ready: false,
+                    ready: stillOnWatchPage,
 
                     duration: 0,
 
