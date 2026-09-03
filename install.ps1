@@ -1493,7 +1493,7 @@ function Wait-ForServer {
     
     while (((Get-Date) - $startTime).TotalSeconds -lt $MaxWaitSeconds) {
         try {
-            $response = Invoke-WebRequest -Uri "$serverUrl/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+            $response = Invoke-WebRequest -Uri "$serverUrl/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
             if ($response.StatusCode -eq 200) {
                 Write-Host "   [OK] Server is ready!" -ForegroundColor Green
                 return $true

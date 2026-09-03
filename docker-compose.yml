@@ -30,7 +30,7 @@ services:
       - server-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:53331/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:53331/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -50,10 +50,19 @@ services:
       SERVER_IP: server
       DISPLAY: ${DISPLAY}
       XAUTHORITY: /root/.Xauthority
+      # Without this, Chromium finds no audio sink inside the container
+      # (nothing forwards its sound to the host) and YouTube plays silently.
+      # PULSE_SOCKET/PULSE_COOKIE are written to the project-root .env by
+      # install.sh's run_docker_deploy (resolved from the invoking user's
+      # $HOME/$(id -u), not root's - important since this is launched via
+      # "sudo docker compose" until the user re-logs in to the docker group).
+      PULSE_SERVER: unix:/tmp/pulse-socket
     volumes:
       - agent-profile:/app/data/browser-profile
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ${HOME}/.Xauthority:/root/.Xauthority:ro
+      - ${PULSE_SOCKET}:/tmp/pulse-socket
+      - ${PULSE_COOKIE}:/root/.config/pulse/cookie:ro
     restart: unless-stopped
 
   web:

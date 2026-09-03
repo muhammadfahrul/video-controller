@@ -353,6 +353,26 @@ run_docker_deploy() {
     check_docker_available
     cd "$PROJECT_ROOT"
 
+    # Resolve PulseAudio socket/cookie for the agent container's audio
+    # passthrough (see docker-compose.yml's PULSE_SERVER/PULSE_SOCKET/
+    # PULSE_COOKIE). Written to a project-root .env - the *only* reliable way
+    # to hand docker-compose a variable computed from the invoking user's
+    # $HOME/$(id -u): this whole function may run under "sudo docker
+    # compose" (see check_docker_available), and sudo does not propagate
+    # arbitrary env vars set here to that child process, so plain shell
+    # export wouldn't reach compose's variable substitution.
+    local pulse_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pulse/native"
+    local pulse_cookie="$HOME/.config/pulse/cookie"
+    if [[ ! -S "$pulse_socket" ]]; then
+        echo "⚠️ PulseAudio socket tidak ditemukan di $pulse_socket - video mungkin tidak ada suara."
+        pulse_socket="/dev/null"
+    fi
+    if [[ ! -f "$pulse_cookie" ]]; then
+        pulse_cookie="/dev/null"
+    fi
+    set_env_var "$PROJECT_ROOT/.env" "PULSE_SOCKET" "$pulse_socket"
+    set_env_var "$PROJECT_ROOT/.env" "PULSE_COOKIE" "$pulse_cookie"
+
     if [[ "$mode" == "docker-down" ]]; then
         echo "🐳 Menghentikan semua service Docker (room + kasir, kalau ada)..."
         $DOCKER_COMPOSE_CMD down 2>/dev/null || true
@@ -369,7 +389,14 @@ run_docker_deploy() {
             echo "   Jalankan script ini dari sesi desktop (bukan SSH tanpa X forwarding)."
         fi
         echo "🔑 Mengizinkan container Docker akses ke display X11 (xhost)..."
+        # The agent container runs as root (the Playwright base image has no
+        # non-root USER), and Docker doesn't UID-remap by default - so the
+        # X server sees the container's connection as UID 0 (root), not the
+        # invoking user. Granting only "$(whoami)" leaves root unauthorized
+        # and Chromium fails with "Authorization required, but no
+        # authorization protocol specified".
         xhost +si:localuser:"$(whoami)" 2>/dev/null || echo "⚠️ 'xhost' gagal/tidak ada - agent mungkin tidak bisa nampilin browser. Install paket x11-xserver-utils kalau perlu."
+        xhost +si:localuser:root 2>/dev/null || true
 
         # Build one service at a time instead of "up --build" (Compose
         # builds all services in parallel by default via buildx bake) -
@@ -858,7 +885,7 @@ PIDS=""
 wait_for_server() {
     local port="${1:-53331}"
     local max_wait_seconds="${2:-30}"
-    local url="http://127.0.0.1:${port}/health"
+    local url="http://127.0.0.1:${port}/api/health"
 
     echo "   Waiting for server to be ready..."
     local waited=0
