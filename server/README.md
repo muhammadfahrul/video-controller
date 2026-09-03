@@ -240,6 +240,7 @@ Command dikirim lewat event `player:command` (dari client) / `command` (ke agent
 | `REMOVE_PLAYLIST` | `{ id }` | Hapus item dari queue |
 | `CLEAR_PLAYLIST` | - | Kosongkan queue |
 | `PLAY_PLAYLIST_ITEM` | `{ index }` | Mainkan item queue tertentu |
+| `MOVE_PLAYLIST_ITEM` | `{ id, direction: "up" \| "down" }` | Geser posisi item queue naik/turun |
 | `SHUFFLE_PLAYLIST` | - | Acak urutan queue |
 | `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | - | Atur mode repeat |
 | `SKIP_AD` | - | Skip iklan YouTube yang sedang tampil |

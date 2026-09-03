@@ -141,7 +141,6 @@ agent/
 │   │   └── handlers/   # 1 handler class per CommandType
 │   ├── config/         # Configuration
 │   ├── core/           # Agent core logic
-│   ├── events/         # Event definitions
 │   ├── health/         # Health check
 │   ├── network/       # Socket client, local IP detection
 │   ├── player/        # YouTube player control (DOM, selectors)
@@ -178,6 +177,7 @@ Agent menerima perintah dari server lewat event `command`, di-route ke handler d
 | `REMOVE_PLAYLIST` | RemovePlaylistHandler | Hapus item dari queue |
 | `CLEAR_PLAYLIST` | ClearPlaylistHandler | Kosongkan queue |
 | `PLAY_PLAYLIST_ITEM` | PlayPlaylistItemHandler | Mainkan item queue tertentu |
+| `MOVE_PLAYLIST_ITEM` | MovePlaylistItemHandler | Geser posisi item queue naik/turun (`{ id, direction: "up" \| "down" }`) |
 | `SHUFFLE_PLAYLIST` | ShufflePlaylistHandler | Acak urutan queue |
 | `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | RepeatModeHandler | Atur mode repeat |
 | `SKIP_AD` | SkipAdHandler | Skip iklan YouTube yang sedang tampil |

@@ -313,7 +313,7 @@ video-controller/
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS 4, React Router (tidak pakai Zustand — `web/` dan `cashier/` sama-sama pakai React Context + service singleton, lihat PRD §9.3/§9.4)
+- **Frontend**: React 19, Vite, Tailwind CSS 4, React Router (tidak pakai Zustand — `web/` dan `cashier/` sama-sama pakai React Context + service singleton, lihat PRD.md § State Management Frontend)
 - **Server**: Express, Socket.io, SQLite (sql.js), Google APIs
 - **Agent**: Playwright, Socket.io Client, Pino (logging), Zod
 
@@ -360,7 +360,7 @@ Prioritas evaluasi status (lihat `cashier/src/utils/roomStatus.ts`): OFFLINE > A
 - Manual: Tombol "Sudah Bersih" pada transaksi (set `cleanedAt`) langsung memindahkan ke SUDAH DIBERSIHKAN
 
 ### Pemblokiran Aktivasi
-Ruangan dengan status BERSIHKAN tidak dapat diaktifkan sampai status berubah ke SUDAH DIBERSIHKAN.
+Tombol aktivasi di kasir diblokir (dengan alert penjelasan) untuk dua status: **UNPAID** (ada transaksi belum lunas - harus dilunasi dulu di Riwayat Transaksi) dan **BERSIHKAN** (masih dalam proses pembersihan - tunggu sampai SUDAH DIBERSIHKAN). Ini pengecekan di sisi client (`cashier/src/components/RoomCard.tsx`), bukan penolakan dari server.
 
 ## Troubleshooting
 

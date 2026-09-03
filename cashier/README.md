@@ -8,7 +8,7 @@ Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini te
 - **Billing Otomatis**: Menghitung biaya berdasarkan durasi penggunaan dan harga per jam per ruangan
 - **Status Ruangan**: Menampilkan status real-time ruangan (OFFLINE, AKTIF, UNPAID, BERSIHKAN, SUDAH DIBERSIHKAN, ONLINE)
 - **Status Real-time**: Menampilkan status pemutaran video (playing/paused/idle)
-- **Total Pendapatan**: Menampilkan ringkasan pendapatan semua ruangan
+- **Total Pendapatan**: Ditampilkan **per ruangan** di modal Riwayat Transaksi (`TransactionModal`, dibuka dari kartu ruangan), dengan toggle "Hari Ini" vs "Total" - bukan ringkasan gabungan semua ruangan di dashboard utama
 - **Konfigurasi Fleksibel**: Setiap ruangan bisa memiliki tarif berbeda (`pricePerHour`, dikonfigurasi di `server/.env` PC ruangan tsb, bukan di cashier)
 - **Paket Harga Tetap**: Kalau ruangan punya paket terkonfigurasi (`PACKAGES` di `server/.env` ruangan tsb), cashier bisa memilih paket saat aktivasi alih-alih mengisi durasi manual
 - **Full Page Loading**: Setiap proses menampilkan loading screen dengan estimasi waktu
@@ -149,4 +149,4 @@ Status dihitung di client (`src/utils/roomStatus.ts`), prioritas: OFFLINE > AKTI
 ### Fitur Cleaning Manual
 - Tombol "Sudah Bersih" di modal riwayat transaksi menandai `cleanedAt` pada transaksi tsb, langsung memindahkan ke SUDAH DIBERSIHKAN tanpa menunggu 30 menit
 - Tombol terpisah di kartu ruangan (`cashier:mark-room-cleaned`) khusus untuk ruangan yang di-vacate lewat fitur Pindah Ruangan (tidak ada transaksi baru untuk ruangan asal, jadi statusnya dilacak lewat `needsCleaning`/`lastTransactionEndTime`, bukan lewat transaksi)
-- Ruangan dengan status BERSIHKAN tidak bisa diaktifkan
+- Tombol aktivasi diblokir di sisi client (`RoomCard.tsx`, dengan alert penjelasan) untuk status **UNPAID** (ada transaksi belum lunas) maupun **BERSIHKAN** (masih dalam proses pembersihan) - bukan cuma BERSIHKAN saja

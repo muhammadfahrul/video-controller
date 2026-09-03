@@ -140,6 +140,7 @@ Web mengirim command lewat event `player:command`, dengan `type` sesuai `Command
 | `FULLSCREEN` / `EXIT_FULLSCREEN` / `TOGGLE_FULLSCREEN` | Kontrol fullscreen |
 | `ADD_PLAYLIST` / `REMOVE_PLAYLIST` / `CLEAR_PLAYLIST` | Kelola queue |
 | `PLAY_PLAYLIST_ITEM` | Mainkan item queue tertentu |
+| `MOVE_PLAYLIST_ITEM` | Geser posisi item queue (naik/turun) |
 | `SHUFFLE_PLAYLIST` | Acak urutan queue |
 | `REPEAT_OFF` / `REPEAT_ONE` / `REPEAT_ALL` | Atur mode repeat |
 | `SKIP_AD` / `SET_AUTO_SKIP_ADS` | Kontrol iklan YouTube |
@@ -184,7 +185,7 @@ npm run build
 - **Vite** - Build tool
 - **Tailwind CSS** - Styling
 - **Socket.io Client** - Real-time communication
-- **React Context + service singleton** - State management (tidak pakai Zustand, lihat PRD §9.4)
+- **React Context + service singleton** - State management (tidak pakai Zustand, lihat PRD.md § State Management Frontend)
 - **React Query** - Data fetching
 - **React Router** - Routing
 - **PWA** - Progressive Web App
