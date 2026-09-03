@@ -63,7 +63,7 @@ export function RoomCard({ roomBilling }: RoomCardProps) {
   useEffect(() => {
     if (roomBilling.expiresAt) {
       const updateCountdown = () => {
-        const remaining = Math.max(0, Math.floor((roomBilling.expiresAt! - Date.now()) / 1000));
+        const remaining = Math.max(0, Math.floor((roomBilling.expiresAt! - multiSocketService.getServerNow(roomBilling.roomId)) / 1000));
         setCountdown(remaining);
         
         // Auto-deactivate when time expires

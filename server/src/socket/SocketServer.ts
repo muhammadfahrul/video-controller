@@ -103,7 +103,17 @@ export class SocketServer {
             this.broadcastAgents(this.manager.getRegistry().getAll());
         });
 
+        // Re-broadcast our clock periodically, not just once on connect, so a
+        // long-lived connection's clock-skew correction (see the "server:time"
+        // emit in setup()) doesn't go stale if a client's system clock actually
+        // drifts over a multi-hour session.
+        setInterval(() => {
+            this.io.emit("server:time", { serverTime: Date.now() });
+        }, SocketServer.SERVER_TIME_BROADCAST_INTERVAL_MS);
+
     }
+
+    private static readonly SERVER_TIME_BROADCAST_INTERVAL_MS = 5 * 60 * 1000;
 
     public async initialize(): Promise<void> {
         await this.database.initialize();
@@ -179,6 +189,20 @@ export class SocketServer {
                         .getRegistry()
                         .getAll()
 
+                );
+
+                // Web clients compute the "Sisa Waktu" countdown as
+                // expiresAt - their own Date.now(). If a room PC's system
+                // clock is off from this server's clock (common on offline
+                // kiosk machines with no NTP sync), that countdown is wrong
+                // by exactly the clock skew even though expiresAt itself is
+                // correct - e.g. a PC clock running ~45min slow makes a 60min
+                // session display as ~105min remaining. Sending our own
+                // clock lets clients compute an offset and correct for it
+                // (see web's SocketService/BillingStatus).
+                socket.emit(
+                    "server:time",
+                    { serverTime: Date.now() }
                 );
 
 

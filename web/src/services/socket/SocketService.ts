@@ -15,6 +15,11 @@ export class SocketService {
     private socket?: Socket;
     private pendingHandlers: PendingHandler[] = [];
     private connectCallbacks: ConnectCallback[] = [];
+    // serverTime - Date.now() at the moment the offset was captured. Lets
+    // callers compute "now" as if their clock matched the server's, so a
+    // room PC's own (possibly wrong/unsynced) system clock never skews the
+    // "Sisa Waktu" countdown, which is otherwise just expiresAt - Date.now().
+    private serverTimeOffsetMs = 0;
 
     connect() {
 
@@ -58,6 +63,10 @@ export class SocketService {
 
             this.connectCallbacks.forEach((cb) => cb());
 
+        });
+
+        this.socket.on("server:time", (payload: { serverTime: number }) => {
+            this.serverTimeOffsetMs = payload.serverTime - Date.now();
         });
 
         // Global listener for ALL events to debug what's coming through
@@ -209,6 +218,14 @@ export class SocketService {
     isConnected() {
 
         return this.socket?.connected ?? false;
+
+    }
+
+    // "Now", corrected to match the server's clock rather than this
+    // machine's - see serverTimeOffsetMs above.
+    getServerNow(): number {
+
+        return Date.now() + this.serverTimeOffsetMs;
 
     }
 

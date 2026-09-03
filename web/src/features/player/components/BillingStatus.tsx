@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Clock, Infinity as InfinityIcon } from "lucide-react";
 import { useAgentState } from "../../../hooks/useAppState";
 import { env } from "../../../config/env";
+import { socketService } from "../../../services";
 
 function formatRemaining(ms: number): string {
     const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -18,11 +19,15 @@ function formatRemaining(ms: number): string {
 export default function BillingStatus() {
 
     const agent = useAgentState();
-    const [now, setNow] = useState(() => Date.now());
+    // Uses the server's clock, not this PC's - a room PC with an unsynced
+    // system clock would otherwise show a countdown that's off by exactly
+    // that clock's skew from the server, even though expiresAt itself is
+    // correct (e.g. a 60min session showing ~105min remaining).
+    const [now, setNow] = useState(() => socketService.getServerNow());
 
     useEffect(() => {
         if (!agent.expiresAt) return;
-        const interval = setInterval(() => setNow(Date.now()), 1000);
+        const interval = setInterval(() => setNow(socketService.getServerNow()), 1000);
         return () => clearInterval(interval);
     }, [agent.expiresAt]);
 

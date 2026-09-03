@@ -17,6 +17,13 @@ interface RoomConnection {
   // Transactions as last reported by this connection's server (authoritative,
   // replaced wholesale on every 'transaction:get' - never merged).
   transactions: Transaction[];
+  // serverTime - Date.now() at the moment this room's server last told us its
+  // clock, captured per-connection since the cashier talks to a different
+  // physical server (and clock) per room. Used to correct expiresAt countdowns
+  // against the cashier PC's own (possibly wrong/unsynced) clock - without it
+  // a skewed cashier clock can trigger the auto-deactivate below too early or
+  // too late relative to the room's real, server-authoritative expiry.
+  serverTimeOffsetMs: number;
 }
 
 class MultiSocketService {
@@ -53,6 +60,7 @@ class MultiSocketService {
       agentUpdateQueue: Promise.resolve(),
       lastAgentUpdate: 0,
       transactions: [],
+      serverTimeOffsetMs: 0,
     };
 
     // Set up one-time connection callback
@@ -419,6 +427,16 @@ class MultiSocketService {
     console.log('[MultiSocket] Extended time for room:', roomId, '-> agentRoomId:', agentRoomId, 'minutes:', additionalMinutes);
   }
 
+  // "Now", corrected to match the given room's server clock rather than this
+  // cashier PC's own - see serverTimeOffsetMs on RoomConnection. Falls back to
+  // the raw local clock (offset 0) if the room isn't connected yet.
+  getServerNow(roomId: string): number {
+    const connection = Array.from(this.connections.values()).find(
+      (c) => c.config.id === roomId || c.agents[0]?.roomId === roomId
+    );
+    return Date.now() + (connection?.serverTimeOffsetMs ?? 0);
+  }
+
   // Get all room billings
   getRoomBillings(): Map<string, RoomBilling> {
     const billings = new Map<string, RoomBilling>();
@@ -460,6 +478,10 @@ class MultiSocketService {
       socket.emit('cashier:request-agents');
       // Request transactions from server
       socket.emit('transaction:get');
+    });
+
+    socket.on('server:time', (data: { serverTime: number }) => {
+      connection.serverTimeOffsetMs = data.serverTime - Date.now();
     });
 
     // Listen for transactions from server - this is always the complete,

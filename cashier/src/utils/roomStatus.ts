@@ -1,4 +1,5 @@
 import type { RoomBilling, Transaction } from '../types';
+import { multiSocketService } from '../services/MultiSocketService';
 
 export type RoomStatusLabel = 'OFFLINE' | 'AKTIF' | 'UNPAID' | 'BERSIHKAN' | 'SUDAH DIBERSIHKAN' | 'ONLINE';
 
@@ -49,7 +50,9 @@ function getPaidCleaningStatus(roomTransactions: Transaction[]): RoomStatusLabel
 // with the same thresholds as the paid-transaction flow.
 function getMovedOutCleaningStatus(roomBilling: RoomBilling): RoomStatusLabel | null {
   if (!roomBilling.needsCleaning || !roomBilling.lastTransactionEndTime) return null;
-  const timeSinceMoved = Date.now() - roomBilling.lastTransactionEndTime;
+  // lastTransactionEndTime is set server-side (Date.now() on the room's server,
+  // not this cashier PC) - correct for clock skew the same way as expiresAt.
+  const timeSinceMoved = multiSocketService.getServerNow(roomBilling.roomId) - roomBilling.lastTransactionEndTime;
   if (timeSinceMoved < CLEANING_THRESHOLD) return 'BERSIHKAN';
   if (timeSinceMoved < CLEANED_THRESHOLD) return 'SUDAH DIBERSIHKAN';
   return null; // Back to ONLINE after > 60 min

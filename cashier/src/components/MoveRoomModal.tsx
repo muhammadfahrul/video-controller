@@ -52,8 +52,9 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
 
     // Calculate remaining time in minutes
     let remainingMinutes: number | undefined;
-    if (roomBilling.expiresAt && roomBilling.expiresAt > Date.now()) {
-      remainingMinutes = Math.ceil((roomBilling.expiresAt - Date.now()) / 60000);
+    const serverNow = multiSocketService.getServerNow(roomBilling.roomId);
+    if (roomBilling.expiresAt && roomBilling.expiresAt > serverNow) {
+      remainingMinutes = Math.ceil((roomBilling.expiresAt - serverNow) / 60000);
     }
 
     setGlobalLoading(true, 'moving');
@@ -176,8 +177,8 @@ export function MoveRoomModal({ roomBilling, onClose, onMoveComplete }: MoveRoom
                 <span className="text-sm text-gray-400">Sisa Waktu</span>
               </div>
               <span className="text-sm font-medium text-orange-400">
-                {roomBilling.expiresAt && roomBilling.expiresAt > Date.now() 
-                  ? formatCountdown(Math.floor((roomBilling.expiresAt - Date.now()) / 1000))
+                {roomBilling.expiresAt && roomBilling.expiresAt > multiSocketService.getServerNow(roomBilling.roomId)
+                  ? formatCountdown(Math.floor((roomBilling.expiresAt - multiSocketService.getServerNow(roomBilling.roomId)) / 1000))
                   : '--:--'}
               </span>
             </div>
