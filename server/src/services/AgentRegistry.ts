@@ -106,10 +106,14 @@ export class AgentRegistry {
     }
 
     removeBySocket(socketId: string) {
-        for (const [roomId, agent] of this.agents.entries()) {
+        for (const agent of this.agents.values()) {
             if (agent.socketId === socketId) {
-                this.agents.delete(roomId);
-                if (agent.id) this.agentIdIndex.delete(agent.id);
+                // Keep the agent/session record in memory so a reconnecting
+                // container can re-register without losing an in-progress
+                // billing session's timer/customer data.
+                agent.socketId = "";
+                agent.status = "OFFLINE";
+                agent.lastHeartbeat = Date.now();
             }
         }
     }
