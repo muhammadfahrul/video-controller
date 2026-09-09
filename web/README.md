@@ -13,6 +13,26 @@ Aplikasi web (PWA) untuk mengontrol pemutaran video di **satu ruangan karaoke**.
 
 ## Cara Menjalankan
 
+Untuk deployment production, paling praktis jalankan installer dari root project:
+
+```bash
+# Linux
+./install.sh
+
+# Windows
+.\install.ps1
+```
+
+Lalu pilih:
+- `[1]` untuk install Room App
+- `[A]` untuk pasang auto-start Room App
+- `[K]` untuk update source + dependency + build tanpa start lagi
+- `[L]` untuk update lalu menyalakan lagi auto-start Room App yang aktif
+
+Mode update installer mempertahankan `web/.env`, `agent/data`, dan `server/data`, jadi konfigurasi room serta data lokal tetap aman saat update rutin.
+
+Kalau mau menjalankan web app ini secara manual tanpa installer, langkah di bawah tetap berlaku:
+
 ```bash
 # Install dependencies
 cd web
@@ -201,7 +221,7 @@ npm run build
 - Pastikan server mendukung CORS
 
 ### Build error
-- Pastikan Node.js versi kompatibel
+- Pastikan Node.js memakai versi yang didukung project: `20.19+`, `22.13+`, atau `24+`
 - Hapus folder node_modules dan reinstall
 
 ### PWA tidak works

@@ -1,6 +1,6 @@
 # Video Controller Server
 
-Server pusat untuk menghubungkan semua komponen sistem video controller. Server ini mengelola koneksi antara Agent, Cashier, dan Web.
+Server per-ruangan untuk menghubungkan semua komponen sistem video controller. Server ini mengelola koneksi antara Agent, Cashier, dan Web untuk PC ruangan tersebut.
 
 ## Fitur
 
@@ -103,6 +103,10 @@ server/
 ├── dist/                # Build output
 └── package.json
 ```
+
+Catatan update installer:
+- Mode update di `install.sh` / `install.ps1` mempertahankan folder `server/data`, termasuk database SQLite lokal, sehingga riwayat transaksi dan state server tidak hilang saat update rutin.
+- Root `.env` dan `server/.env` juga dipreservasi oleh installer update.
 
 ## Socket Events
 

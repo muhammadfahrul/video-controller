@@ -6,6 +6,8 @@ param(
     [string]$Mode
 )
 
+$RepoZipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+
 # Bypass execution policy untuk menjalankan script ini
 $currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
 if ($currentPolicy -eq "Restricted" -or $currentPolicy -eq "AllSigned") {
@@ -38,11 +40,13 @@ function Show-Menu {
     Write-Host "  [H] Docker: Kasir       - cashier via Docker" -ForegroundColor Cyan
     Write-Host "  [I] Docker: Semua       - server+web+kasir via Docker" -ForegroundColor Cyan
     Write-Host "  [J] Docker: Stop        - hentikan semua service Docker yang jalan" -ForegroundColor Cyan
+    Write-Host "  [K] Update Aplikasi     - update source + dependency + build, tanpa restart lagi" -ForegroundColor Magenta
+    Write-Host "  [L] Update + Restart    - update lalu nyalakan lagi service auto-start yang aktif" -ForegroundColor Magenta
     Write-Host ""
     Write-Host "  [0] Keluar" -ForegroundColor White
     Write-Host ""
 
-    $choice = Read-Host "Masukkan pilihan [0-J]"
+    $choice = Read-Host "Masukkan pilihan [0-L]"
     return $choice
 }
 
@@ -86,6 +90,12 @@ function Get-InstallMode {
             'j' { return 'docker-down' }
             'docker-down' { return 'docker-down' }
             'ddown' { return 'docker-down' }
+            'k' { return 'update' }
+            'u' { return 'update' }
+            'update' { return 'update' }
+            'l' { return 'update-restart' }
+            'ur' { return 'update-restart' }
+            'update-restart' { return 'update-restart' }
             '0' { exit 0 }
             default {
                 Write-Host "Pilihan tidak valid: $RequestedMode" -ForegroundColor Red
@@ -120,6 +130,10 @@ function Get-InstallMode {
         'I' { return 'docker-all' }
         'j' { return 'docker-down' }
         'J' { return 'docker-down' }
+        'k' { return 'update' }
+        'K' { return 'update' }
+        'l' { return 'update-restart' }
+        'L' { return 'update-restart' }
         '0' { exit 0 }
         default {
             Write-Host "Pilihan tidak valid!" -ForegroundColor Red
@@ -363,6 +377,224 @@ function Remove-FileIfExists {
 
     if (Test-Path $Path) {
         Remove-Item -Path $Path -Force
+    }
+}
+
+function Backup-LocalState {
+    param(
+        [string]$ProjectRoot,
+        [string]$BackupRoot
+    )
+
+    $envFiles = @('.env', 'agent\.env', 'server\.env', 'web\.env', 'cashier\.env')
+    foreach ($relativePath in $envFiles) {
+        $sourcePath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $sourcePath) {
+            $targetPath = Join-Path $BackupRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $sourcePath -Destination $targetPath -Force
+        }
+    }
+
+    $dataFolders = @('agent\data', 'server\data')
+    foreach ($relativePath in $dataFolders) {
+        $sourcePath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $sourcePath) {
+            $targetPath = Join-Path $BackupRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $sourcePath -Destination $targetPath -Recurse -Force
+        }
+    }
+}
+
+function Restore-LocalState {
+    param(
+        [string]$ProjectRoot,
+        [string]$BackupRoot
+    )
+
+    $envFiles = @('.env', 'agent\.env', 'server\.env', 'web\.env', 'cashier\.env')
+    foreach ($relativePath in $envFiles) {
+        $backupPath = Join-Path $BackupRoot $relativePath
+        if (Test-Path $backupPath) {
+            $targetPath = Join-Path $ProjectRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $backupPath -Destination $targetPath -Force
+        }
+    }
+
+    $dataFolders = @('agent\data', 'server\data')
+    foreach ($relativePath in $dataFolders) {
+        $backupDataPath = Join-Path $BackupRoot $relativePath
+        $targetDataPath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $backupDataPath) {
+            if (Test-Path $targetDataPath) {
+                Remove-Item -Path $targetDataPath -Recurse -Force
+            }
+            $targetDir = Split-Path $targetDataPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $backupDataPath -Destination $targetDataPath -Recurse -Force
+        }
+    }
+}
+
+function Update-ProjectSourceFromArchive {
+    param([string]$ProjectRoot)
+
+    $tempRoot = Join-Path $env:TEMP "video-controller-update-$PID"
+    $backupRoot = Join-Path $env:TEMP "video-controller-update-env-$PID"
+    $archivePath = Join-Path $tempRoot "video-controller-main.zip"
+    $extractRoot = Join-Path $tempRoot "extracted"
+    $sourceDir = Join-Path $extractRoot "video-controller-main"
+
+    Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+    try {
+        Backup-LocalState -ProjectRoot $ProjectRoot -BackupRoot $backupRoot
+
+        Write-Host "[INFO] Downloading latest source archive..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $RepoZipUrl -OutFile $archivePath -UseBasicParsing
+        Expand-Archive -Path $archivePath -DestinationPath $extractRoot -Force
+
+        if (-not (Test-Path $sourceDir)) {
+            throw "Folder hasil extract tidak ditemukan"
+        }
+
+        Get-ChildItem -Path $sourceDir -Force | Where-Object { $_.Name -ne '.git' } | ForEach-Object {
+            $destinationPath = Join-Path $ProjectRoot $_.Name
+            if ($_.PSIsContainer) {
+                if (-not (Test-Path $destinationPath)) {
+                    New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+                }
+                Get-ChildItem -Path $_.FullName -Force | ForEach-Object {
+                    Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                }
+            } else {
+                Copy-Item -Path $_.FullName -Destination $destinationPath -Force
+            }
+        }
+
+        Restore-LocalState -ProjectRoot $ProjectRoot -BackupRoot $backupRoot
+        Write-Host "[OK] Project files updated from latest archive" -ForegroundColor Green
+    }
+    finally {
+        Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Update-ProjectSource {
+    param([string]$ProjectRoot)
+
+    Write-Host "[INFO] Updating application files..." -ForegroundColor Yellow
+
+    $gitPath = Get-Command git -ErrorAction SilentlyContinue
+    $gitDir = Join-Path $ProjectRoot '.git'
+    if ($gitPath -and (Test-Path $gitDir)) {
+        & git -C $ProjectRoot remote get-url origin *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $branch = (& git -C $ProjectRoot branch --show-current 2>$null).Trim()
+            if (-not $branch) {
+                $branch = 'main'
+            }
+
+            & git -C $ProjectRoot pull --ff-only --autostash origin $branch
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[OK] Project files updated via git pull" -ForegroundColor Green
+                return
+            }
+
+            Write-Host "[WARNING] git pull gagal, fallback ke ZIP terbaru..." -ForegroundColor Yellow
+        }
+    }
+
+    Update-ProjectSourceFromArchive -ProjectRoot $ProjectRoot
+}
+
+function Get-UpdateRestartMode {
+    param([string]$ProjectRoot)
+
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+    $roomConfigured =
+        (Test-Path (Join-Path $startupFolder "VideoController_Server.lnk")) -and
+        (Test-Path (Join-Path $startupFolder "VideoController_Agent.lnk")) -and
+        (Test-Path (Join-Path $startupFolder "VideoController_Web.lnk"))
+    $kasirConfigured = Test-Path (Join-Path $startupFolder "VideoController_Cashier.lnk")
+
+    if ($roomConfigured -and $kasirConfigured) { return 'all' }
+    if ($roomConfigured) { return 'room' }
+    if ($kasirConfigured) { return 'kasir' }
+    return 'none'
+}
+
+function Stop-RestartModeServices {
+    param(
+        [string]$ProjectRoot,
+        [string]$Mode
+    )
+
+    $scriptsFolder = Join-Path $ProjectRoot ".autostart-scripts"
+
+    if ($Mode -eq 'room' -or $Mode -eq 'all') {
+        Write-Host "[INFO] Menghentikan Room App auto-start services sebelum update..." -ForegroundColor Yellow
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Server.bat")
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Agent.bat")
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Web.bat")
+    }
+
+    if ($Mode -eq 'kasir' -or $Mode -eq 'all') {
+        Write-Host "[INFO] Menghentikan Kasir auto-start service sebelum update..." -ForegroundColor Yellow
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Cashier.bat")
+    }
+}
+
+function Start-RestartModeServices {
+    param(
+        [string]$ProjectRoot,
+        [string]$Mode
+    )
+
+    $scriptsFolder = Join-Path $ProjectRoot ".autostart-scripts"
+
+    if ($Mode -eq 'room' -or $Mode -eq 'all') {
+        $serverVbs = Join-Path $scriptsFolder "VideoController_Server.vbs"
+        $agentVbs = Join-Path $scriptsFolder "VideoController_Agent.vbs"
+        $webVbs = Join-Path $scriptsFolder "VideoController_Web.vbs"
+
+        if ((Test-Path $serverVbs) -and (Test-Path $agentVbs) -and (Test-Path $webVbs)) {
+            Write-Host "[INFO] Menyalakan lagi Room App auto-start services..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $serverVbs
+            Start-Sleep -Seconds 2
+            Start-Hidden -VbsPath $agentVbs
+            Start-Sleep -Seconds 1
+            Start-Hidden -VbsPath $webVbs
+        } else {
+            Write-Host "[WARNING] File launcher Room App tidak lengkap, skip restart otomatis." -ForegroundColor Yellow
+        }
+    }
+
+    if ($Mode -eq 'kasir' -or $Mode -eq 'all') {
+        $cashierVbs = Join-Path $scriptsFolder "VideoController_Cashier.vbs"
+        if (Test-Path $cashierVbs) {
+            Write-Host "[INFO] Menyalakan lagi Kasir auto-start service..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $cashierVbs
+        } else {
+            Write-Host "[WARNING] File launcher Kasir tidak ditemukan, skip restart otomatis." -ForegroundColor Yellow
+        }
     }
 }
 
@@ -1055,17 +1287,11 @@ if ($found) {
 }
 
 $INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
+$UPDATE_RESTART_MODE = 'none'
 
 # ============================================
 # Prompt for .env configuration
 # ============================================
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "  Konfigurasi .env (optional)" -ForegroundColor Cyan
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "Tekan Enter untuk skip/tidak ubah field"
-Write-Host ""
-
 # Initialize variables
 $ServerIP = ""
 $RoomID = ""
@@ -1075,57 +1301,66 @@ $BillingEnabled = ""
 $PricePerHour = ""
 $Packages = ""
 
-# Room App mode - needs Server IP, Room ID, Room Name
-if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-room" -or $INSTALL_MODE -eq "docker-all") {
-    Write-Host "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama." -ForegroundColor Cyan
-    Write-Host "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)." -ForegroundColor Cyan
-    $input = Read-Host "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto)"
-    if ($input -ne "") { $ServerIP = $input }
+if ($INSTALL_MODE -ne "update" -and $INSTALL_MODE -ne "update-restart") {
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "  Konfigurasi .env (optional)" -ForegroundColor Cyan
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "Tekan Enter untuk skip/tidak ubah field"
+    Write-Host ""
 
-    $input = Read-Host "Room ID (contoh: room-001, kosongkan untuk skip)"
-    if ($input -ne "") { $RoomID = $input }
+    # Room App mode - needs Server IP, Room ID, Room Name
+    if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-room" -or $INSTALL_MODE -eq "docker-all") {
+        Write-Host "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama." -ForegroundColor Cyan
+        Write-Host "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)." -ForegroundColor Cyan
+        $input = Read-Host "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto)"
+        if ($input -ne "") { $ServerIP = $input }
 
-    $input = Read-Host "Room Name (contoh: Room 1, kosongkan untuk skip)"
-    if ($input -ne "") { $RoomName = $input }
+        $input = Read-Host "Room ID (contoh: room-001, kosongkan untuk skip)"
+        if ($input -ne "") { $RoomID = $input }
 
-    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
-    if ($input -ne "") { $BillingEnabled = $input }
+        $input = Read-Host "Room Name (contoh: Room 1, kosongkan untuk skip)"
+        if ($input -ne "") { $RoomName = $input }
 
-    $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
-    if ($input -ne "") { $PricePerHour = $input }
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
 
-    Write-Host "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak" -ForegroundColor Cyan
-    Write-Host "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa." -ForegroundColor Cyan
-    Write-Host "Contoh: [{`"id`":`"p2j`",`"name`":`"Paket 2 Jam`",`"durationMinutes`":120,`"price`":150000}]" -ForegroundColor Cyan
-    $input = Read-Host "Packages JSON (kosongkan untuk skip)"
-    if ($input -ne "") { $Packages = $input }
-}
+        $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
+        if ($input -ne "") { $PricePerHour = $input }
 
-# Kasir mode - only needs Rooms JSON
-if ($INSTALL_MODE -eq "kasir" -or $INSTALL_MODE -eq "docker-kasir") {
-    Write-Host "Topologi: PC Kasir konek ke N server ruangan yg terpisah." -ForegroundColor Cyan
-    Write-Host "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)." -ForegroundColor Cyan
-    Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat" -ForegroundColor Cyan
-    Write-Host "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
-    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
-    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
-    if ($input -ne "") { $Rooms = $input }
+        Write-Host "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak" -ForegroundColor Cyan
+        Write-Host "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa." -ForegroundColor Cyan
+        Write-Host "Contoh: [{`"id`":`"p2j`",`"name`":`"Paket 2 Jam`",`"durationMinutes`":120,`"price`":150000}]" -ForegroundColor Cyan
+        $input = Read-Host "Packages JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Packages = $input }
+    }
 
-    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
-    if ($input -ne "") { $BillingEnabled = $input }
-}
+    # Kasir mode - only needs Rooms JSON
+    if ($INSTALL_MODE -eq "kasir" -or $INSTALL_MODE -eq "docker-kasir") {
+        Write-Host "Topologi: PC Kasir konek ke N server ruangan yg terpisah." -ForegroundColor Cyan
+        Write-Host "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)." -ForegroundColor Cyan
+        Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat" -ForegroundColor Cyan
+        Write-Host "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+        Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
+        $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Rooms = $input }
 
-# All mode - also needs Rooms JSON
-if ($INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-all") {
-    Write-Host "Untuk mode all, jika PC ini handle KASIR sekaligus:" -ForegroundColor Cyan
-    Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat" -ForegroundColor Cyan
-    Write-Host "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
-    Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
-    $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
-    if ($input -ne "") { $Rooms = $input }
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
+    }
 
-    $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
-    if ($input -ne "") { $BillingEnabled = $input }
+    # All mode - also needs Rooms JSON
+    if ($INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-all") {
+        Write-Host "Untuk mode all, jika PC ini handle KASIR sekaligus:" -ForegroundColor Cyan
+        Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat" -ForegroundColor Cyan
+        Write-Host "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+        Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
+        $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Rooms = $input }
+
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
+    }
 }
 
 # Show selected mode
@@ -1169,9 +1404,30 @@ switch ($INSTALL_MODE) {
     'docker-down' {
         Write-Host "[INFO] Mode: Docker Stop" -ForegroundColor Cyan
     }
+    'update' {
+        Write-Host "[INFO] Mode: Update aplikasi" -ForegroundColor Magenta
+    }
+    'update-restart' {
+        Write-Host "[INFO] Mode: Update + restart layanan" -ForegroundColor Magenta
+    }
 }
 
 Write-Host ""
+
+if ($INSTALL_MODE -eq 'update' -or $INSTALL_MODE -eq 'update-restart') {
+    $UPDATE_RESTART_MODE = Get-UpdateRestartMode -ProjectRoot $PROJECT_ROOT
+    if ($UPDATE_RESTART_MODE -ne 'none') {
+        Write-Host "[INFO] Terdeteksi auto-start mode aktif: $UPDATE_RESTART_MODE" -ForegroundColor Cyan
+        Stop-RestartModeServices -ProjectRoot $PROJECT_ROOT -Mode $UPDATE_RESTART_MODE
+    } else {
+        if ($INSTALL_MODE -eq 'update-restart') {
+            Write-Host "[INFO] Tidak ada auto-start mode aktif yang terdeteksi. Update akan selesai tanpa restart otomatis." -ForegroundColor Yellow
+        } else {
+            Write-Host "[INFO] Tidak ada auto-start mode aktif yang terdeteksi." -ForegroundColor Yellow
+        }
+    }
+    Update-ProjectSource -ProjectRoot $PROJECT_ROOT
+}
 
 # Handle Docker modes - build/run via docker compose, no local Node.js needed
 if ($INSTALL_MODE -match "^docker-") {
@@ -1355,6 +1611,56 @@ if (-not $npmExePath) {
 
 $npmVersion = & $npmExePath --version 2>$null
 Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundColor Green
+
+if ($INSTALL_MODE -eq 'update' -or $INSTALL_MODE -eq 'update-restart') {
+    Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
+    Write-Host "[INFO] Updating all workspace dependencies..." -ForegroundColor Yellow
+
+    Install-Dependencies -Path $PROJECT_ROOT -Name 'root' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier' -ForceReinstall
+    Ensure-PlaywrightBrowsers
+
+    Write-Host "[INFO] Building all services..." -ForegroundColor Yellow
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'server')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'agent')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'web')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'web')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+        & npm run build
+        Pop-Location
+    }
+
+    Write-Host ""
+    Write-Host "[OK] Update aplikasi selesai." -ForegroundColor Green
+    if ($INSTALL_MODE -eq 'update-restart' -and $UPDATE_RESTART_MODE -ne 'none') {
+        Start-RestartModeServices -ProjectRoot $PROJECT_ROOT -Mode $UPDATE_RESTART_MODE
+        Write-Host "[INFO] Service auto-start untuk mode $UPDATE_RESTART_MODE sudah dinyalakan lagi." -ForegroundColor Yellow
+    } elseif ($INSTALL_MODE -eq 'update' -and $UPDATE_RESTART_MODE -ne 'none') {
+        Write-Host "[INFO] Service auto-start untuk mode $UPDATE_RESTART_MODE dibiarkan berhenti. Jalankan manual saat siap." -ForegroundColor Yellow
+    } else {
+        Write-Host "[INFO] Jalankan ulang mode room/kasir/all atau restart auto-start/Docker bila service sedang dipakai." -ForegroundColor Yellow
+    }
+    exit 0
+}
 
 if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
     Write-Host "[INFO] Project files not found. Downloading ZIP archive..." -ForegroundColor Yellow

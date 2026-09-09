@@ -78,11 +78,58 @@ Setiap PC ruangan adalah unit self-contained yang menjalankan **Agent + Server +
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js `20.19+`, `22.13+`, atau `24+`
 - npm atau yarn
 - Google Chrome/Chromium (untuk Playwright)
 
 ## Installation
+
+### Instalasi cepat via script
+
+Disarankan pakai script installer bawaan:
+
+```bash
+# Linux
+./install.sh
+
+# Windows
+.\install.ps1
+```
+
+Menu native/autostart/update yang tersedia:
+
+- `[1]` Room App
+- `[2]` Kasir
+- `[3]` Semua
+- `[A]` `[B]` `[C]` Auto-start Room/Kasir/Semua
+- `[D]` `[E]` `[F]` Remove auto-start
+- `[G]` `[H]` `[I]` `[J]` Mode Docker
+- `[K]` Update aplikasi saja
+- `[L]` Update aplikasi + restart lagi service auto-start yang aktif
+
+Catatan auto-start:
+- Linux memakai `systemctl --user` service.
+- Windows memakai shortcut Startup + launcher tersembunyi (`.vbs`/`.bat`).
+
+Perilaku mode update:
+
+- Script mencoba `git pull` kalau project ini hasil clone git.
+- Kalau bukan repo git atau `git pull` gagal, script fallback ke download ZIP terbaru.
+- Konfigurasi lokal tetap dipertahankan: root `.env`, `agent/.env`, `server/.env`, `web/.env`, `cashier/.env`.
+- Data lokal juga dipertahankan saat update: `agent/data` dan `server/data`.
+- Opsi `L` akan mendeteksi mode auto-start yang aktif sebelumnya (`A`, `B`, atau `C`) lalu menyalakannya lagi setelah update selesai.
+
+Contoh jalankan langsung tanpa menu:
+
+```bash
+./install.sh update
+./install.sh update-restart
+
+.\install.ps1 -Mode update
+.\install.ps1 -Mode update-restart
+```
+
+### Instalasi manual
 
 ```bash
 # Install dependencies untuk semua packages
@@ -209,6 +256,7 @@ docker compose -f docker-compose.cashier.yml up -d --build   # Kasir
 - `server`/`agent` baca `.env` langsung lewat `env_file:` - ubah `.env` lalu restart container sudah cukup, tidak perlu rebuild.
 - Data persisten (`server/data/database.sqlite`, profil browser agent yang menyimpan sesi login YouTube) disimpan di named volume Docker, aman lintas `docker compose up`/`down` (bukan `down -v`).
 - Untuk mengganti `SERVER_IP` yang dipakai agent menghubungi server, override sudah otomatis diarahkan ke nama service Docker (`server`) di `docker-compose.yml` - field `SERVER_IP` di `agent/.env` sendiri tetap dipakai apa adanya oleh `web`/`cashier` karena mereka diakses dari luar jaringan Docker (LAN).
+- Opsi update `K/L` hanya berlaku untuk deployment native. Untuk deployment Docker, update image tetap dilakukan lewat `docker compose up -d --build` atau menu Docker terkait.
 
 ## Socket Events
 

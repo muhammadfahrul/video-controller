@@ -42,7 +42,7 @@ Sistem ini sudah berjalan (bukan konsep) — dokumen ini menjabarkan kembali per
 - **Kontrol manual di dalam ruangan tidak praktis.** Tamu karaoke perlu mencari & mengganti lagu tanpa harus menyentuh PC/TV ruangan langsung.
 - **Billing manual rawan selisih.** Menghitung durasi pakai dan tarif per ruangan dengan cara manual (kertas/stopwatch) rentan salah hitung dan sulit diaudit.
 - **Operator kasir butuh satu titik pantau.** Dengan banyak ruangan berjalan paralel, staf perlu tahu ruangan mana aktif, mana kosong, mana yang belum dibersihkan — tanpa mondar-mandir fisik.
-- **Setiap ruangan harus tetap independen.** Kalau jaringan atau server pusat mati, ruangan lain tidak boleh ikut lumpuh.
+- **Setiap ruangan harus tetap independen.** Kalau jaringan LAN bermasalah atau satu PC ruangan mati, ruangan lain tidak boleh ikut lumpuh.
 
 ### Tujuan Produk
 
@@ -309,7 +309,7 @@ Selain daftar di atas, alur operasional juga bergantung pada broadcast turunan s
 
 ### Deployment
 
-- **Native:** Node.js 18+, tiap komponen di-build & dijalankan terpisah (`npm run build` / `npm start`), dikoordinasikan lewat `install.sh` (Linux, bash) / `install.ps1` (Windows, PowerShell). Menu interaktif: `[1]` Room App, `[2]` Kasir, `[3]` Semua (native); `[A]`–`[C]` pasang autostart (systemd di Linux) untuk Room App/Kasir/Semua, `[D]`–`[F]` mencabutnya; `[G]`–`[J]` mode Docker. Systemd unit yang digenerate memakai `Restart=on-failure` + `RestartSec=10`, sehingga proses yang keluar (lihat §5.10) otomatis naik lagi dalam ~10 detik.
+- **Native:** Node.js `20.19+`, `22.13+`, atau `24+`. Tiap komponen di-build & dijalankan terpisah (`npm run build` / `npm start`), dikoordinasikan lewat `install.sh` (Linux, bash) / `install.ps1` (Windows, PowerShell). Menu interaktif: `[1]` Room App, `[2]` Kasir, `[3]` Semua (native); `[A]`–`[C]` pasang autostart untuk Room App/Kasir/Semua, `[D]`–`[F]` mencabutnya; `[G]`–`[J]` mode Docker; `[K]` update source + dependency + build tanpa start lagi; `[L]` update lalu restart kembali mode auto-start yang aktif. Di Linux, autostart memakai user-level `systemd`; di Windows, autostart memakai shortcut Startup + launcher tersembunyi. Saat update native, installer mempertahankan root `.env`, `.env` tiap app, serta data lokal `agent/data` dan `server/data`. Systemd unit yang digenerate di Linux memakai `Restart=on-failure` + `RestartSec=10`, sehingga proses yang keluar (lihat §5.10) otomatis naik lagi dalam ~10 detik.
 - **Docker:** tiap service (`agent`, `server`, `web`, `cashier`) punya Dockerfile sendiri; `docker-compose.yml` untuk Room App, `docker-compose.cashier.yml` untuk kasir. Build dilakukan satu service per satu (bukan paralel) khusus untuk `docker-room`/`docker-all`, karena build TypeScript paralel bisa kehabisan memori host.
 - **Batasan platform agent:** agent butuh browser Chrome yang benar-benar tampil di layar (`BROWSER_HEADLESS=false`). Di Docker, ini hanya berjalan di **Linux** lewat X11 passthrough ke display host (`xhost +si:localuser:$(whoami)` sekali per sesi, container mem-mount `$DISPLAY`). Di **Windows** tidak ada padanan X11 — `install.ps1` mode `docker-room`/`docker-all` mencetak peringatan eksplisit dan hanya men-Docker-kan `server`+`web`; agent tetap wajib native di PC ruangan itu.
 

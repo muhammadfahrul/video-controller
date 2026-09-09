@@ -89,6 +89,8 @@ export PATH="$NVM_DIR/versions/node/$(nvm version default 2>/dev/null || echo 'v
 
 set -e
 
+REPO_ZIP_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+
 # ============================================
 # Prompt for .env configuration
 # ============================================
@@ -285,6 +287,191 @@ apply_env_config() {
     fi
 }
 
+backup_local_state() {
+    local backup_dir="$1"
+    local rel
+
+    mkdir -p "$backup_dir"
+    for rel in .env agent/.env server/.env web/.env cashier/.env; do
+        if [[ -f "$PROJECT_ROOT/$rel" ]]; then
+            mkdir -p "$backup_dir/$(dirname "$rel")"
+            cp "$PROJECT_ROOT/$rel" "$backup_dir/$rel"
+        fi
+    done
+
+    for rel in agent/data server/data; do
+        if [[ -d "$PROJECT_ROOT/$rel" ]]; then
+            mkdir -p "$backup_dir/$(dirname "$rel")"
+            cp -a "$PROJECT_ROOT/$rel" "$backup_dir/$rel"
+        fi
+    done
+}
+
+restore_local_state() {
+    local backup_dir="$1"
+    local rel
+
+    for rel in .env agent/.env server/.env web/.env cashier/.env; do
+        if [[ -f "$backup_dir/$rel" ]]; then
+            mkdir -p "$PROJECT_ROOT/$(dirname "$rel")"
+            cp "$backup_dir/$rel" "$PROJECT_ROOT/$rel"
+        fi
+    done
+
+    for rel in agent/data server/data; do
+        if [[ -d "$backup_dir/$rel" ]]; then
+            rm -rf "$PROJECT_ROOT/$rel"
+            mkdir -p "$PROJECT_ROOT/$(dirname "$rel")"
+            cp -a "$backup_dir/$rel" "$PROJECT_ROOT/$rel"
+        fi
+    done
+}
+
+update_project_from_archive() {
+    local temp_root="/tmp/video-controller-update-$$"
+    local backup_root="/tmp/video-controller-update-env-$$"
+    local archive_name="$temp_root/video-controller-main.zip"
+    local extract_root="$temp_root/extracted"
+    local source_dir="$extract_root/video-controller-main"
+
+    rm -rf "$temp_root" "$backup_root"
+    mkdir -p "$temp_root" "$extract_root"
+
+    backup_local_state "$backup_root"
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ unzip is not installed!"
+        install_unzip
+    fi
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ Cannot install unzip!"
+        return 1
+    fi
+
+    echo "⬇️ Downloading latest source archive..."
+    curl -fsSL "$REPO_ZIP_URL" -o "$archive_name"
+    unzip -q "$archive_name" -d "$extract_root"
+
+    if [[ ! -d "$source_dir" ]]; then
+        echo "❌ Failed to extract latest source archive"
+        return 1
+    fi
+
+    cp -a "$source_dir"/. "$PROJECT_ROOT"/
+    restore_local_state "$backup_root"
+
+    rm -rf "$temp_root" "$backup_root"
+    echo "✅ Project files updated from latest archive"
+}
+
+update_project_source() {
+    echo "⬆️ Updating application files..."
+
+    if [[ -d "$PROJECT_ROOT/.git" ]] && command -v git &> /dev/null; then
+        local current_branch
+        current_branch="$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null || true)"
+        if [[ -z "$current_branch" ]]; then
+            current_branch="main"
+        fi
+
+        if git -C "$PROJECT_ROOT" remote get-url origin &> /dev/null; then
+            if git -C "$PROJECT_ROOT" pull --ff-only --autostash origin "$current_branch"; then
+                echo "✅ Project files updated via git pull"
+                return 0
+            fi
+            echo "⚠️ git pull gagal, fallback ke ZIP terbaru..."
+        fi
+    fi
+
+    update_project_from_archive
+}
+
+user_service_enabled_or_active() {
+    local service_name="$1"
+    if ! command -v systemctl &> /dev/null; then
+        return 1
+    fi
+
+    systemctl --user is-enabled "$service_name" >/dev/null 2>&1 || \
+    systemctl --user is-active "$service_name" >/dev/null 2>&1
+}
+
+detect_update_restart_mode() {
+    local room_mode=false
+    local kasir_mode=false
+
+    if user_service_enabled_or_active "video-controller-server.service" && \
+       user_service_enabled_or_active "video-controller-agent.service" && \
+       user_service_enabled_or_active "video-controller-web.service"; then
+        room_mode=true
+    fi
+
+    if user_service_enabled_or_active "video-controller-cashier.service"; then
+        kasir_mode=true
+    fi
+
+    if [[ "$room_mode" == true && "$kasir_mode" == true ]]; then
+        echo "all"
+    elif [[ "$room_mode" == true ]]; then
+        echo "room"
+    elif [[ "$kasir_mode" == true ]]; then
+        echo "kasir"
+    else
+        echo "none"
+    fi
+}
+
+stop_restart_mode_services() {
+    local mode="$1"
+
+    if ! command -v systemctl &> /dev/null; then
+        return 0
+    fi
+
+    case "$mode" in
+        room|all)
+            echo "🛑 Stopping Room App auto-start services sebelum update..."
+            systemctl --user stop video-controller-agent.service 2>/dev/null || true
+            systemctl --user stop video-controller-web.service 2>/dev/null || true
+            systemctl --user stop video-controller-server.service 2>/dev/null || true
+            ;;
+    esac
+
+    case "$mode" in
+        kasir|all)
+            echo "🛑 Stopping Kasir auto-start service sebelum update..."
+            systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+            ;;
+    esac
+}
+
+start_restart_mode_services() {
+    local mode="$1"
+
+    if ! command -v systemctl &> /dev/null; then
+        return 0
+    fi
+
+    case "$mode" in
+        room|all)
+            echo "▶️ Restarting Room App auto-start services..."
+            systemctl --user start video-controller-server.service
+            sleep 2
+            systemctl --user start video-controller-agent.service
+            sleep 1
+            systemctl --user start video-controller-web.service
+            ;;
+    esac
+
+    case "$mode" in
+        kasir|all)
+            echo "▶️ Restarting Kasir auto-start service..."
+            systemctl --user start video-controller-cashier.service
+            ;;
+    esac
+}
+
 # ============================================
 # Docker deploy (alternative to the native npm build+run below - builds and
 # runs each service in a container via docker-compose.yml /
@@ -448,10 +635,12 @@ show_menu() {
     echo "  [H] Docker: Kasir       - cashier via Docker"
     echo "  [I] Docker: Semua       - Room App + Kasir via Docker"
     echo "  [J] Docker: Stop        - hentikan semua service Docker yang jalan"
+    echo "  [K] Update Aplikasi     - update source + dependency + build, tanpa restart lagi"
+    echo "  [L] Update + Restart    - update lalu nyalakan lagi service auto-start yang aktif"
     echo ""
     echo "  [0] Keluar"
     echo ""
-    echo -n "Masukkan pilihan [0-J]: "
+    echo -n "Masukkan pilihan [0-L]: "
 }
 
 # ============================================
@@ -481,6 +670,8 @@ resolve_install_mode() {
         h|docker-kasir|dkasir) echo "docker-kasir" ;;
         i|docker-all|dall) echo "docker-all" ;;
         j|docker-down|ddown) echo "docker-down" ;;
+        k|u|update) echo "update" ;;
+        l|ur|update-restart) echo "update-restart" ;;
         *) echo "" ;;
     esac
 }
@@ -559,6 +750,12 @@ case $INSTALL_MODE in
     remove-autostart-all)
         echo "📦 Mode: Hapus Auto-start Semua"
         ;;
+    update)
+        echo "📦 Mode: Update aplikasi"
+        ;;
+    update-restart)
+        echo "📦 Mode: Update + restart layanan"
+        ;;
     docker-room)
         echo "📦 Mode: Docker Room App"
         ;;
@@ -620,13 +817,12 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
     # Create video-controller subfolder in current directory
     DEST_DIR="$PROJECT_ROOT/video-controller"
     
-    REPO_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
     ARCHIVE_NAME="video-controller-main.zip"
     EXTRACT_DIR="$DEST_DIR/video-controller-main"
 
     cd /tmp
     rm -f "$ARCHIVE_NAME"
-    curl -fsSL "$REPO_URL" -o "$ARCHIVE_NAME"
+    curl -fsSL "$REPO_ZIP_URL" -o "$ARCHIVE_NAME"
 
     # Remove existing destination folder if exists
     if [ -d "$DEST_DIR" ]; then
@@ -653,8 +849,29 @@ if [ "$HAS_PROJECT_FILES" = false ]; then
     exit 1
 fi
 
+UPDATE_RESTART_MODE="none"
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    UPDATE_RESTART_MODE="$(detect_update_restart_mode)"
+    if [[ "$UPDATE_RESTART_MODE" != "none" ]]; then
+        echo "ℹ️ Terdeteksi auto-start mode aktif: $UPDATE_RESTART_MODE"
+        stop_restart_mode_services "$UPDATE_RESTART_MODE"
+    else
+        if [[ "$INSTALL_MODE" == "update-restart" ]]; then
+            echo "ℹ️ Tidak ada auto-start mode aktif yang terdeteksi. Update akan selesai tanpa restart otomatis."
+        else
+            echo "ℹ️ Tidak ada auto-start mode aktif yang terdeteksi."
+        fi
+    fi
+fi
+
 # Prompt for .env configuration AFTER PROJECT_ROOT is set correctly
-prompt_env_config "$INSTALL_MODE"
+if [[ "$INSTALL_MODE" != "update" && "$INSTALL_MODE" != "update-restart" ]]; then
+    prompt_env_config "$INSTALL_MODE"
+fi
+
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    update_project_source
+fi
 
 # ============================================
 # Docker mode - build/run in containers, no local Node.js needed on the host
@@ -766,6 +983,57 @@ if ! node_version_ok "$(node -v 2>/dev/null)"; then
 fi
 
 echo "✅ Node.js $(node -v) and npm $(npm -v) detected"
+
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    echo "📦 Updating all workspace dependencies..."
+
+    cd "$PROJECT_ROOT" && npm install
+
+    if [[ -d "$PROJECT_ROOT/agent" ]]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+        echo "🌐 Ensuring Playwright browsers..."
+        npx playwright install chromium --with-deps
+    fi
+
+    if [[ -d "$PROJECT_ROOT/server" ]]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+
+    if [[ -d "$PROJECT_ROOT/web" ]]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+
+    if [[ -d "$PROJECT_ROOT/cashier" ]]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
+    echo "🔨 Building all services..."
+
+    if [[ -d "$PROJECT_ROOT/server" ]]; then
+        cd "$PROJECT_ROOT/server" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/agent" ]]; then
+        cd "$PROJECT_ROOT/agent" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/web" ]]; then
+        cd "$PROJECT_ROOT/web" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/cashier" ]]; then
+        cd "$PROJECT_ROOT/cashier" && npm run build
+    fi
+
+    echo ""
+    echo "✅ Update aplikasi selesai."
+    if [[ "$INSTALL_MODE" == "update-restart" && "$UPDATE_RESTART_MODE" != "none" ]]; then
+        start_restart_mode_services "$UPDATE_RESTART_MODE"
+        echo "ℹ️ Service auto-start untuk mode $UPDATE_RESTART_MODE sudah dinyalakan lagi."
+    elif [[ "$INSTALL_MODE" == "update" && "$UPDATE_RESTART_MODE" != "none" ]]; then
+        echo "ℹ️ Service auto-start untuk mode $UPDATE_RESTART_MODE dibiarkan berhenti. Jalankan manual saat siap."
+    else
+        echo "ℹ️ Jalankan ulang mode room/kasir/all atau restart auto-start/Docker bila service sedang dipakai."
+    fi
+    exit 0
+fi
 
 # Clean other node_modules if Node.js was upgraded
 if [ "$NODE_UPGRADED" = true ]; then

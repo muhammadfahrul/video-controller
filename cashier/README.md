@@ -1,6 +1,6 @@
 # Cashier Application
 
-Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini terhubung ke server pusat dan menampilkan status semua ruangan yang aktif.
+Aplikasi kasir untuk mengatur timer dan billing ruangan karaoke. Aplikasi ini terhubung ke banyak server ruangan sekaligus dan menampilkan status semua ruangan yang aktif.
 
 ## Fitur
 
@@ -108,6 +108,26 @@ cashier/
 ```
 
 ## Cara Install di PC Kasir
+
+Untuk deployment production, lebih praktis jalankan installer dari root project:
+
+```bash
+# Windows
+.\install.ps1
+
+# Linux
+./install.sh
+```
+
+Lalu pilih:
+- `[2]` untuk install Kasir saja
+- `[B]` untuk pasang auto-start Kasir
+- `[K]` untuk update source + dependency + build tanpa start lagi
+- `[L]` untuk update lalu menyalakan lagi auto-start Kasir yang aktif
+
+Mode update installer mempertahankan `.env` lokal dan data persisten room/server yang ada di project yang sama, jadi PC kasir tidak perlu diset ulang setelah update routine.
+
+Kalau mau deploy manual tanpa installer, langkah lama di bawah ini tetap bisa dipakai:
 
 1. Konfigurasi file `.env` sesuai kebutuhan
 2. Build aplikasi: `npm run build`

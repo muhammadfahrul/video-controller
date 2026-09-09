@@ -1,6 +1,6 @@
 # Video Controller Agent
 
-Agent yang berjalan di ruangan karaoke untuk mengontrol pemutaran video YouTube. Agent terhubung ke server pusat dan menerima perintah dari kasir melalui server.
+Agent yang berjalan di ruangan karaoke untuk mengontrol pemutaran video YouTube. Agent terhubung ke server lokal di PC ruangan yang sama dan menerima perintah dari web/kasir melalui server tersebut.
 
 ## Fitur
 
@@ -104,6 +104,10 @@ Kapan perlu direset:
 - Profil korup (browser gagal start terus-menerus meski konfigurasi benar)
 
 Cara reset: hentikan agent, hapus folder `data/browser-profile/` secara manual, lalu jalankan ulang agent — folder akan dibuat ulang otomatis dan browser akan start dengan profil bersih (perlu login YouTube ulang jika diperlukan).
+
+Catatan update installer:
+- Mode update di `install.sh` / `install.ps1` mempertahankan folder `agent/data`, jadi profil browser lokal ini tidak hilang saat update rutin.
+- Kalau memang ingin reset profil browser, hapus manual folder ini setelah agent dihentikan; proses update biasa tidak akan mengosongkannya.
 
 ## Topologi (1 Ruangan = 1 PC)
 
