@@ -134,8 +134,38 @@ export class YouTubeDOM {
 
         await this.page.evaluate(
 
-            ({selector, volume})=>{
+            ({playerSelector, selector, volume})=>{
 
+                const clamped =
+                    Math.max(
+                        0,
+                        Math.min(
+                            100,
+                            volume
+                        )
+                    );
+
+                // YouTube's own player.js keeps an internal volume state
+                // (persisted to localStorage and re-applied on ad
+                // transitions, quality changes, etc). Setting
+                // video.volume directly leaves that internal state
+                // untouched, so YouTube "corrects" the <video> element
+                // back to its own remembered volume a few seconds later.
+                // #movie_player exposes the same YT.Player instance
+                // YouTube's own UI drives - go through it so the change
+                // actually sticks.
+                const player =
+                    document.querySelector(
+                        playerSelector
+                    ) as (HTMLElement & { setVolume?: (v:number)=>void }) | null;
+
+                if (player && typeof player.setVolume === "function") {
+
+                    player.setVolume(clamped);
+
+                    return;
+
+                }
 
                 const video =
                     document.querySelector(
@@ -146,13 +176,7 @@ export class YouTubeDOM {
                 if(video){
 
                     video.volume =
-                        Math.max(
-                            0,
-                            Math.min(
-                                1,
-                                volume / 100
-                            )
-                        );
+                        clamped / 100;
 
                 }
 
@@ -161,6 +185,9 @@ export class YouTubeDOM {
 
 
             {
+
+                playerSelector:
+                    YouTubeSelectors.player,
 
                 selector:
                     YouTubeSelectors.video,
@@ -180,7 +207,21 @@ export class YouTubeDOM {
 
     public async mute() {
 
-        await this.page.evaluate(() => {
+        await this.page.evaluate(
+            (playerSelector) => {
+
+            const player =
+                document.querySelector(
+                    playerSelector
+                ) as (HTMLElement & { mute?: () => void }) | null;
+
+            if (player && typeof player.mute === "function") {
+
+                player.mute();
+
+                return;
+
+            }
 
             const video =
                 document.querySelector(
@@ -197,13 +238,27 @@ export class YouTubeDOM {
 
             video.muted = true;
 
-        });
+        }, YouTubeSelectors.player);
 
     }
 
     public async unmute() {
 
-        await this.page.evaluate(() => {
+        await this.page.evaluate(
+            (playerSelector) => {
+
+            const player =
+                document.querySelector(
+                    playerSelector
+                ) as (HTMLElement & { unMute?: () => void }) | null;
+
+            if (player && typeof player.unMute === "function") {
+
+                player.unMute();
+
+                return;
+
+            }
 
             const video =
                 document.querySelector(
@@ -220,7 +275,7 @@ export class YouTubeDOM {
 
             video.muted = false;
 
-        });
+        }, YouTubeSelectors.player);
 
     }
 
