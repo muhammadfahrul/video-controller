@@ -1,0 +1,1669 @@
+#!/bin/bash
+
+# Video Controller - Deploy Script
+# Run selected services with a single command
+# Auto-installs dependencies - just run ./install.sh
+
+# ============================================
+# Find project root - look in script directory, parent directories, AND
+# sibling directories (mirrors install.ps1's Find-NodeJS-adjacent search so
+# the script still works when run from Downloads, a symlink, etc.)
+# ============================================
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+FOUND_PROJECT=false
+
+# 0. Check current working directory (where user runs the script)
+if [ -f "$PWD/package.json" ]; then
+    PROJECT_ROOT="$PWD"
+    FOUND_PROJECT=true
+fi
+
+# 1. Check script directory (where script file is located)
+if [ "$FOUND_PROJECT" = false ] && [ -f "$SCRIPT_DIR/package.json" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR"
+    FOUND_PROJECT=true
+fi
+
+# 2. If not found, walk up parent directories
+if [ "$FOUND_PROJECT" = false ]; then
+    check_path="$SCRIPT_DIR"
+    for _ in 1 2 3 4 5; do
+        if [ -f "$check_path/package.json" ]; then
+            PROJECT_ROOT="$check_path"
+            FOUND_PROJECT=true
+            break
+        fi
+        parent="$(dirname "$check_path")"
+        if [ "$parent" = "$check_path" ]; then
+            break
+        fi
+        check_path="$parent"
+    done
+fi
+
+# 3. Check for "video-controller" folder in script directory
+if [ "$FOUND_PROJECT" = false ] && [ -f "$SCRIPT_DIR/video-controller/package.json" ]; then
+    PROJECT_ROOT="$SCRIPT_DIR/video-controller"
+    FOUND_PROJECT=true
+fi
+
+# 4. Check for video-controller in parent directory (common case for Downloads)
+if [ "$FOUND_PROJECT" = false ]; then
+    parent_dir="$(dirname "$SCRIPT_DIR")"
+    if [ -f "$parent_dir/video-controller/package.json" ]; then
+        PROJECT_ROOT="$parent_dir/video-controller"
+        FOUND_PROJECT=true
+    fi
+fi
+
+# Show where we found the project
+if [ "$FOUND_PROJECT" = true ]; then
+    echo "📁 Project root: $PROJECT_ROOT"
+else
+    echo "⚠️ Cannot find project root (package.json)"
+    echo ""
+    echo "🔍 Searched locations:"
+    echo "  - $PWD (current directory)"
+    echo "  - $SCRIPT_DIR (script location)"
+    check_path="$SCRIPT_DIR"
+    for i in 1 2 3; do
+        parent="$(dirname "$check_path")"
+        if [ "$parent" = "$check_path" ]; then
+            break
+        fi
+        echo "  - $parent (parent $i)"
+        check_path="$parent"
+    done
+    echo "  - $SCRIPT_DIR/video-controller (sibling)"
+    parent_dir="$(dirname "$SCRIPT_DIR")"
+    echo "  - $parent_dir/video-controller (sibling in parent)"
+fi
+
+# Source NVM for proper Node.js version (hardcoded path for reliability)
+export NVM_DIR="/home/parkee/.nvm"
+# Try to source NVM if it exists, use default version if available
+\. "$NVM_DIR/nvm.sh" 2>/dev/null && nvm use default >/dev/null 2>&1 || true
+# Ensure NVM node is first in PATH
+export PATH="$NVM_DIR/versions/node/$(nvm version default 2>/dev/null || echo 'v22.18.0')/bin:$PATH"
+
+set -e
+
+REPO_ZIP_URL="https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+
+# Target version for update: a git tag like "v1.2.0", given as the second
+# argument ("./install.sh update v1.2.0") or VC_VERSION env var. Empty =
+# latest main (the previous behavior). Pinning a tag also makes rollback a
+# one-liner: rerun update with the older tag.
+TARGET_VERSION="${VC_VERSION:-$2}"
+if [[ -n "$TARGET_VERSION" && "$TARGET_VERSION" != v* ]]; then
+    TARGET_VERSION="v$TARGET_VERSION"
+fi
+
+# Read the app version from the root package.json without needing Node.js
+# (update may run before Node is installed).
+get_app_version() {
+    local pkg="${1:-$PROJECT_ROOT}/package.json"
+    if [[ -f "$pkg" ]]; then
+        sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$pkg" | head -n 1
+    fi
+}
+
+# List the newest release tags (v*), newest first: from git when this is a
+# clone, otherwise from the GitHub API (ZIP installs have no .git).
+list_remote_versions() {
+    local tags=""
+    if [[ -d "$PROJECT_ROOT/.git" ]] && command -v git &> /dev/null; then
+        tags="$(git -C "$PROJECT_ROOT" ls-remote --tags --refs origin 'v*' 2>/dev/null | sed 's|.*refs/tags/||')"
+    fi
+    if [[ -z "$tags" ]] && command -v curl &> /dev/null; then
+        tags="$(curl -fsSL --max-time 10 "https://api.github.com/repos/muhammadfahrul/video-controller/tags?per_page=100" 2>/dev/null \
+            | sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\(v[^"]*\)".*/\1/p')"
+    fi
+    printf '%s\n' "$tags" | grep -E '^v[0-9]' | sort -rV | head -n 5
+}
+
+# Menu-only: ask which version to update to (CLI callers pass it as an
+# argument instead, so unattended runs are never blocked on a prompt).
+prompt_target_version() {
+    local current versions input
+    current="$(get_app_version)"
+    echo ""
+    echo "📦 Versi terpasang: ${current:-unknown}"
+    echo "🔎 Mengecek versi yang tersedia..."
+
+    local -a version_list=()
+    mapfile -t version_list < <(list_remote_versions)
+
+    if [[ ${#version_list[@]} -gt 0 ]]; then
+        echo "Versi tersedia:"
+        local i
+        for i in "${!version_list[@]}"; do
+            if [[ $i -eq 0 ]]; then
+                echo "  [$((i + 1))] ${version_list[$i]} (rilis terbaru)"
+            else
+                echo "  [$((i + 1))] ${version_list[$i]}"
+            fi
+        done
+    else
+        echo "⚠️ Tidak bisa mengambil daftar versi (offline / belum ada tag)."
+    fi
+
+    local default_label="terbaru dari main"
+    if [[ ${#version_list[@]} -gt 0 ]]; then
+        default_label="${version_list[0]}"
+    fi
+    echo -n "Pilih nomor atau ketik versi (contoh v1.0.0) [default: $default_label]: "
+    read -r input
+
+    if [[ -z "$input" ]]; then
+        # Default to the newest release tag; fall back to main only when the
+        # tag list couldn't be fetched (offline / no tags yet).
+        TARGET_VERSION="${version_list[0]:-}"
+    elif [[ "$input" =~ ^[0-9]+$ && "$input" -ge 1 && "$input" -le ${#version_list[@]} ]]; then
+        TARGET_VERSION="${version_list[$((input - 1))]}"
+    elif [[ "$input" =~ ^[0-9]+$ ]]; then
+        echo "❌ Nomor $input tidak ada di daftar."
+        exit 1
+    else
+        TARGET_VERSION="$input"
+        [[ "$TARGET_VERSION" != v* ]] && TARGET_VERSION="v$TARGET_VERSION"
+    fi
+    echo "➡️ Target: ${TARGET_VERSION:-terbaru dari main}"
+}
+
+# ============================================
+# Prompt for .env configuration
+# ============================================
+prompt_env_config() {
+    local mode="$1"
+    
+    echo ""
+    echo "=========================================="
+    echo "  Konfigurasi .env (optional)"
+    echo "=========================================="
+    echo "Tekan Enter untuk skip/tidak ubah field"
+    echo ""
+    
+    local server_ip=""
+    local room_id=""
+    local room_name=""
+    local rooms_json=""
+    local billing_enabled=""
+    local price_per_hour=""
+    local packages_json=""
+
+    # Room App mode - needs Server IP, Room ID, Room Name
+    if [[ "$mode" == "room" || "$mode" == "all" || "$mode" == "docker-room" || "$mode" == "docker-all" ]]; then
+        echo "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama."
+        echo "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)."
+        read -p "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto): " server_ip
+
+        read -p "Room ID (contoh: room-001, kosongkan untuk skip): " room_id
+
+        read -p "Room Name (contoh: Room 1, kosongkan untuk skip): " room_name
+
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
+
+        read -p "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip): " price_per_hour
+
+        echo "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak"
+        echo "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa."
+        echo "Contoh: [{\"id\":\"p2j\",\"name\":\"Paket 2 Jam\",\"durationMinutes\":120,\"price\":150000}]"
+        read -p "Packages JSON (kosongkan untuk skip): " packages_json
+    fi
+
+    # Kasir mode - only needs Rooms JSON
+    if [[ "$mode" == "kasir" || "$mode" == "docker-kasir" ]]; then
+        echo "Topologi: PC Kasir konek ke N server ruangan yg terpisah."
+        echo "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)."
+        echo "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat"
+        echo "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis."
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331}]"
+        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
+    fi
+
+    # All mode - needs everything
+    if [[ "$mode" == "all" || "$mode" == "docker-all" ]]; then
+        echo "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama."
+        echo "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)."
+        read -p "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto): " server_ip
+
+        echo ""
+        echo "Untuk mode all, jika PC ini handle KASIR sekaligus:"
+        echo "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat"
+        echo "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis."
+        echo "Rooms JSON contoh: [{\"roomId\":\"room-001\",\"name\":\"Room 1\",\"ip\":\"192.168.1.101\",\"port\":53331}]"
+        read -p "Rooms JSON (kosongkan untuk skip): " rooms_json
+
+        read -p "Billing Enabled (contoh: true/false, kosongkan untuk skip): " billing_enabled
+    fi
+
+    # Apply configuration - only non-empty values will be applied
+    apply_env_config "$server_ip" "$room_id" "$room_name" "$rooms_json" "$billing_enabled" "$mode" "$price_per_hour" "$packages_json"
+}
+
+# Set a KEY=VALUE line in an .env file: replace it if it already exists
+# (regardless of position), append it if the key isn't present yet. Plain
+# sed replace (used for the other vars below) only works when the line
+# already exists, which isn't guaranteed for PACKAGES since it's a newer,
+# optional var absent from most existing .env files.
+set_env_var() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+apply_env_config() {
+    local server_ip="$1"
+    local room_id="$2"
+    local room_name="$3"
+    local rooms_json="$4"
+    local billing_enabled="$5"
+    local mode="$6"
+    local price_per_hour="$7"
+    local packages_json="$8"
+
+    # Skip if all values are empty
+    if [[ -z "$server_ip" && -z "$room_id" && -z "$room_name" && -z "$rooms_json" && -z "$billing_enabled" && -z "$price_per_hour" && -z "$packages_json" ]]; then
+        echo "[INFO] Tidak ada konfigurasi yang diubah"
+        return
+    fi
+    
+    echo ""
+    echo "Mengupdate file .env..."
+    
+    # Agent .env - ROOM_ID, ROOM_NAME, SERVER_IP
+    if [[ "$mode" == "room" || "$mode" == "all" ]]; then
+        local agent_env="$PROJECT_ROOT/agent/.env"
+        if [[ -f "$agent_env" ]]; then
+            if [[ -n "$server_ip" ]]; then
+                sed -i "s|SERVER_IP=.*|SERVER_IP=$server_ip|" "$agent_env"
+            fi
+            if [[ -n "$room_id" ]]; then
+                sed -i "s|ROOM_ID=.*|ROOM_ID=$room_id|" "$agent_env"
+            fi
+            if [[ -n "$room_name" ]]; then
+                sed -i "s|ROOM_NAME=.*|ROOM_NAME=$room_name|" "$agent_env"
+            fi
+            echo "[OK] Updated agent/.env"
+        else
+            echo "[WARN] File agent/.env tidak ditemukan"
+        fi
+    fi
+
+    # Server .env - SERVER_IP
+    local server_env="$PROJECT_ROOT/server/.env"
+    if [[ -f "$server_env" ]]; then
+        if [[ -n "$server_ip" ]]; then
+            sed -i "s|SERVER_IP=.*|SERVER_IP=$server_ip|" "$server_env"
+        fi
+        echo "[OK] Updated server/.env"
+    else
+        echo "[WARN] File server/.env tidak ditemukan"
+    fi
+
+    # Web .env - SERVER_IP
+    local web_env="$PROJECT_ROOT/web/.env"
+    if [[ -f "$web_env" ]]; then
+        if [[ -n "$server_ip" ]]; then
+            sed -i "s|VITE_SERVER_IP=.*|VITE_SERVER_IP=$server_ip|" "$web_env"
+        fi
+        echo "[OK] Updated web/.env"
+    else
+        echo "[WARN] File web/.env tidak ditemukan"
+    fi
+
+    # Cashier .env - VITE_ROOMS
+    if [[ "$mode" == "kasir" || "$mode" == "all" ]]; then
+        local cashier_env="$PROJECT_ROOT/cashier/.env"
+        if [[ -f "$cashier_env" ]]; then
+            if [[ -n "$rooms_json" ]]; then
+                sed -i "s|VITE_ROOMS=.*|VITE_ROOMS=$rooms_json|" "$cashier_env"
+            fi
+            if [[ -n "$billing_enabled" ]]; then
+                sed -i "s|VITE_BILLING_ENABLED=.*|VITE_BILLING_ENABLED=$billing_enabled|" "$cashier_env"
+            fi
+            echo "[OK] Updated cashier/.env"
+        else
+            echo "[WARN] File cashier/.env tidak ditemukan"
+        fi
+    fi
+    
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR
+    local server_env="$PROJECT_ROOT/server/.env"
+    if [[ -f "$server_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|BILLING_ENABLED=.*|BILLING_ENABLED=$billing_enabled|" "$server_env"
+        fi
+        if [[ -n "$price_per_hour" ]]; then
+            sed -i "s|PRICE_PER_HOUR=.*|PRICE_PER_HOUR=$price_per_hour|" "$server_env"
+        fi
+        if [[ -n "$packages_json" ]]; then
+            set_env_var "$server_env" "PACKAGES" "$packages_json"
+        fi
+    fi
+
+    # Agent .env - BILLING_ENABLED
+    local agent_env="$PROJECT_ROOT/agent/.env"
+    if [[ -f "$agent_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|BILLING_ENABLED=.*|BILLING_ENABLED=$billing_enabled|" "$agent_env"
+        fi
+    fi
+    
+    # Web .env - VITE_BILLING_ENABLED
+    local web_env="$PROJECT_ROOT/web/.env"
+    if [[ -f "$web_env" ]]; then
+        if [[ -n "$billing_enabled" ]]; then
+            sed -i "s|VITE_BILLING_ENABLED=.*|VITE_BILLING_ENABLED=$billing_enabled|" "$web_env"
+        fi
+    fi
+}
+
+backup_local_state() {
+    local backup_dir="$1"
+    local rel
+
+    mkdir -p "$backup_dir"
+    for rel in .env agent/.env server/.env web/.env cashier/.env; do
+        if [[ -f "$PROJECT_ROOT/$rel" ]]; then
+            mkdir -p "$backup_dir/$(dirname "$rel")"
+            cp "$PROJECT_ROOT/$rel" "$backup_dir/$rel"
+        fi
+    done
+
+    for rel in agent/data server/data; do
+        if [[ -d "$PROJECT_ROOT/$rel" ]]; then
+            mkdir -p "$backup_dir/$(dirname "$rel")"
+            cp -a "$PROJECT_ROOT/$rel" "$backup_dir/$rel"
+        fi
+    done
+}
+
+restore_local_state() {
+    local backup_dir="$1"
+    local rel
+
+    for rel in .env agent/.env server/.env web/.env cashier/.env; do
+        if [[ -f "$backup_dir/$rel" ]]; then
+            mkdir -p "$PROJECT_ROOT/$(dirname "$rel")"
+            cp "$backup_dir/$rel" "$PROJECT_ROOT/$rel"
+        fi
+    done
+
+    for rel in agent/data server/data; do
+        if [[ -d "$backup_dir/$rel" ]]; then
+            rm -rf "$PROJECT_ROOT/$rel"
+            mkdir -p "$PROJECT_ROOT/$(dirname "$rel")"
+            cp -a "$backup_dir/$rel" "$PROJECT_ROOT/$rel"
+        fi
+    done
+}
+
+update_project_from_archive() {
+    local temp_root="/tmp/video-controller-update-$$"
+    local backup_root="/tmp/video-controller-update-env-$$"
+    local archive_name="$temp_root/video-controller.zip"
+    local extract_root="$temp_root/extracted"
+    local source_dir
+    local zip_url="$REPO_ZIP_URL"
+    if [[ -n "$TARGET_VERSION" ]]; then
+        zip_url="https://github.com/muhammadfahrul/video-controller/archive/refs/tags/${TARGET_VERSION}.zip"
+    fi
+
+    rm -rf "$temp_root" "$backup_root"
+    mkdir -p "$temp_root" "$extract_root"
+
+    backup_local_state "$backup_root"
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ unzip is not installed!"
+        install_unzip
+    fi
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ Cannot install unzip!"
+        return 1
+    fi
+
+    echo "⬇️ Downloading source archive (${TARGET_VERSION:-latest main})..."
+    if ! curl -fsSL "$zip_url" -o "$archive_name"; then
+        echo "❌ Gagal download $zip_url (versi ${TARGET_VERSION:-main} tidak ada?)"
+        return 1
+    fi
+    unzip -q "$archive_name" -d "$extract_root"
+    # GitHub names the top folder after the ref (video-controller-main,
+    # video-controller-1.2.0, ...), so take whichever single dir was extracted.
+    source_dir="$(find "$extract_root" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+    if [[ -z "$source_dir" || ! -d "$source_dir" ]]; then
+        echo "❌ Failed to extract source archive"
+        return 1
+    fi
+
+    cp -a "$source_dir"/. "$PROJECT_ROOT"/
+    restore_local_state "$backup_root"
+
+    rm -rf "$temp_root" "$backup_root"
+    echo "✅ Project files updated from archive (${TARGET_VERSION:-latest main})"
+}
+
+update_project_source() {
+    echo "⬆️ Updating application files..."
+
+    if [[ -d "$PROJECT_ROOT/.git" ]] && command -v git &> /dev/null && [[ -n "$TARGET_VERSION" ]]; then
+        if git -C "$PROJECT_ROOT" remote get-url origin &> /dev/null; then
+            if git -C "$PROJECT_ROOT" fetch --tags origin && \
+               git -C "$PROJECT_ROOT" -c advice.detachedHead=false checkout "$TARGET_VERSION"; then
+                echo "✅ Project files checked out to $TARGET_VERSION"
+                return 0
+            fi
+            echo "⚠️ Checkout $TARGET_VERSION gagal (tag tidak ada / ada perubahan lokal?), fallback ke ZIP..."
+        fi
+        update_project_from_archive
+        return
+    fi
+
+    if [[ -d "$PROJECT_ROOT/.git" ]] && command -v git &> /dev/null; then
+        local current_branch
+        current_branch="$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null || true)"
+        if [[ -z "$current_branch" ]]; then
+            # Detached HEAD = previously pinned to a tag; go back to main to
+            # get the latest version.
+            current_branch="main"
+            git -C "$PROJECT_ROOT" checkout main 2>/dev/null || true
+        fi
+
+        if git -C "$PROJECT_ROOT" remote get-url origin &> /dev/null; then
+            if git -C "$PROJECT_ROOT" pull --ff-only --autostash origin "$current_branch"; then
+                echo "✅ Project files updated via git pull"
+                return 0
+            fi
+            echo "⚠️ git pull gagal, fallback ke ZIP terbaru..."
+        fi
+    fi
+
+    update_project_from_archive
+}
+
+user_service_enabled_or_active() {
+    local service_name="$1"
+    if ! command -v systemctl &> /dev/null; then
+        return 1
+    fi
+
+    systemctl --user is-enabled "$service_name" >/dev/null 2>&1 || \
+    systemctl --user is-active "$service_name" >/dev/null 2>&1
+}
+
+detect_update_restart_mode() {
+    local room_mode=false
+    local kasir_mode=false
+
+    if user_service_enabled_or_active "video-controller-server.service" && \
+       user_service_enabled_or_active "video-controller-agent.service" && \
+       user_service_enabled_or_active "video-controller-web.service"; then
+        room_mode=true
+    fi
+
+    if user_service_enabled_or_active "video-controller-cashier.service"; then
+        kasir_mode=true
+    fi
+
+    if [[ "$room_mode" == true && "$kasir_mode" == true ]]; then
+        echo "all"
+    elif [[ "$room_mode" == true ]]; then
+        echo "room"
+    elif [[ "$kasir_mode" == true ]]; then
+        echo "kasir"
+    else
+        echo "none"
+    fi
+}
+
+stop_restart_mode_services() {
+    local mode="$1"
+
+    if ! command -v systemctl &> /dev/null; then
+        return 0
+    fi
+
+    case "$mode" in
+        room|all)
+            echo "🛑 Stopping Room App auto-start services sebelum update..."
+            systemctl --user stop video-controller-agent.service 2>/dev/null || true
+            systemctl --user stop video-controller-web.service 2>/dev/null || true
+            systemctl --user stop video-controller-server.service 2>/dev/null || true
+            ;;
+    esac
+
+    case "$mode" in
+        kasir|all)
+            echo "🛑 Stopping Kasir auto-start service sebelum update..."
+            systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+            ;;
+    esac
+}
+
+start_restart_mode_services() {
+    local mode="$1"
+
+    if ! command -v systemctl &> /dev/null; then
+        return 0
+    fi
+
+    case "$mode" in
+        room|all)
+            echo "▶️ Restarting Room App auto-start services..."
+            systemctl --user start video-controller-server.service
+            sleep 2
+            systemctl --user start video-controller-agent.service
+            sleep 1
+            systemctl --user start video-controller-web.service
+            ;;
+    esac
+
+    case "$mode" in
+        kasir|all)
+            echo "▶️ Restarting Kasir auto-start service..."
+            systemctl --user start video-controller-cashier.service
+            ;;
+    esac
+}
+
+# ============================================
+# Docker deploy (alternative to the native npm build+run below - builds and
+# runs each service in a container via docker-compose.yml /
+# docker-compose.cashier.yml instead of installing Node.js on the host).
+# ============================================
+install_docker() {
+    echo "🔧 Docker tidak ditemukan. Mencoba auto-install..."
+
+    if ! command -v curl &> /dev/null; then
+        echo "❌ curl tidak ditemukan, tidak bisa auto-install Docker."
+        return 1
+    fi
+
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sudo sh /tmp/get-docker.sh
+    rm -f /tmp/get-docker.sh
+
+    # Start & enable the Docker daemon on distros that use systemd
+    if command -v systemctl &> /dev/null; then
+        sudo systemctl enable --now docker 2>/dev/null || true
+    fi
+
+    # Add current user to the 'docker' group so 'docker' can run without sudo
+    # (only takes effect after logout/login - handled below via sudo fallback
+    # for the rest of THIS run)
+    if ! groups "$(whoami)" 2>/dev/null | grep -qw docker; then
+        sudo usermod -aG docker "$(whoami)" 2>/dev/null || true
+        echo "⚠️ User $(whoami) ditambahkan ke group 'docker'. Logout/login ulang agar bisa jalankan docker tanpa sudo nanti."
+    fi
+}
+
+# Set once by check_docker_available: "docker compose" normally, or
+# "sudo docker compose" when the user was just added to the docker group
+# by install_docker but hasn't re-logged in yet for it to take effect.
+DOCKER_COMPOSE_CMD="docker compose"
+
+check_docker_available() {
+    if ! command -v docker &> /dev/null; then
+        install_docker
+    fi
+
+    if ! command -v docker &> /dev/null; then
+        echo "❌ Gagal auto-install Docker. Install manual: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+
+    if docker info &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+    elif sudo docker info &> /dev/null; then
+        echo "ℹ️ User belum bisa akses docker tanpa sudo (perlu re-login setelah instalasi). Pakai 'sudo docker' untuk sesi ini."
+        DOCKER_COMPOSE_CMD="sudo docker compose"
+    else
+        echo "❌ Docker terinstall tapi tidak bisa diakses - cek apakah Docker daemon sudah jalan."
+        exit 1
+    fi
+
+    if ! $DOCKER_COMPOSE_CMD version &> /dev/null; then
+        echo "❌ Docker Compose plugin tidak ditemukan (butuh 'docker compose', bukan 'docker-compose' lama)."
+        exit 1
+    fi
+}
+
+run_docker_deploy() {
+    local mode="$1"  # docker-room, docker-kasir, docker-all, docker-down
+
+    check_docker_available
+    cd "$PROJECT_ROOT"
+
+    # Resolve PulseAudio socket/cookie for the agent container's audio
+    # passthrough (see docker-compose.yml's PULSE_SERVER/PULSE_SOCKET/
+    # PULSE_COOKIE). Written to a project-root .env - the *only* reliable way
+    # to hand docker-compose a variable computed from the invoking user's
+    # $HOME/$(id -u): this whole function may run under "sudo docker
+    # compose" (see check_docker_available), and sudo does not propagate
+    # arbitrary env vars set here to that child process, so plain shell
+    # export wouldn't reach compose's variable substitution.
+    local pulse_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/pulse/native"
+    local pulse_cookie="$HOME/.config/pulse/cookie"
+    if [[ ! -S "$pulse_socket" ]]; then
+        echo "⚠️ PulseAudio socket tidak ditemukan di $pulse_socket - video mungkin tidak ada suara."
+        pulse_socket="/dev/null"
+    fi
+    if [[ ! -f "$pulse_cookie" ]]; then
+        pulse_cookie="/dev/null"
+    fi
+    set_env_var "$PROJECT_ROOT/.env" "PULSE_SOCKET" "$pulse_socket"
+    set_env_var "$PROJECT_ROOT/.env" "PULSE_COOKIE" "$pulse_cookie"
+    # Images are tagged video-controller-<service>:<APP_VERSION> (see the
+    # compose files), so older versions stay available for rollback.
+    local app_version
+    app_version="$(get_app_version)"
+    set_env_var "$PROJECT_ROOT/.env" "APP_VERSION" "${app_version:-latest}"
+    echo "📦 Versi aplikasi: ${app_version:-unknown}"
+
+    if [[ "$mode" == "docker-down" ]]; then
+        echo "🐳 Menghentikan semua service Docker (room + kasir, kalau ada)..."
+        $DOCKER_COMPOSE_CMD down 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f docker-compose.cashier.yml down 2>/dev/null || true
+        echo "✅ Docker services dihentikan."
+        return
+    fi
+
+    if [[ "$mode" == "docker-room" || "$mode" == "docker-all" ]]; then
+        # Agent membuka browser bervisual di layar - butuh akses ke X11 host.
+        # Lihat catatan Linux-only di docker-compose.yml.
+        if [[ -z "$DISPLAY" ]]; then
+            echo "⚠️ \$DISPLAY kosong - agent butuh display X11 aktif buat nampilin browser video."
+            echo "   Jalankan script ini dari sesi desktop (bukan SSH tanpa X forwarding)."
+        fi
+        echo "🔑 Mengizinkan container Docker akses ke display X11 (xhost)..."
+        # The agent container runs as root (the Playwright base image has no
+        # non-root USER), and Docker doesn't UID-remap by default - so the
+        # X server sees the container's connection as UID 0 (root), not the
+        # invoking user. Granting only "$(whoami)" leaves root unauthorized
+        # and Chromium fails with "Authorization required, but no
+        # authorization protocol specified".
+        xhost +si:localuser:"$(whoami)" 2>/dev/null || echo "⚠️ 'xhost' gagal/tidak ada - agent mungkin tidak bisa nampilin browser. Install paket x11-xserver-utils kalau perlu."
+        xhost +si:localuser:root 2>/dev/null || true
+
+        # Build one service at a time instead of "up --build" (Compose
+        # builds all services in parallel by default via buildx bake) -
+        # concurrent "npm run build"/tsc processes can exhaust available
+        # memory and crash with "JavaScript heap out of memory" (exit 134).
+        echo "🐳 Building Room App services satu per satu (biar hemat memori)..."
+        $DOCKER_COMPOSE_CMD build server
+        $DOCKER_COMPOSE_CMD build agent
+        $DOCKER_COMPOSE_CMD build web
+        echo "🐳 Starting Room App (server + agent + web)..."
+        $DOCKER_COMPOSE_CMD up -d
+    fi
+
+    if [[ "$mode" == "docker-kasir" || "$mode" == "docker-all" ]]; then
+        echo "🐳 Building & starting Kasir via Docker..."
+        $DOCKER_COMPOSE_CMD -f docker-compose.cashier.yml up -d --build
+    fi
+
+    echo ""
+    echo "✅ Docker deployment ($mode) selesai."
+    echo "ℹ️ Cek status: docker compose ps   (dan: docker compose -f docker-compose.cashier.yml ps)"
+    echo "ℹ️ Lihat log:  docker compose logs -f"
+    echo "ℹ️ Stop:       ./install.sh docker-down"
+}
+
+# ============================================
+# Interactive menu
+# ============================================
+show_menu() {
+    echo "============================================"
+    echo "   Video Controller - Deploy Script"
+    echo "============================================"
+    echo ""
+    echo "Pilih aplikasi yang ingin diinstall:"
+    echo ""
+    echo "  [1] Room App       - Agent + Server + Web (1 PC = 1 Ruangan)"
+    echo "  [2] Kasir          - Aplikasi Kasir (PC Kasir, konek ke N server ruangan)"
+    echo "  [3] Semua          - Room App + Kasir (untuk PC yg handle keduanya)"
+    echo ""
+    echo "  [A] Auto-start Room App"
+    echo "  [B] Auto-start Kasir"
+    echo "  [C] Auto-start Semua"
+    echo ""
+    echo "  [D] Remove Auto-start Room App"
+    echo "  [E] Remove Auto-start Kasir"
+    echo "  [F] Remove Auto-start Semua"
+    echo ""
+    echo "  [G] Docker: Room App    - server+agent+web via Docker (Linux, butuh display X11)"
+    echo "  [H] Docker: Kasir       - cashier via Docker"
+    echo "  [I] Docker: Semua       - Room App + Kasir via Docker"
+    echo "  [J] Docker: Stop        - hentikan semua service Docker yang jalan"
+    echo "  [K] Update Aplikasi     - update source + dependency + build, tanpa restart lagi"
+    echo "  [L] Update + Restart    - update lalu nyalakan lagi service auto-start yang aktif"
+    echo ""
+    echo "  [0] Keluar"
+    echo ""
+    echo -n "Masukkan pilihan [0-L]: "
+}
+
+# ============================================
+# Parse menu selection
+# ============================================
+# Single alias table shared by all three entry points ($CLI_MODE, the
+# positional $1 legacy format, and the interactive menu) - they used to
+# have divergent alias coverage ($CLI_MODE only understood bare
+# digits/letters with no word aliases and no invalid-input error message;
+# the interactive menu had an undocumented "r/R" -> legacy "remove-autostart"
+# shortcut not available anywhere else). Mirrors install.ps1's
+# Get-InstallMode alias set.
+resolve_install_mode() {
+    local raw
+    raw="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+    case "$raw" in
+        1|room) echo "room" ;;
+        2|kasir) echo "kasir" ;;
+        3|all) echo "all" ;;
+        a|autostart|ar|autostart-room) echo "autostart-room" ;;
+        b|autostart-kasir|bk|autostart-cashier) echo "autostart-kasir" ;;
+        c|autostart-all) echo "autostart-all" ;;
+        d|remove-autostart-room|remove-room) echo "remove-autostart-room" ;;
+        e|remove-autostart-kasir|remove-kasir) echo "remove-autostart-kasir" ;;
+        f|remove-autostart-all|remove-all|remove-autostart) echo "remove-autostart-all" ;;
+        g|docker-room|droom) echo "docker-room" ;;
+        h|docker-kasir|dkasir) echo "docker-kasir" ;;
+        i|docker-all|dall) echo "docker-all" ;;
+        j|docker-down|ddown) echo "docker-down" ;;
+        k|u|update) echo "update" ;;
+        l|ur|update-restart) echo "update-restart" ;;
+        *) echo "" ;;
+    esac
+}
+
+INSTALL_MODE=""
+
+# Use CLI mode if provided via arguments
+if [[ -n "$CLI_MODE" ]]; then
+    if [[ "$CLI_MODE" == "0" || "$CLI_MODE" == "exit" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$CLI_MODE")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid: $CLI_MODE"
+        exit 1
+    fi
+elif [[ $# -gt 0 ]]; then
+    # Command line argument provided (legacy format)
+    if [[ "$1" == "0" || "$1" == "exit" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$1")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid: $1"
+        exit 1
+    fi
+else
+    # Show interactive menu
+    MENU_MODE=true
+    show_menu
+    read -r choice
+    echo ""
+
+    if [[ "$choice" == "0" ]]; then
+        echo "Keluar..."
+        exit 0
+    fi
+    INSTALL_MODE="$(resolve_install_mode "$choice")"
+    if [[ -z "$INSTALL_MODE" ]]; then
+        echo "Pilihan tidak valid!"
+        exit 1
+    fi
+fi
+
+# ============================================
+# Show selected mode
+# ============================================
+echo "🚀 Starting Video Controller..."
+
+case $INSTALL_MODE in
+    all)
+        echo "📦 Mode: Semua layanan (Room App + Kasir)"
+        ;;
+    room)
+        echo "📦 Mode: Room App saja (agent, server, web)"
+        ;;
+    kasir)
+        echo "📦 Mode: Kasir saja (cashier)"
+        ;;
+    autostart-room)
+        echo "📦 Mode: Setup Auto-start Room App"
+        ;;
+    autostart-kasir)
+        echo "📦 Mode: Setup Auto-start Kasir"
+        ;;
+    autostart-all)
+        echo "📦 Mode: Setup Auto-start Semua"
+        ;;
+    remove-autostart-room)
+        echo "📦 Mode: Hapus Auto-start Room App"
+        ;;
+    remove-autostart-kasir)
+        echo "📦 Mode: Hapus Auto-start Kasir"
+        ;;
+    remove-autostart-all)
+        echo "📦 Mode: Hapus Auto-start Semua"
+        ;;
+    update)
+        echo "📦 Mode: Update aplikasi"
+        ;;
+    update-restart)
+        echo "📦 Mode: Update + restart layanan"
+        ;;
+    docker-room)
+        echo "📦 Mode: Docker Room App"
+        ;;
+    docker-kasir)
+        echo "📦 Mode: Docker Kasir"
+        ;;
+    docker-all)
+        echo "📦 Mode: Docker Semua"
+        ;;
+    docker-down)
+        echo "📦 Mode: Docker Stop"
+        ;;
+esac
+echo ""
+
+# ============================================
+# Ensure unzip is available
+# ============================================
+install_unzip() {
+    echo "🔧 Installing unzip..."
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y unzip
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y unzip
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y unzip
+    elif command -v brew &> /dev/null; then
+        brew install unzip
+    fi
+}
+
+# Project location was already resolved by the root-finding search above
+HAS_PROJECT_FILES="$FOUND_PROJECT"
+
+# Download repository archive directly as ZIP when project files are not present
+if [ "$HAS_PROJECT_FILES" = false ]; then
+    echo ""
+    echo -n "❓ Download dari GitHub? [y/N]: "
+    read -r download_confirm
+    if [[ ! "$download_confirm" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "ℹ️ Solusi: Pindahkan install.sh ke dalam folder video-controller"
+        exit 1
+    fi
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ unzip is not installed!"
+        install_unzip
+    fi
+
+    if ! command -v unzip &> /dev/null; then
+        echo "❌ Cannot install unzip!"
+        exit 1
+    fi
+
+    echo "⬇️ Downloading repository archive..."
+
+    # Create video-controller subfolder in current directory
+    DEST_DIR="$PROJECT_ROOT/video-controller"
+    
+    ARCHIVE_NAME="video-controller-main.zip"
+    EXTRACT_DIR="$DEST_DIR/video-controller-main"
+
+    cd /tmp
+    rm -f "$ARCHIVE_NAME"
+    curl -fsSL "$REPO_ZIP_URL" -o "$ARCHIVE_NAME"
+
+    # Remove existing destination folder if exists
+    if [ -d "$DEST_DIR" ]; then
+        rm -rf "$DEST_DIR"
+    fi
+
+    mkdir -p "$DEST_DIR"
+    unzip -q "$ARCHIVE_NAME" -d "$DEST_DIR"
+    
+    # Move contents from video-controller-main to DEST_DIR
+    if [ -d "$EXTRACT_DIR" ]; then
+        mv "$EXTRACT_DIR/"* "$DEST_DIR/"
+        rm -rf "$EXTRACT_DIR"
+    fi
+    rm -f "$ARCHIVE_NAME"
+
+    PROJECT_ROOT="$DEST_DIR"
+    cd "$PROJECT_ROOT"
+    HAS_PROJECT_FILES=true
+fi
+
+if [ "$HAS_PROJECT_FILES" = false ]; then
+    echo "❌ Cannot get project files!"
+    exit 1
+fi
+
+UPDATE_RESTART_MODE="none"
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    # Ask before stopping any service, so the room isn't down while the
+    # operator is still choosing.
+    if [[ "$MENU_MODE" == true && -z "$TARGET_VERSION" ]]; then
+        prompt_target_version
+    fi
+    UPDATE_RESTART_MODE="$(detect_update_restart_mode)"
+    if [[ "$UPDATE_RESTART_MODE" != "none" ]]; then
+        echo "ℹ️ Terdeteksi auto-start mode aktif: $UPDATE_RESTART_MODE"
+        stop_restart_mode_services "$UPDATE_RESTART_MODE"
+    else
+        if [[ "$INSTALL_MODE" == "update-restart" ]]; then
+            echo "ℹ️ Tidak ada auto-start mode aktif yang terdeteksi. Update akan selesai tanpa restart otomatis."
+        else
+            echo "ℹ️ Tidak ada auto-start mode aktif yang terdeteksi."
+        fi
+    fi
+fi
+
+# Prompt for .env configuration AFTER PROJECT_ROOT is set correctly
+if [[ "$INSTALL_MODE" != "update" && "$INSTALL_MODE" != "update-restart" ]]; then
+    prompt_env_config "$INSTALL_MODE"
+fi
+
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    VERSION_BEFORE="$(get_app_version)"
+    if ! update_project_source; then
+        echo "❌ Update gagal, aplikasi tetap di versi ${VERSION_BEFORE:-unknown}."
+        exit 1
+    fi
+    VERSION_AFTER="$(get_app_version)"
+    echo "📦 Versi: ${VERSION_BEFORE:-unknown} -> ${VERSION_AFTER:-unknown}"
+fi
+
+# ============================================
+# Docker mode - build/run in containers, no local Node.js needed on the host
+# ============================================
+if [[ "$INSTALL_MODE" == docker-* ]]; then
+    run_docker_deploy "$INSTALL_MODE"
+    exit 0
+fi
+
+# ============================================
+# Auto-install Node.js if not present
+# ============================================
+install_nodejs() {
+    echo "🔧 Installing Node.js..."
+    
+    if command -v brew &> /dev/null; then
+        brew install node
+    elif command -v apt-get &> /dev/null; then
+        # Remove old node packages first
+        echo "🧹 Cleaning old Node.js packages..."
+        sudo apt-get remove -y nodejs libnode-dev libnode72 2>/dev/null || true
+        sudo apt-get autoremove -y
+        
+        # Install Node.js 20
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+    elif command -v yum &> /dev/null; then
+        sudo yum remove -y nodejs 2>/dev/null || true
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        sudo yum install -y nodejs
+    elif command -v dnf &> /dev/null; then
+        sudo dnf remove -y nodejs 2>/dev/null || true
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+        sudo dnf install -y nodejs
+    else
+        echo "⬇️ Downloading Node.js LTS..."
+        
+        if [ "$(uname -m)" = "x86_64" ]; then
+            ARCH="x64"
+        elif [ "$(uname -m)" = "aarch64" ] || [ "$(uname -m)" = "arm64" ]; then
+            ARCH="arm64"
+        else
+            ARCH="x86"
+        fi
+        
+        NODE_VERSION="22.13.1"
+        NODE_TAR="node-v${NODE_VERSION}-linux-${ARCH}.tar.xz"
+        
+        cd /tmp
+        curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_TAR}" -o "$NODE_TAR"
+        sudo tar -xJf "$NODE_TAR" -C /usr/local --strip-components=1
+        rm -f "$NODE_TAR"
+        
+        echo "✅ Node.js installed to /usr/local"
+    fi
+}
+
+# Check whether a Node.js version string (e.g. "v20.19.0") satisfies what
+# this project's tooling actually requires: Vite 8.x needs
+# "^20.19.0 || >=22.12.0" and ESLint 10.x needs "^20.19.0 || ^22.13.0 || >=24"
+# (see web/node_modules/{vite,eslint}/package.json "engines"). Their
+# intersection is 20.19+, 22.13+, or 24+ - Node 21.x and 23.x are NOT
+# supported even though they're newer than 20.
+node_version_ok() {
+    local ver="${1#v}"
+    local major minor
+    major=$(echo "$ver" | cut -d. -f1)
+    minor=$(echo "$ver" | cut -d. -f2)
+    if [ -z "$major" ]; then
+        return 1
+    fi
+    if [ "$major" -ge 24 ]; then
+        return 0
+    elif [ "$major" -eq 22 ] && [ "$minor" -ge 13 ]; then
+        return 0
+    elif [ "$major" -eq 20 ] && [ "$minor" -ge 19 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Check if Node.js version satisfies Vite 8.x / ESLint 10.x (need 20.19+, 22.13+, or 24+)
+NODE_CURRENT_VERSION=$(node -v 2>/dev/null)
+
+# Track if we upgraded Node.js
+NODE_UPGRADED=false
+
+# Auto-install Node.js if not present or version doesn't satisfy requirements
+if ! command -v node &> /dev/null || ! node_version_ok "$NODE_CURRENT_VERSION"; then
+    echo "❌ Node.js ${NODE_CURRENT_VERSION:-not found} tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)!"
+    install_nodejs
+    NODE_UPGRADED=true
+fi
+
+# Refresh PATH to get new Node.js
+export PATH="/usr/local/bin:$PATH"
+
+# Auto-install npm if not present
+if ! command -v npm &> /dev/null; then
+    echo "❌ npm is not installed!"
+    install_nodejs
+fi
+
+if ! node_version_ok "$(node -v 2>/dev/null)"; then
+    echo "❌ Node.js $(node -v 2>/dev/null || echo 'not found') masih belum memenuhi syarat (butuh 20.19+, 22.13+, atau 24+) setelah instalasi."
+    echo "ℹ️ Silakan buka terminal baru lalu jalankan ulang script ini."
+    exit 1
+fi
+
+echo "✅ Node.js $(node -v) and npm $(npm -v) detected"
+
+if [[ "$INSTALL_MODE" == "update" || "$INSTALL_MODE" == "update-restart" ]]; then
+    echo "📦 Updating all workspace dependencies..."
+
+    cd "$PROJECT_ROOT" && npm install
+
+    if [[ -d "$PROJECT_ROOT/agent" ]]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+        echo "🌐 Ensuring Playwright browsers..."
+        npx playwright install chromium --with-deps
+    fi
+
+    if [[ -d "$PROJECT_ROOT/server" ]]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+
+    if [[ -d "$PROJECT_ROOT/web" ]]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+
+    if [[ -d "$PROJECT_ROOT/cashier" ]]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
+    echo "🔨 Building all services..."
+
+    if [[ -d "$PROJECT_ROOT/server" ]]; then
+        cd "$PROJECT_ROOT/server" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/agent" ]]; then
+        cd "$PROJECT_ROOT/agent" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/web" ]]; then
+        cd "$PROJECT_ROOT/web" && npm run build
+    fi
+    if [[ -d "$PROJECT_ROOT/cashier" ]]; then
+        cd "$PROJECT_ROOT/cashier" && npm run build
+    fi
+
+    echo ""
+    echo "✅ Update aplikasi selesai."
+    if [[ "$INSTALL_MODE" == "update-restart" && "$UPDATE_RESTART_MODE" != "none" ]]; then
+        start_restart_mode_services "$UPDATE_RESTART_MODE"
+        echo "ℹ️ Service auto-start untuk mode $UPDATE_RESTART_MODE sudah dinyalakan lagi."
+    elif [[ "$INSTALL_MODE" == "update" && "$UPDATE_RESTART_MODE" != "none" ]]; then
+        echo "ℹ️ Service auto-start untuk mode $UPDATE_RESTART_MODE dibiarkan berhenti. Jalankan manual saat siap."
+    else
+        echo "ℹ️ Jalankan ulang mode room/kasir/all atau restart auto-start/Docker bila service sedang dipakai."
+    fi
+    exit 0
+fi
+
+# Clean other node_modules if Node.js was upgraded
+if [ "$NODE_UPGRADED" = true ]; then
+    echo "🧹 Removing old node_modules (Node.js upgraded)..."
+    rm -rf "$PROJECT_ROOT/node_modules"
+    rm -rf "$PROJECT_ROOT/agent/node_modules"
+    rm -rf "$PROJECT_ROOT/server/node_modules"
+    rm -rf "$PROJECT_ROOT/web/node_modules"
+    rm -rf "$PROJECT_ROOT/cashier/node_modules"
+    rm -f "$PROJECT_ROOT/package-lock.json"
+    rm -f "$PROJECT_ROOT/agent/package-lock.json"
+    rm -f "$PROJECT_ROOT/server/package-lock.json"
+    rm -f "$PROJECT_ROOT/web/package-lock.json"
+    rm -f "$PROJECT_ROOT/cashier/package-lock.json"
+fi
+
+# ============================================
+# Install dependencies based on mode
+# ============================================
+echo "📦 Checking dependencies..."
+
+# Root dependencies (always needed for workspace)
+if [ ! -d "$PROJECT_ROOT/node_modules" ]; then
+    echo "📦 Installing root dependencies..."
+    cd "$PROJECT_ROOT" && npm install
+fi
+
+# Room App dependencies
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        echo "📦 Installing agent dependencies..."
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    
+    # Install Playwright browsers if not exists
+    if [ ! -d "$HOME/.cache/ms-playwright" ]; then
+        echo "🌐 Installing Playwright browsers..."
+        cd "$PROJECT_ROOT/agent" && npx playwright install chromium --with-deps
+    fi
+    
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        echo "📦 Installing server dependencies..."
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        echo "📦 Installing web dependencies..."
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+fi
+
+# Kasir dependencies
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        echo "📦 Installing cashier dependencies..."
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+fi
+
+# ============================================
+# Build based on mode
+# ============================================
+echo "🔨 Building services..."
+
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    echo "🔨 Building Room App (agent, server, web)..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+fi
+
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    echo "🔨 Building Kasir (cashier)..."
+    cd "$PROJECT_ROOT/cashier" && npm run build
+fi
+
+# ============================================
+# Install xvfb for headless browser
+# ============================================
+install_xvfb() {
+    echo "🔧 Installing xvfb (headless display)..."
+    
+    if command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y xvfb
+    elif command -v yum &> /dev/null; then
+        sudo yum install -y xorg-x11-server-Xvfb
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y xorg-x11-server-Xvfb
+    fi
+}
+
+# Check if xvfb is needed (headless server)
+if [ -z "$DISPLAY" ] && ! command -v xvfb-run &> /dev/null; then
+    install_xvfb
+fi
+
+# ============================================
+# Skip if auto-start mode (services will be started by systemd)
+# ============================================
+if [[ "$INSTALL_MODE" == autostart-* ]] || [[ "$INSTALL_MODE" == remove-autostart-* ]]; then
+    # Skip starting services here, will be started by systemd
+    echo "⏭️ Skipping manual start (auto-start mode)"
+else
+# ============================================
+# Start services based on mode
+# ============================================
+echo "▶️ Starting services..."
+
+# PIDs for cleanup
+PIDS=""
+
+# Poll the server's /health endpoint on localhost (this script and the
+# server always run on the same machine, so localhost is correct here
+# regardless of what SERVER_IP was configured for LAN access) before
+# starting the agent - without this, the agent can try to connect before
+# the server is listening.
+wait_for_server() {
+    local port="${1:-53331}"
+    local max_wait_seconds="${2:-30}"
+    local url="http://127.0.0.1:${port}/api/health"
+
+    echo "   Waiting for server to be ready..."
+    local waited=0
+    while [ "$waited" -lt "$max_wait_seconds" ]; do
+        if curl -fsS -o /dev/null --max-time 2 "$url" 2>/dev/null; then
+            echo "   ✅ Server is ready!"
+            return 0
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    echo "   ⚠️ Server may not be ready, but continuing..."
+    return 1
+}
+
+# Start Room App services
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "room" ]; then
+    echo "▶️ Starting Room App services..."
+
+    cd "$PROJECT_ROOT/server" && NODE_ENV=production npm run start &
+    SERVER_PID=$!
+    PIDS="$PIDS $SERVER_PID"
+    echo "   - Server: PID $SERVER_PID"
+
+    wait_for_server 53331 30 || true
+
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        echo "   ✅ Server is running"
+    else
+        echo "   ❌ Server exited unexpectedly"
+    fi
+
+    # Start agent (only if server is still running) with xvfb if no display
+    if kill -0 "$SERVER_PID" 2>/dev/null; then
+        if [ -z "$DISPLAY" ] && command -v xvfb-run &> /dev/null; then
+            cd "$PROJECT_ROOT/agent" && NODE_ENV=production xvfb-run -a npm run start &
+            AGENT_PID=$!
+        else
+            cd "$PROJECT_ROOT/agent" && NODE_ENV=production npm run start &
+            AGENT_PID=$!
+        fi
+        PIDS="$PIDS $AGENT_PID"
+        echo "   - Agent: PID $AGENT_PID"
+    fi
+
+    cd "$PROJECT_ROOT/web" && npm run preview:host &
+    WEB_PID=$!
+    PIDS="$PIDS $WEB_PID"
+    echo "   - Web: PID $WEB_PID"
+fi
+
+# Start Kasir service
+if [ "$INSTALL_MODE" = "all" ] || [ "$INSTALL_MODE" = "kasir" ]; then
+    echo "▶️ Starting Kasir service..."
+    
+    cd "$PROJECT_ROOT/cashier" && npm run preview:host &
+    CASHIER_PID=$!
+    PIDS="$PIDS $CASHIER_PID"
+    echo "   - Cashier: PID $CASHIER_PID"
+fi
+
+echo ""
+echo "✅ All selected services started!"
+echo ""
+echo "Press Ctrl+C to stop all services"
+
+# ============================================
+# Cleanup function
+# ============================================
+cleanup() {
+    echo ""
+    echo "🛑 Stopping all services..."
+    for pid in $PIDS; do
+        kill $pid 2>/dev/null || true
+    done
+    echo "✅ All services stopped"
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+# End of manual start section
+fi
+
+# ============================================
+# Auto-start setup (systemd)
+# ============================================
+setup_autostart() {
+    local mode="$1"  # room, kasir, or all
+    
+    echo "📝 Membuat systemd service files..."
+    
+    # Source NVM to get correct Node.js and npm paths
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    
+    # Get current user
+    CURRENT_USER=$(whoami)
+    
+    # Create systemd service directory
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    mkdir -p "$SYSTEMD_USER_DIR"
+    
+    # Setup based on mode
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        # Server service
+        cat > "$SYSTEMD_USER_DIR/video-controller-server.service" << EOF
+[Unit]
+Description=Video Controller Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/server
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run start'
+Restart=on-failure
+RestartSec=10
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=default.target
+EOF
+        echo "   ✅ video-controller-server.service"
+        
+        # Agent service (visible browser with DISPLAY access)
+        cat > "$SYSTEMD_USER_DIR/video-controller-agent.service" << EOF
+[Unit]
+Description=Video Controller Agent
+After=network.target video-controller-server.service
+Wants=video-controller-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/agent
+Environment=NODE_ENV=production
+Environment=BROWSER_HEADLESS=false
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+ExecStart=/bin/bash -l -c 'source /home/parkee/.nvm/nvm.sh && npm run start'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+        echo "   ✅ video-controller-agent.service"
+        
+        # Web service
+        cat > "$SYSTEMD_USER_DIR/video-controller-web.service" << EOF
+[Unit]
+Description=Video Controller Web
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/web
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run preview:host'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+        echo "   ✅ video-controller-web.service"
+    fi
+    
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        # Cashier service
+        cat > "$SYSTEMD_USER_DIR/video-controller-cashier.service" << EOF
+[Unit]
+Description=Video Controller Cashier
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$PROJECT_ROOT/cashier
+ExecStart=/bin/bash -l -c 'source $NVM_DIR/nvm.sh && npm run preview:host'
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+        echo "   ✅ video-controller-cashier.service"
+    fi
+    
+    # Reload systemd
+    systemctl --user daemon-reload
+    
+    # Enable linger to allow user services to start on boot
+    echo "🔐 Enabling user service linger..."
+    loginctl enable-linger "$CURRENT_USER" 2>/dev/null || true
+    
+    echo ""
+    echo "✅ Systemd services dibuat untuk mode: $mode"
+    echo ""
+    
+    # Show enable commands based on mode
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        echo "Untuk mengaktifkan Room App auto-start:"
+        echo "  systemctl --user enable video-controller-server.service"
+        echo "  systemctl --user enable video-controller-agent.service"
+        echo "  systemctl --user enable video-controller-web.service"
+        echo ""
+        echo "Untuk memulai sekarang:"
+        echo "  systemctl --user start video-controller-server.service"
+        echo "  systemctl --user start video-controller-agent.service"
+        echo "  systemctl --user start video-controller-web.service"
+        echo ""
+    fi
+    
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        echo "Untuk mengaktifkan Kasir auto-start:"
+        echo "  systemctl --user enable video-controller-cashier.service"
+        echo ""
+        echo "Untuk memulai sekarang:"
+        echo "  systemctl --user start video-controller-cashier.service"
+        echo ""
+    fi
+    
+    # Ask to enable now
+    echo -n "Aktifkan auto-start sekarang? [y/N]: "
+    read -r enable_now
+    
+    if [[ "$enable_now" =~ ^[Yy]$ ]]; then
+        echo ""
+        echo "🔄 Mengaktifkan services..."
+        
+        if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+            systemctl --user enable video-controller-server.service
+            systemctl --user enable video-controller-agent.service
+            systemctl --user enable video-controller-web.service
+            
+            echo ""
+            echo "▶️ Memulai Room App services..."
+            systemctl --user start video-controller-server.service
+            sleep 2
+            systemctl --user start video-controller-agent.service
+            sleep 1
+            systemctl --user start video-controller-web.service
+        fi
+        
+        if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+            systemctl --user enable video-controller-cashier.service
+            
+            echo ""
+            echo "▶️ Memulai Kasir service..."
+            systemctl --user start video-controller-cashier.service
+        fi
+        
+        echo ""
+        echo "✅ Auto-start diaktifkan!"
+    fi
+}
+
+# Remove auto-start
+remove_autostart() {
+    local mode="$1"  # room, kasir, or all
+    
+    echo "🗑️ Menghapus auto-start untuk mode: $mode..."
+    
+    SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+    
+    if [ "$mode" = "room" ] || [ "$mode" = "all" ]; then
+        # Stop Room App services
+        systemctl --user stop video-controller-server.service 2>/dev/null || true
+        systemctl --user stop video-controller-agent.service 2>/dev/null || true
+        systemctl --user stop video-controller-web.service 2>/dev/null || true
+        
+        # Disable Room App services
+        systemctl --user disable video-controller-server.service 2>/dev/null || true
+        systemctl --user disable video-controller-agent.service 2>/dev/null || true
+        systemctl --user disable video-controller-web.service 2>/dev/null || true
+        
+        # Remove Room App service files
+        rm -f "$SYSTEMD_USER_DIR/video-controller-server.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-agent.service"
+        rm -f "$SYSTEMD_USER_DIR/video-controller-web.service"
+        
+        echo "   ✅ Room App services removed"
+    fi
+    
+    if [ "$mode" = "kasir" ] || [ "$mode" = "all" ]; then
+        # Stop Kasir service
+        systemctl --user stop video-controller-cashier.service 2>/dev/null || true
+        
+        # Disable Kasir service
+        systemctl --user disable video-controller-cashier.service 2>/dev/null || true
+        
+        # Remove Kasir service file
+        rm -f "$SYSTEMD_USER_DIR/video-controller-cashier.service"
+        
+        echo "   ✅ Kasir service removed"
+    fi
+    
+    # Reload systemd
+    systemctl --user daemon-reload
+    
+    echo "✅ Auto-start ($mode) dihapus!"
+}
+
+# Handle auto-start modes
+# Each install is guarded by "node_modules missing" (same as the normal-mode
+# dependency section above) instead of always running npm install - otherwise
+# re-running an autostart mode reinstalls everything from scratch every time.
+# agent/server/web skip if node_modules already exists; cashier's
+# node_modules was already wiped unconditionally above (see the cleaning
+# section, kept there to avoid known native-binding issues), so its install
+# still always runs fresh.
+if [ "$INSTALL_MODE" = "autostart-room" ]; then
+    echo "📦 Installing dependencies for Room App auto-start..."
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+
+    echo "🔨 Building Room App..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+
+    setup_autostart "room"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "autostart-kasir" ]; then
+    echo "📦 Installing dependencies for Kasir auto-start..."
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
+    echo "🔨 Building Kasir..."
+    cd "$PROJECT_ROOT/cashier" && npm run build
+
+    setup_autostart "kasir"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "autostart-all" ]; then
+    echo "📦 Installing dependencies for all services..."
+    if [ ! -d "$PROJECT_ROOT/agent/node_modules" ]; then
+        cd "$PROJECT_ROOT/agent" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/server/node_modules" ]; then
+        cd "$PROJECT_ROOT/server" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/web/node_modules" ]; then
+        cd "$PROJECT_ROOT/web" && npm install
+    fi
+    if [ ! -d "$PROJECT_ROOT/cashier/node_modules" ]; then
+        cd "$PROJECT_ROOT/cashier" && npm install
+    fi
+
+    echo "🔨 Building all services..."
+    cd "$PROJECT_ROOT/server" && npm run build
+    cd "$PROJECT_ROOT/agent" && npm run build
+    cd "$PROJECT_ROOT/web" && npm run build
+    cd "$PROJECT_ROOT/cashier" && npm run build
+    
+    setup_autostart "all"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart-room" ]; then
+    remove_autostart "room"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart-kasir" ]; then
+    remove_autostart "kasir"
+    exit 0
+fi
+
+if [ "$INSTALL_MODE" = "remove-autostart-all" ]; then
+    remove_autostart "all"
+    exit 0
+fi
+
+# Wait for any process to exit (only for manual start mode)
+if [ -n "$PIDS" ]; then
+    wait $PIDS
+fi

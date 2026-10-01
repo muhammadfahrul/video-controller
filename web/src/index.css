@@ -1,0 +1,206 @@
+:root {
+  /* Karaoke Theme - Dark with Neon Accents */
+  --text: #b8b8d0;
+  --text-h: #ffffff;
+  --bg: #0a0a14;
+  --border: #2a2a4a;
+  --code-bg: #151528;
+  --accent: #ff2d95;
+  --accent-bg: rgba(255, 45, 149, 0.15);
+  --accent-border: rgba(255, 45, 149, 0.6);
+  --secondary: #00f0ff;
+  --secondary-bg: rgba(0, 240, 255, 0.1);
+  --tertiary: #a855f7;
+  --tertiary-bg: rgba(168, 85, 247, 0.1);
+  --card-bg: #12121f;
+  --card-hover: #1a1a2e;
+  --neon-glow: 0 0 10px rgba(255, 45, 149, 0.5), 0 0 20px rgba(255, 45, 149, 0.3), 0 0 30px rgba(255, 45, 149, 0.1);
+  --neon-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+  --social-bg: rgba(42, 42, 74, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 18px/145% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+/* Karaoke theme - always dark mode */
+:root {
+  --text: #b8b8d0;
+  --text-h: #ffffff;
+  --bg: #0a0a14;
+  --border: #2a2a4a;
+  --code-bg: #151528;
+  --accent: #ff2d95;
+  --accent-bg: rgba(255, 45, 149, 0.15);
+  --accent-border: rgba(255, 45, 149, 0.6);
+  --secondary: #00f0ff;
+  --secondary-bg: rgba(0, 240, 255, 0.1);
+  --tertiary: #a855f7;
+  --tertiary-bg: rgba(168, 85, 247, 0.1);
+  --card-bg: #12121f;
+  --card-hover: #1a1a2e;
+  --neon-glow: 0 0 10px rgba(255, 45, 149, 0.5), 0 0 20px rgba(255, 45, 149, 0.3), 0 0 30px rgba(255, 45, 149, 0.1);
+  --neon-glow-cyan: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+  --social-bg: rgba(42, 42, 74, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
+}
+
+#root {
+  width: 1126px;
+  max-width: 100%;
+  margin: 0 auto;
+  text-align: center;
+  border-inline: 1px solid var(--border);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 56px;
+  letter-spacing: -1.68px;
+  margin: 32px 0;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+@import "tailwindcss";
+
+/* ===========================================
+   Mobile/Tablet Optimizations
+   =========================================== */
+
+/* Prevent text size adjustment on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Improve tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Better touch targets for mobile */
+button,
+a,
+input,
+select {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Touch-friendly scrollbar for mobile */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text);
+}
+
+/* Safe area padding for notched devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* PWA splash screen background */
+@media (display-mode: standalone) {
+  body {
+    background: #16171d;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (orientation: landscape) and (max-height: 500px) {
+  #root {
+    min-height: 100vh;
+  }
+}
+
+/* Landscape mode - adjust root for wider screens */
+@media (orientation: landscape) {
+  #root {
+    max-width: 100%;
+  }
+}
+
+/* Large landscape - constrain width for readability */
+@media (orientation: landscape) and (min-width: 1024px) {
+  #root {
+    max-width: 900px;
+  }
+}

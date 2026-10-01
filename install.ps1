@@ -1,0 +1,2039 @@
+# Video Controller - Deploy Script for Windows
+# Auto-installs dependencies and starts the selected services
+
+param(
+    [switch]$SkipInstall,
+    [string]$Mode,
+    [string]$Version
+)
+
+$RepoZipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+
+# Target version for update: a git tag like "v1.2.0", given as -Version
+# ("install.ps1 -Mode update -Version v1.2.0") or VC_VERSION env var. Empty =
+# latest main (the previous behavior). Pinning a tag also makes rollback a
+# one-liner: rerun update with the older tag.
+$TargetVersion = if ($Version) { $Version } else { $env:VC_VERSION }
+if ($TargetVersion -and -not $TargetVersion.StartsWith('v')) {
+    $TargetVersion = "v$TargetVersion"
+}
+
+function Get-AppVersion {
+    param([string]$ProjectRoot)
+
+    $pkgPath = Join-Path $ProjectRoot 'package.json'
+    if (-not (Test-Path $pkgPath)) { return $null }
+    try {
+        return (Get-Content -Path $pkgPath -Raw | ConvertFrom-Json).version
+    } catch {
+        return $null
+    }
+}
+
+# List the newest release tags (v*), newest first: from git when this is a
+# clone, otherwise from the GitHub API (ZIP installs have no .git).
+function Get-RemoteVersions {
+    param([string]$ProjectRoot)
+
+    # Local to this function: git writes to stderr when offline, and under the
+    # script-wide "Stop" preference a redirected native stderr line would abort.
+    $ErrorActionPreference = 'Continue'
+    $tags = @()
+
+    $gitPath = Get-Command git -ErrorAction SilentlyContinue
+    if ($gitPath -and (Test-Path (Join-Path $ProjectRoot '.git'))) {
+        $tags = @(& git -C $ProjectRoot ls-remote --tags --refs origin 'v*' 2>$null |
+            ForEach-Object { ($_ -split 'refs/tags/')[-1] })
+    }
+    if ($tags.Count -eq 0) {
+        try {
+            $response = Invoke-RestMethod -Uri 'https://api.github.com/repos/muhammadfahrul/video-controller/tags?per_page=100' -TimeoutSec 10 -UseBasicParsing
+            $tags = @($response | ForEach-Object { $_.name })
+        } catch {
+            $tags = @()
+        }
+    }
+
+    return @($tags |
+        Where-Object { $_ -match '^v\d+(\.\d+){1,3}$' } |
+        Sort-Object { [version]$_.TrimStart('v') } -Descending |
+        Select-Object -First 5)
+}
+
+# Menu-only: ask which version to update to (CLI callers pass -Version
+# instead, so unattended runs are never blocked on a prompt).
+function Read-TargetVersion {
+    param([string]$ProjectRoot)
+
+    $current = Get-AppVersion -ProjectRoot $ProjectRoot
+    Write-Host ""
+    Write-Host "[INFO] Versi terpasang: $(if ($current) { $current } else { 'unknown' })" -ForegroundColor Cyan
+    Write-Host "[INFO] Mengecek versi yang tersedia..." -ForegroundColor Yellow
+
+    $versions = @(Get-RemoteVersions -ProjectRoot $ProjectRoot)
+    if ($versions.Count -gt 0) {
+        Write-Host "Versi tersedia:"
+        for ($i = 0; $i -lt $versions.Count; $i++) {
+            $suffix = if ($i -eq 0) { ' (rilis terbaru)' } else { '' }
+            Write-Host "  [$($i + 1)] $($versions[$i])$suffix"
+        }
+    } else {
+        Write-Host "[WARNING] Tidak bisa mengambil daftar versi (offline / belum ada tag)." -ForegroundColor Yellow
+    }
+
+    $defaultLabel = if ($versions.Count -gt 0) { $versions[0] } else { 'terbaru dari main' }
+    $answer = "$(Read-Host "Pilih nomor atau ketik versi (contoh v1.0.0) [default: $defaultLabel]")".Trim()
+
+    if (-not $answer) {
+        # Default to the newest release tag; fall back to main only when the
+        # tag list couldn't be fetched (offline / no tags yet).
+        $script:TargetVersion = if ($versions.Count -gt 0) { $versions[0] } else { $null }
+    } elseif ($answer -match '^\d+$') {
+        $index = [int]$answer
+        if ($index -lt 1 -or $index -gt $versions.Count) {
+            Write-Host "[ERROR] Nomor $answer tidak ada di daftar." -ForegroundColor Red
+            exit 1
+        }
+        $script:TargetVersion = $versions[$index - 1]
+    } else {
+        $script:TargetVersion = if ($answer.StartsWith('v')) { $answer } else { "v$answer" }
+    }
+
+    Write-Host "[INFO] Target: $(if ($script:TargetVersion) { $script:TargetVersion } else { 'terbaru dari main' })" -ForegroundColor Cyan
+}
+
+# Bypass execution policy untuk menjalankan script ini
+$currentPolicy = Get-ExecutionPolicy -Scope CurrentUser
+if ($currentPolicy -eq "Restricted" -or $currentPolicy -eq "AllSigned") {
+    Write-Host "[INFO] Mengaktifkan execution policy..." -ForegroundColor Yellow
+    Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction SilentlyContinue
+}
+
+$ErrorActionPreference = "Stop"
+
+function Show-Menu {
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host "   Video Controller - Deploy Script" -ForegroundColor Cyan
+    Write-Host "============================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Pilih aplikasi yang ingin diinstall:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  [1] Room App       - Agent + Server + Web (1 PC = 1 Ruangan)" -ForegroundColor White
+    Write-Host "  [2] Kasir          - Aplikasi Kasir (PC Kasir, konek ke N server ruangan)" -ForegroundColor White
+    Write-Host "  [3] Semua          - Room App + Kasir (untuk PC yg handle keduanya)" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  [A] Auto-start Room App" -ForegroundColor Green
+    Write-Host "  [B] Auto-start Kasir" -ForegroundColor Green
+    Write-Host "  [C] Auto-start Semua" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  [D] Remove Auto-start Room App" -ForegroundColor Red
+    Write-Host "  [E] Remove Auto-start Kasir" -ForegroundColor Red
+    Write-Host "  [F] Remove Auto-start Semua" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  [G] Docker: Room App    - server+web via Docker (agent tetap native, lihat catatan)" -ForegroundColor Cyan
+    Write-Host "  [H] Docker: Kasir       - cashier via Docker" -ForegroundColor Cyan
+    Write-Host "  [I] Docker: Semua       - server+web+kasir via Docker" -ForegroundColor Cyan
+    Write-Host "  [J] Docker: Stop        - hentikan semua service Docker yang jalan" -ForegroundColor Cyan
+    Write-Host "  [K] Update Aplikasi     - update source + dependency + build, tanpa restart lagi" -ForegroundColor Magenta
+    Write-Host "  [L] Update + Restart    - update lalu nyalakan lagi service auto-start yang aktif" -ForegroundColor Magenta
+    Write-Host ""
+    Write-Host "  [0] Keluar" -ForegroundColor White
+    Write-Host ""
+
+    $choice = Read-Host "Masukkan pilihan [0-L]"
+    return $choice
+}
+
+function Get-InstallMode {
+    param([string]$RequestedMode)
+
+    if ($RequestedMode) {
+        $mode = $RequestedMode.ToLower()
+        switch ($mode) {
+            '1' { return 'room' }
+            'room' { return 'room' }
+            '2' { return 'kasir' }
+            'kasir' { return 'kasir' }
+            '3' { return 'all' }
+            'all' { return 'all' }
+            'a' { return 'autostart-room' }
+            'autostart-room' { return 'autostart-room' }
+            'b' { return 'autostart-kasir' }
+            'autostart-kasir' { return 'autostart-kasir' }
+            'c' { return 'autostart-all' }
+            'autostart-all' { return 'autostart-all' }
+            'd' { return 'remove-autostart-room' }
+            'remove-autostart-room' { return 'remove-autostart-room' }
+            'remove-room' { return 'remove-autostart-room' }
+            'e' { return 'remove-autostart-kasir' }
+            'remove-autostart-kasir' { return 'remove-autostart-kasir' }
+            'remove-kasir' { return 'remove-autostart-kasir' }
+            'f' { return 'remove-autostart-all' }
+            'remove-autostart-all' { return 'remove-autostart-all' }
+            'remove-all' { return 'remove-autostart-all' }
+            'remove-autostart' { return 'remove-autostart-all' }
+            'g' { return 'docker-room' }
+            'docker-room' { return 'docker-room' }
+            'droom' { return 'docker-room' }
+            'h' { return 'docker-kasir' }
+            'docker-kasir' { return 'docker-kasir' }
+            'dkasir' { return 'docker-kasir' }
+            'i' { return 'docker-all' }
+            'docker-all' { return 'docker-all' }
+            'dall' { return 'docker-all' }
+            'j' { return 'docker-down' }
+            'docker-down' { return 'docker-down' }
+            'ddown' { return 'docker-down' }
+            'k' { return 'update' }
+            'u' { return 'update' }
+            'update' { return 'update' }
+            'l' { return 'update-restart' }
+            'ur' { return 'update-restart' }
+            'update-restart' { return 'update-restart' }
+            '0' { exit 0 }
+            default {
+                Write-Host "Pilihan tidak valid: $RequestedMode" -ForegroundColor Red
+                exit 1
+            }
+        }
+    }
+
+    $choice = Show-Menu
+
+    switch ($choice) {
+        '1' { return 'room' }
+        '2' { return 'kasir' }
+        '3' { return 'all' }
+        'a' { return 'autostart-room' }
+        'A' { return 'autostart-room' }
+        'b' { return 'autostart-kasir' }
+        'B' { return 'autostart-kasir' }
+        'c' { return 'autostart-all' }
+        'C' { return 'autostart-all' }
+        'd' { return 'remove-autostart-room' }
+        'D' { return 'remove-autostart-room' }
+        'e' { return 'remove-autostart-kasir' }
+        'E' { return 'remove-autostart-kasir' }
+        'f' { return 'remove-autostart-all' }
+        'F' { return 'remove-autostart-all' }
+        'g' { return 'docker-room' }
+        'G' { return 'docker-room' }
+        'h' { return 'docker-kasir' }
+        'H' { return 'docker-kasir' }
+        'i' { return 'docker-all' }
+        'I' { return 'docker-all' }
+        'j' { return 'docker-down' }
+        'J' { return 'docker-down' }
+        'k' { return 'update' }
+        'K' { return 'update' }
+        'l' { return 'update-restart' }
+        'L' { return 'update-restart' }
+        '0' { exit 0 }
+        default {
+            Write-Host "Pilihan tidak valid!" -ForegroundColor Red
+            exit 1
+        }
+    }
+}
+
+function Install-7Zip {
+    Write-Host "[INFO] Installing 7-Zip..." -ForegroundColor Yellow
+
+    $sevenZipUrl = 'https://www.7-zip.org/a/7z2408-x64.exe'
+    $sevenZipInstaller = "$env:TEMP\7z-installer.exe"
+
+    Write-Host "[INFO] Downloading 7-Zip..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $sevenZipUrl -OutFile $sevenZipInstaller -UseBasicParsing
+
+    Write-Host "[INFO] Installing 7-Zip (this may take a moment)..." -ForegroundColor Yellow
+    Start-Process -FilePath $sevenZipInstaller -ArgumentList '/S' -Wait
+
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+
+    Write-Host "[OK] 7-Zip installed" -ForegroundColor Green
+}
+
+# ============================================
+# Configure .env files
+# ============================================
+function Set-EnvConfig {
+    param(
+        [string]$ProjectRoot,
+        [string]$ServerIP,
+        [string]$RoomID,
+        [string]$RoomName,
+        [string]$Rooms,
+        [string]$BillingEnabled,
+        [string]$PricePerHour,
+        [string]$Packages
+    )
+
+    # Skip if all values are empty
+    if (-not $ServerIP -and -not $RoomID -and -not $RoomName -and -not $Rooms -and -not $BillingEnabled -and -not $PricePerHour -and -not $Packages) {
+        Write-Host "[INFO] Tidak ada konfigurasi yang diubah" -ForegroundColor Cyan
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Mengupdate file .env..." -ForegroundColor Yellow
+
+    # Agent .env - ROOM_ID, ROOM_NAME, SERVER_IP
+    if ($RoomID -or $RoomName -or $ServerIP) {
+        $agentEnvPath = Join-Path $ProjectRoot "agent\.env"
+        if (Test-Path $agentEnvPath) {
+            $envContent = Get-Content $agentEnvPath -Raw
+            
+            if ($ServerIP) {
+                $envContent = $envContent -replace 'SERVER_IP=.*', "SERVER_IP=$ServerIP"
+            }
+            if ($RoomID) {
+                $envContent = $envContent -replace 'ROOM_ID=.*', "ROOM_ID=$RoomID"
+            }
+            if ($RoomName) {
+                $envContent = $envContent -replace 'ROOM_NAME=.*', "ROOM_NAME=$RoomName"
+            }
+            
+            Set-Content -Path $agentEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated agent/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File agent/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Server .env - SERVER_IP
+    if ($ServerIP) {
+        $serverEnvPath = Join-Path $ProjectRoot "server\.env"
+        if (Test-Path $serverEnvPath) {
+            $envContent = Get-Content $serverEnvPath -Raw
+            $envContent = $envContent -replace 'SERVER_IP=.*', "SERVER_IP=$ServerIP"
+            Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated server/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File server/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Web .env - SERVER_IP
+    if ($ServerIP) {
+        $webEnvPath = Join-Path $ProjectRoot "web\.env"
+        if (Test-Path $webEnvPath) {
+            $envContent = Get-Content $webEnvPath -Raw
+            $envContent = $envContent -replace 'VITE_SERVER_IP=.*', "VITE_SERVER_IP=$ServerIP"
+            Set-Content -Path $webEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated web/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File web/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+
+    # Cashier .env - VITE_ROOMS
+    if ($Rooms -or $BillingEnabled) {
+        $cashierEnvPath = Join-Path $ProjectRoot "cashier\.env"
+        if (Test-Path $cashierEnvPath) {
+            $envContent = Get-Content $cashierEnvPath -Raw
+            
+            # Use rooms JSON directly if provided (user already included IPs)
+            if ($Rooms -and $Rooms -ne "default") {
+                $envContent = $envContent -replace 'VITE_ROOMS=.*', "VITE_ROOMS=$Rooms"
+            }
+            
+            if ($BillingEnabled) {
+                $envContent = $envContent -replace 'VITE_BILLING_ENABLED=.*', "VITE_BILLING_ENABLED=$BillingEnabled"
+            }
+            
+            Set-Content -Path $cashierEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated cashier/.env" -ForegroundColor Green
+        } else {
+            Write-Host "[WARN] File cashier/.env tidak ditemukan" -ForegroundColor Yellow
+        }
+    }
+    
+    # Server .env - BILLING_ENABLED, PRICE_PER_HOUR, PACKAGES
+    if ($BillingEnabled -or $PricePerHour -or $Packages) {
+        $serverEnvPath = Join-Path $ProjectRoot "server\.env"
+        if (Test-Path $serverEnvPath) {
+            $envContent = Get-Content $serverEnvPath -Raw
+            if ($BillingEnabled) {
+                $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            }
+            if ($PricePerHour) {
+                $envContent = $envContent -replace 'PRICE_PER_HOUR=.*', "PRICE_PER_HOUR=$PricePerHour"
+            }
+            if ($Packages) {
+                # PACKAGES is a newer, optional var that may not exist yet in
+                # older .env files - replace it if present, append if not
+                # (plain -replace is a no-op when the line doesn't exist).
+                if ($envContent -match '(?m)^PACKAGES=.*') {
+                    $envContent = $envContent -replace '(?m)^PACKAGES=.*', "PACKAGES=$Packages"
+                } else {
+                    $envContent = $envContent.TrimEnd() + "`r`nPACKAGES=$Packages`r`n"
+                }
+            }
+            Set-Content -Path $serverEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated server/.env" -ForegroundColor Green
+        }
+    }
+    
+    # Agent .env - BILLING_ENABLED
+    if ($BillingEnabled) {
+        $agentEnvPath = Join-Path $ProjectRoot "agent\.env"
+        if (Test-Path $agentEnvPath) {
+            $envContent = Get-Content $agentEnvPath -Raw
+            $envContent = $envContent -replace 'BILLING_ENABLED=.*', "BILLING_ENABLED=$BillingEnabled"
+            Set-Content -Path $agentEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated agent/.env" -ForegroundColor Green
+        }
+    }
+    
+    # Web .env - VITE_BILLING_ENABLED
+    if ($BillingEnabled) {
+        $webEnvPath = Join-Path $ProjectRoot "web\.env"
+        if (Test-Path $webEnvPath) {
+            $envContent = Get-Content $webEnvPath -Raw
+            $envContent = $envContent -replace 'VITE_BILLING_ENABLED=.*', "VITE_BILLING_ENABLED=$BillingEnabled"
+            Set-Content -Path $webEnvPath -Value $envContent -NoNewline
+            Write-Host "[OK] Updated web/.env" -ForegroundColor Green
+        }
+    }
+}
+
+function Install-NodeJS {
+    Write-Host "[INFO] Installing Node.js v22 (ZIP format)..." -ForegroundColor Yellow
+
+    # Use Node.js v22 - required by Vite 8.x and ESLint 10.x
+    $nodeVersion = "22.13.1"
+    $nodeUrl = "https://nodejs.org/dist/v$nodeVersion/node-v$nodeVersion-win-x64.zip"
+    $nodeZip = "$env:TEMP\node-v$nodeVersion-win-x64.zip"
+    $nodeExtractDir = "C:\nodejs"
+
+    Write-Host "[INFO] Downloading Node.js v$nodeVersion..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $nodeUrl -OutFile $nodeZip -UseBasicParsing
+
+    Write-Host "[INFO] Extracting Node.js to $nodeExtractDir..." -ForegroundColor Yellow
+    
+    # Remove old installation if exists
+    if (Test-Path $nodeExtractDir) {
+        Remove-Item -Path $nodeExtractDir -Recurse -Force
+    }
+    
+    # Create directory
+    New-Item -ItemType Directory -Path $nodeExtractDir -Force | Out-Null
+
+    # Extract using Expand-Archive (PowerShell 5.1+)
+    Expand-Archive -Path $nodeZip -DestinationPath $nodeExtractDir -Force
+
+    Write-Host "[OK] Node.js v$nodeVersion installed to $nodeExtractDir" -ForegroundColor Green
+}
+
+function Install-Dependencies {
+    param(
+        [string]$Path,
+        [string]$Name,
+        [switch]$ForceReinstall
+    )
+
+    # Skip if path doesn't exist
+    if (-not (Test-Path $Path)) {
+        Write-Host "[INFO] Skipping $Name - folder not found" -ForegroundColor Yellow
+        return
+    }
+
+    # Remove node_modules if ForceReinstall or doesn't exist properly
+    if ($ForceReinstall -or -not (Test-Path (Join-Path $Path 'node_modules'))) {
+        if (Test-Path (Join-Path $Path 'node_modules')) {
+            Write-Host "[INFO] Removing $Name node_modules (fresh install)..." -ForegroundColor Yellow
+            Remove-NodeModules -Path (Join-Path $Path 'node_modules')
+        }
+        
+        $lockFile = Join-Path $Path 'package-lock.json'
+        if (Test-Path $lockFile) {
+            Write-Host "[INFO] Removing $Name package-lock.json..." -ForegroundColor Yellow
+            Remove-FileIfExists -Path $lockFile
+        }
+        
+        Write-Host "[INFO] Installing $Name dependencies..." -ForegroundColor Yellow
+        Push-Location $Path
+        & npm install
+        Pop-Location
+    }
+}
+
+function Remove-NodeModules {
+    param([string]$Path)
+
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Recurse -Force
+    }
+}
+
+function Remove-FileIfExists {
+    param([string]$Path)
+
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Force
+    }
+}
+
+function Backup-LocalState {
+    param(
+        [string]$ProjectRoot,
+        [string]$BackupRoot
+    )
+
+    $envFiles = @('.env', 'agent\.env', 'server\.env', 'web\.env', 'cashier\.env')
+    foreach ($relativePath in $envFiles) {
+        $sourcePath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $sourcePath) {
+            $targetPath = Join-Path $BackupRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $sourcePath -Destination $targetPath -Force
+        }
+    }
+
+    $dataFolders = @('agent\data', 'server\data')
+    foreach ($relativePath in $dataFolders) {
+        $sourcePath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $sourcePath) {
+            $targetPath = Join-Path $BackupRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $sourcePath -Destination $targetPath -Recurse -Force
+        }
+    }
+}
+
+function Restore-LocalState {
+    param(
+        [string]$ProjectRoot,
+        [string]$BackupRoot
+    )
+
+    $envFiles = @('.env', 'agent\.env', 'server\.env', 'web\.env', 'cashier\.env')
+    foreach ($relativePath in $envFiles) {
+        $backupPath = Join-Path $BackupRoot $relativePath
+        if (Test-Path $backupPath) {
+            $targetPath = Join-Path $ProjectRoot $relativePath
+            $targetDir = Split-Path $targetPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $backupPath -Destination $targetPath -Force
+        }
+    }
+
+    $dataFolders = @('agent\data', 'server\data')
+    foreach ($relativePath in $dataFolders) {
+        $backupDataPath = Join-Path $BackupRoot $relativePath
+        $targetDataPath = Join-Path $ProjectRoot $relativePath
+        if (Test-Path $backupDataPath) {
+            if (Test-Path $targetDataPath) {
+                Remove-Item -Path $targetDataPath -Recurse -Force
+            }
+            $targetDir = Split-Path $targetDataPath -Parent
+            if (-not (Test-Path $targetDir)) {
+                New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $backupDataPath -Destination $targetDataPath -Recurse -Force
+        }
+    }
+}
+
+function Update-ProjectSourceFromArchive {
+    param([string]$ProjectRoot)
+
+    $tempRoot = Join-Path $env:TEMP "video-controller-update-$PID"
+    $backupRoot = Join-Path $env:TEMP "video-controller-update-env-$PID"
+    $archivePath = Join-Path $tempRoot "video-controller.zip"
+    $extractRoot = Join-Path $tempRoot "extracted"
+    $zipUrl = $RepoZipUrl
+    if ($TargetVersion) {
+        $zipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/tags/$TargetVersion.zip"
+    }
+
+    Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+    try {
+        Backup-LocalState -ProjectRoot $ProjectRoot -BackupRoot $backupRoot
+
+        $versionLabel = if ($TargetVersion) { $TargetVersion } else { 'latest main' }
+        Write-Host "[INFO] Downloading source archive ($versionLabel)..." -ForegroundColor Yellow
+        try {
+            Invoke-WebRequest -Uri $zipUrl -OutFile $archivePath -UseBasicParsing
+        } catch {
+            throw "Gagal download $zipUrl (versi $versionLabel tidak ada?)"
+        }
+        Expand-Archive -Path $archivePath -DestinationPath $extractRoot -Force
+
+        # GitHub names the top folder after the ref (video-controller-main,
+        # video-controller-1.2.0, ...), so take whichever single dir was extracted.
+        $sourceDir = Get-ChildItem -Path $extractRoot -Directory | Select-Object -First 1 -ExpandProperty FullName
+        if (-not $sourceDir -or -not (Test-Path $sourceDir)) {
+            throw "Folder hasil extract tidak ditemukan"
+        }
+
+        Get-ChildItem -Path $sourceDir -Force | Where-Object { $_.Name -ne '.git' } | ForEach-Object {
+            $destinationPath = Join-Path $ProjectRoot $_.Name
+            if ($_.PSIsContainer) {
+                if (-not (Test-Path $destinationPath)) {
+                    New-Item -ItemType Directory -Path $destinationPath -Force | Out-Null
+                }
+                Get-ChildItem -Path $_.FullName -Force | ForEach-Object {
+                    Copy-Item -Path $_.FullName -Destination $destinationPath -Recurse -Force
+                }
+            } else {
+                Copy-Item -Path $_.FullName -Destination $destinationPath -Force
+            }
+        }
+
+        Restore-LocalState -ProjectRoot $ProjectRoot -BackupRoot $backupRoot
+        Write-Host "[OK] Project files updated from archive ($versionLabel)" -ForegroundColor Green
+    }
+    finally {
+        Remove-Item -Path $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $backupRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Update-ProjectSource {
+    param([string]$ProjectRoot)
+
+    Write-Host "[INFO] Updating application files..." -ForegroundColor Yellow
+
+    $gitPath = Get-Command git -ErrorAction SilentlyContinue
+    $gitDir = Join-Path $ProjectRoot '.git'
+
+    if ($TargetVersion) {
+        if ($gitPath -and (Test-Path $gitDir)) {
+            & git -C $ProjectRoot remote get-url origin *> $null
+            if ($LASTEXITCODE -eq 0) {
+                & git -C $ProjectRoot fetch --tags origin
+                if ($LASTEXITCODE -eq 0) {
+                    & git -C $ProjectRoot -c advice.detachedHead=false checkout $TargetVersion
+                }
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "[OK] Project files checked out to $TargetVersion" -ForegroundColor Green
+                    return
+                }
+                Write-Host "[WARNING] Checkout $TargetVersion gagal (tag tidak ada / ada perubahan lokal?), fallback ke ZIP..." -ForegroundColor Yellow
+            }
+        }
+        Update-ProjectSourceFromArchive -ProjectRoot $ProjectRoot
+        return
+    }
+
+    if ($gitPath -and (Test-Path $gitDir)) {
+        & git -C $ProjectRoot remote get-url origin *> $null
+        if ($LASTEXITCODE -eq 0) {
+            $branch = "$(& git -C $ProjectRoot branch --show-current 2>$null)".Trim()
+            if (-not $branch) {
+                # Detached HEAD = previously pinned to a tag; go back to main
+                # to get the latest version.
+                $branch = 'main'
+                # No 2>$null here: git prints "Switched to branch" on stderr,
+                # and redirecting native stderr under ErrorActionPreference=Stop
+                # turns it into a terminating error on Windows PowerShell 5.1.
+                & git -C $ProjectRoot checkout main
+            }
+
+            & git -C $ProjectRoot pull --ff-only --autostash origin $branch
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[OK] Project files updated via git pull" -ForegroundColor Green
+                return
+            }
+
+            Write-Host "[WARNING] git pull gagal, fallback ke ZIP terbaru..." -ForegroundColor Yellow
+        }
+    }
+
+    Update-ProjectSourceFromArchive -ProjectRoot $ProjectRoot
+}
+
+function Get-UpdateRestartMode {
+    param([string]$ProjectRoot)
+
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+    $roomConfigured =
+        (Test-Path (Join-Path $startupFolder "VideoController_Server.lnk")) -and
+        (Test-Path (Join-Path $startupFolder "VideoController_Agent.lnk")) -and
+        (Test-Path (Join-Path $startupFolder "VideoController_Web.lnk"))
+    $kasirConfigured = Test-Path (Join-Path $startupFolder "VideoController_Cashier.lnk")
+
+    if ($roomConfigured -and $kasirConfigured) { return 'all' }
+    if ($roomConfigured) { return 'room' }
+    if ($kasirConfigured) { return 'kasir' }
+    return 'none'
+}
+
+function Stop-RestartModeServices {
+    param(
+        [string]$ProjectRoot,
+        [string]$Mode
+    )
+
+    $scriptsFolder = Join-Path $ProjectRoot ".autostart-scripts"
+
+    if ($Mode -eq 'room' -or $Mode -eq 'all') {
+        Write-Host "[INFO] Menghentikan Room App auto-start services sebelum update..." -ForegroundColor Yellow
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Server.bat")
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Agent.bat")
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Web.bat")
+    }
+
+    if ($Mode -eq 'kasir' -or $Mode -eq 'all') {
+        Write-Host "[INFO] Menghentikan Kasir auto-start service sebelum update..." -ForegroundColor Yellow
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Cashier.bat")
+    }
+}
+
+function Start-RestartModeServices {
+    param(
+        [string]$ProjectRoot,
+        [string]$Mode
+    )
+
+    $scriptsFolder = Join-Path $ProjectRoot ".autostart-scripts"
+
+    if ($Mode -eq 'room' -or $Mode -eq 'all') {
+        $serverVbs = Join-Path $scriptsFolder "VideoController_Server.vbs"
+        $agentVbs = Join-Path $scriptsFolder "VideoController_Agent.vbs"
+        $webVbs = Join-Path $scriptsFolder "VideoController_Web.vbs"
+
+        if ((Test-Path $serverVbs) -and (Test-Path $agentVbs) -and (Test-Path $webVbs)) {
+            Write-Host "[INFO] Menyalakan lagi Room App auto-start services..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $serverVbs
+            Start-Sleep -Seconds 2
+            Start-Hidden -VbsPath $agentVbs
+            Start-Sleep -Seconds 1
+            Start-Hidden -VbsPath $webVbs
+        } else {
+            Write-Host "[WARNING] File launcher Room App tidak lengkap, skip restart otomatis." -ForegroundColor Yellow
+        }
+    }
+
+    if ($Mode -eq 'kasir' -or $Mode -eq 'all') {
+        $cashierVbs = Join-Path $scriptsFolder "VideoController_Cashier.vbs"
+        if (Test-Path $cashierVbs) {
+            Write-Host "[INFO] Menyalakan lagi Kasir auto-start service..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $cashierVbs
+        } else {
+            Write-Host "[WARNING] File launcher Kasir tidak ditemukan, skip restart otomatis." -ForegroundColor Yellow
+        }
+    }
+}
+
+# ============================================
+# Stop any node/npm/cmd/wscript processes belonging to this project before
+# wiping node_modules. A previous install/test run can leave a service
+# running - and since it now launches hidden (see New-HiddenLauncherVbs
+# below) there's no window to notice it's still alive - holding a lock on
+# a native binary (e.g. rolldown's win32-x64-msvc .node file) that
+# Remove-Item then can't delete ("Access to the path ... is denied").
+# ============================================
+function Stop-ProjectProcesses {
+    param([string]$ProjectRoot)
+
+    try {
+        $procs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' OR Name = 'cmd.exe' OR Name = 'wscript.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -and $_.CommandLine.Contains($ProjectRoot) }
+        if ($procs) {
+            Write-Host "[INFO] Menghentikan proses Video Controller yang masih jalan (biar node_modules tidak ke-lock)..." -ForegroundColor Yellow
+            foreach ($proc in $procs) {
+                & taskkill /PID $proc.ProcessId /T /F 2>$null | Out-Null
+            }
+            Start-Sleep -Seconds 1
+        }
+    } catch {}
+}
+
+function Ensure-PlaywrightBrowsers {
+    $agentPath = Join-Path $PROJECT_ROOT 'agent'
+    if (Test-Path $agentPath) {
+        Write-Host "[INFO] Installing Playwright browsers..." -ForegroundColor Yellow
+        Push-Location $agentPath
+        & npx playwright install chromium
+        Pop-Location
+    }
+}
+
+# ============================================
+# Docker deploy (alternative to the native npm build+run below - builds and
+# runs each service in a container via docker-compose.yml /
+# docker-compose.cashier.yml instead of installing Node.js on the host).
+#
+# Agent is NOT included here: it opens a visible Chrome/Chromium window that
+# must show up on the room PC's real display, and there is no Windows
+# equivalent of the Linux X11-socket passthrough docker-compose.yml relies
+# on for that. Room mode here only covers server+web; agent stays native
+# (install.ps1 -Mode room / autostart-room).
+# ============================================
+function Test-IsAdministrator {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
+function Install-Docker {
+    Write-Host "[INFO] Docker tidak ditemukan. Mencoba auto-install Docker Desktop..." -ForegroundColor Yellow
+
+    # Docker Desktop's installer always elevates via UAC. If this shell isn't
+    # already Administrator, that UAC prompt has to be accepted manually or
+    # the install silently aborts (winget then reports a generic "cancelled"
+    # exit code).
+    if (-not (Test-IsAdministrator)) {
+        Write-Host "[WARNING] Docker Desktop installer butuh hak Administrator (akan muncul prompt UAC)." -ForegroundColor Yellow
+        Write-Host "[WARNING] Klik 'Yes' saat prompt UAC muncul, jangan di-cancel/close." -ForegroundColor Yellow
+    }
+
+    $installFailed = $false
+    $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+    if ($wingetCmd) {
+        Write-Host "[INFO] Installing Docker Desktop via winget..." -ForegroundColor Yellow
+        & winget install -e --id Docker.DockerDesktop --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -ne 0) { $installFailed = $true }
+    } else {
+        Write-Host "[INFO] winget tidak ditemukan, download installer Docker Desktop..." -ForegroundColor Yellow
+        $dockerInstaller = "$env:TEMP\DockerDesktopInstaller.exe"
+        try {
+            Invoke-WebRequest -Uri "https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe" -OutFile $dockerInstaller -UseBasicParsing
+            Write-Host "[INFO] Installing Docker Desktop (ini bisa makan waktu beberapa menit)..." -ForegroundColor Yellow
+            Start-Process -FilePath $dockerInstaller -ArgumentList "install", "--quiet", "--accept-license" -Wait
+        } catch {
+            Write-Host "[ERROR] Gagal download/install Docker Desktop: $_" -ForegroundColor Red
+            $installFailed = $true
+        } finally {
+            Remove-Item -Path $dockerInstaller -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    if ($installFailed) {
+        Write-Host ""
+        Write-Host "[ERROR] Instalasi Docker Desktop gagal atau dibatalkan (kemungkinan prompt UAC di-'No'/ditutup)." -ForegroundColor Red
+        Write-Host "[INFO] Solusi:" -ForegroundColor Yellow
+        Write-Host "  1. Klik kanan PowerShell/Terminal -> 'Run as Administrator', lalu jalankan ulang install.ps1" -ForegroundColor Yellow
+        Write-Host "  2. Saat muncul jendela 'User Account Control', klik 'Yes' (jangan cancel)" -ForegroundColor Yellow
+        Write-Host "  3. Kalau masih gagal, install manual: https://www.docker.com/products/docker-desktop/" -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host ""
+    Write-Host "[WARNING] Docker Desktop baru saja diinstall. Sebelum lanjut:" -ForegroundColor Yellow
+    Write-Host "  1. Restart komputer kalau diminta (butuh WSL2 aktif)" -ForegroundColor Yellow
+    Write-Host "  2. Buka Docker Desktop secara manual sekali & tunggu sampai statusnya 'running'" -ForegroundColor Yellow
+    Write-Host "  3. Jalankan ulang script ini setelah Docker Desktop siap" -ForegroundColor Yellow
+}
+
+function Test-DockerAvailable {
+    $dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+    if (-not $dockerCmd) {
+        Install-Docker
+        exit 1
+    }
+
+    & docker compose version *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Docker Compose plugin tidak ditemukan (butuh 'docker compose' - pastikan Docker Desktop up to date)." -ForegroundColor Red
+        exit 1
+    }
+}
+
+function Invoke-DockerDeploy {
+    param([string]$mode)
+
+    Test-DockerAvailable
+    Push-Location $PROJECT_ROOT
+
+    # Images are tagged video-controller-<service>:<APP_VERSION> (see the
+    # compose files), so older versions stay available for rollback. A
+    # process env var takes precedence over .env in compose substitution.
+    $appVersion = Get-AppVersion -ProjectRoot $PROJECT_ROOT
+    $env:APP_VERSION = if ($appVersion) { $appVersion } else { 'latest' }
+    Write-Host "[INFO] Versi aplikasi: $env:APP_VERSION" -ForegroundColor Cyan
+
+    try {
+        if ($mode -eq "docker-down") {
+            Write-Host "[INFO] Menghentikan semua service Docker (room + kasir, kalau ada)..." -ForegroundColor Yellow
+            & docker compose down 2>$null
+            & docker compose -f docker-compose.cashier.yml down 2>$null
+            Write-Host "[OK] Docker services dihentikan." -ForegroundColor Green
+            return
+        }
+
+        if ($mode -eq "docker-room" -or $mode -eq "docker-all") {
+            Write-Host "[WARNING] Di Windows, agent TIDAK ikut di-Docker-kan (butuh display X11 yang tidak ada di Windows)." -ForegroundColor Yellow
+            Write-Host "[INFO] Cuma server+web yang dijalankan lewat Docker di sini." -ForegroundColor Yellow
+            Write-Host "[INFO] Jalankan agent secara native: install.ps1 -Mode room (atau -Mode autostart-room)" -ForegroundColor Yellow
+            # Build one service at a time instead of "up --build server web"
+            # (Compose builds requested services in parallel by default via
+            # buildx bake) - two concurrent "npm run build"/tsc processes can
+            # exhaust Docker Desktop's WSL2 memory limit and crash with
+            # "JavaScript heap out of memory" (exit code 134).
+            Write-Host "[INFO] Building server+web via Docker (satu per satu, biar hemat memori)..." -ForegroundColor Yellow
+            & docker compose build server
+            if ($LASTEXITCODE -ne 0) { throw "docker compose build server failed" }
+            & docker compose build web
+            if ($LASTEXITCODE -ne 0) { throw "docker compose build web failed" }
+            Write-Host "[INFO] Starting server+web..." -ForegroundColor Yellow
+            & docker compose up -d server web
+        }
+
+        if ($mode -eq "docker-kasir" -or $mode -eq "docker-all") {
+            Write-Host "[INFO] Building & starting Kasir via Docker..." -ForegroundColor Yellow
+            & docker compose -f docker-compose.cashier.yml up -d --build
+        }
+
+        Write-Host ""
+        Write-Host "[OK] Docker deployment ($mode) selesai." -ForegroundColor Green
+        Write-Host "[INFO] Cek status: docker compose ps   (dan: docker compose -f docker-compose.cashier.yml ps)" -ForegroundColor Yellow
+        Write-Host "[INFO] Lihat log:  docker compose logs -f" -ForegroundColor Yellow
+        Write-Host "[INFO] Stop:       install.ps1 -Mode docker-down" -ForegroundColor Yellow
+    } finally {
+        Pop-Location
+    }
+}
+
+# ============================================
+# Launch a .bat with NO visible window at all (not even minimized).
+#
+# A minimized console still shows up in the taskbar - on a room PC that's
+# an open invitation for someone to click it and hit X, which instantly
+# kills that service (no Startup-folder / Task Scheduler equivalent of
+# systemd here to relaunch it). Start-Process itself can hide a process
+# window directly (-WindowStyle Hidden), but a .lnk shortcut's WindowStyle
+# property only supports Normal/Maximized/Minimized (1/3/7) - there's no
+# "hidden" value for a shortcut. So a truly invisible Startup-folder
+# shortcut has to go through a tiny VBScript wrapper instead, which calls
+# WScript.Shell.Run with window style 0 (hidden).
+# ============================================
+function New-HiddenLauncherVbs {
+    param([string]$BatPath)
+
+    $vbsPath = [System.IO.Path]::ChangeExtension($BatPath, '.vbs')
+    @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run Chr(34) & "$BatPath" & Chr(34), 0, False
+"@ | Set-Content -Path $vbsPath -Encoding ASCII
+
+    return $vbsPath
+}
+
+function New-HiddenShortcut {
+    param(
+        [string]$ShortcutPath,
+        [string]$VbsPath
+    )
+
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($ShortcutPath)
+    $shortcut.TargetPath = "$env:SystemRoot\System32\wscript.exe"
+    $shortcut.Arguments = "`"$VbsPath`""
+    $shortcut.WorkingDirectory = Split-Path $VbsPath -Parent
+    $shortcut.Save()
+}
+
+# Start a .bat hidden right now (used both for the "enable now" step and
+# by anything that wants the same invisible behavior a login-time
+# Startup-folder shortcut would get).
+function Start-Hidden {
+    param([string]$VbsPath)
+    Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$VbsPath`""
+}
+
+# ============================================
+# Build .bat content that restarts the given npm script in a loop.
+# Without this, a service that exits (crash, uncaught error, or the
+# agent's own health-check/fatal-error process.exit(1)) stays dead until
+# someone notices - the Windows Startup folder only runs shortcuts at
+# login, there's no PM2/systemd here to relaunch a crashed process.
+# ============================================
+function Build-AutostartBatchContent {
+    param(
+        [string]$Name,
+        [string]$LogFile,
+        [string]$WorkDir,
+        [string]$NpmScript,
+        [string]$NpmDir,
+        [string]$ExtraEnv = ""
+    )
+
+    $pathLine = if ($NpmDir) { "set PATH=$NpmDir;%PATH%" } else { "echo WARNING: npm not found in PATH >> `"$LogFile`"" }
+
+    return @"
+@echo off
+$pathLine
+$ExtraEnv
+cd /d "$WorkDir"
+:loop
+echo [%date% %time%] Starting $Name... >> "$LogFile"
+call npm run $NpmScript
+echo [%date% %time%] $Name exited with code %errorlevel%, restarting in 5s... >> "$LogFile"
+timeout /t 5 /nobreak > nul
+goto loop
+"@
+}
+
+# ============================================
+# Auto-start setup (Windows Task Scheduler)
+# ============================================
+function Setup-Autostart {
+    param([string]$mode)
+
+    Write-Host "[INFO] Membuat auto-start scripts untuk mode: $mode" -ForegroundColor Yellow
+
+    # Use Startup folder approach (simpler and more reliable)
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+
+    # Actual .bat scripts (and their hidden-launcher .vbs wrappers) live here;
+    # Startup folder only gets shortcuts pointing to the .vbs wrappers
+    $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
+    if (-not (Test-Path $scriptsFolder)) {
+        New-Item -ItemType Directory -Path $scriptsFolder -Force | Out-Null
+    }
+
+    # Find Node.js and npm location (used for all autostart scripts)
+    $npmPath = $null
+    try {
+        $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+        if ($npmCmd) {
+            $npmPath = $npmCmd.Source
+        }
+    } catch {}
+
+    # .bat scripts are always (re)generated - this only writes files on disk,
+    # it doesn't make anything run automatically yet. Activation (the
+    # Startup-folder shortcut, plus starting the processes right now) is
+    # gated behind the confirmation prompt below, mirroring install.sh's
+    # "systemctl enable/start only if confirmed" behavior.
+    $roomScripts = $null
+
+    if ($mode -eq "room" -or $mode -eq "all") {
+        $logFile = Join-Path $PROJECT_ROOT "room_startup.log"
+        $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
+
+        $serverStartupScript = Join-Path $scriptsFolder "VideoController_Server.bat"
+        Build-AutostartBatchContent -Name "Server" -LogFile $logFile -WorkDir "$PROJECT_ROOT\server" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set NODE_ENV=production" |
+            Out-File -FilePath $serverStartupScript -Encoding ASCII
+        Write-Host "[OK] Script dibuat: $serverStartupScript" -ForegroundColor Green
+
+        $agentStartupScript = Join-Path $scriptsFolder "VideoController_Agent.bat"
+        Build-AutostartBatchContent -Name "Agent" -LogFile $logFile -WorkDir "$PROJECT_ROOT\agent" -NpmScript "start" -NpmDir $npmDir -ExtraEnv "set NODE_ENV=production`r`nset BROWSER_HEADLESS=false" |
+            Out-File -FilePath $agentStartupScript -Encoding ASCII
+        Write-Host "[OK] Script dibuat: $agentStartupScript" -ForegroundColor Green
+
+        $webStartupScript = Join-Path $scriptsFolder "VideoController_Web.bat"
+        Build-AutostartBatchContent -Name "Web" -LogFile $logFile -WorkDir "$PROJECT_ROOT\web" -NpmScript "preview:host" -NpmDir $npmDir |
+            Out-File -FilePath $webStartupScript -Encoding ASCII
+        Write-Host "[OK] Script dibuat: $webStartupScript" -ForegroundColor Green
+
+        $roomScripts = @{
+            Server    = $serverStartupScript
+            Agent     = $agentStartupScript
+            Web       = $webStartupScript
+            ServerVbs = New-HiddenLauncherVbs -BatPath $serverStartupScript
+            AgentVbs  = New-HiddenLauncherVbs -BatPath $agentStartupScript
+            WebVbs    = New-HiddenLauncherVbs -BatPath $webStartupScript
+        }
+    }
+
+    $kasirScript = $null
+
+    if ($mode -eq "kasir" -or $mode -eq "all") {
+        $cashierBatScript = Join-Path $scriptsFolder "VideoController_Cashier.bat"
+        $cashierLogFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        $npmDir = if ($npmPath) { Split-Path $npmPath -Parent } else { $null }
+
+        Build-AutostartBatchContent -Name "Cashier" -LogFile $cashierLogFile -WorkDir "$PROJECT_ROOT\cashier" -NpmScript "preview:host" -NpmDir $npmDir |
+            Out-File -FilePath $cashierBatScript -Encoding ASCII
+        Write-Host "[OK] Script dibuat: $cashierBatScript" -ForegroundColor Green
+
+        if ($npmPath) {
+            Write-Host "[OK] Using npm: $npmPath" -ForegroundColor Green
+        } else {
+            Write-Host "[WARNING] npm not found in PATH, using default" -ForegroundColor Yellow
+        }
+        Write-Host "[OK] Log file: $cashierLogFile" -ForegroundColor Green
+
+        $kasirScript = $cashierBatScript
+        $kasirVbs = New-HiddenLauncherVbs -BatPath $cashierBatScript
+    }
+
+    Write-Host ""
+    Write-Host "[OK] Auto-start scripts ($mode) dibuat." -ForegroundColor Green
+    Write-Host ""
+
+    # Ask to enable now (mirrors install.sh's "Aktifkan auto-start sekarang? [y/N]" prompt)
+    Write-Host "[Q] Aktifkan auto-start sekarang? [y/N]: " -ForegroundColor Cyan -NoNewline
+    $enableNow = Read-Host
+
+    if ($enableNow -eq 'y' -or $enableNow -eq 'Y') {
+        Write-Host ""
+        Write-Host "[INFO] Mengaktifkan auto-start..." -ForegroundColor Yellow
+
+        if ($roomScripts) {
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Server.lnk") -VbsPath $roomScripts.ServerVbs
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Agent.lnk") -VbsPath $roomScripts.AgentVbs
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Web.lnk") -VbsPath $roomScripts.WebVbs
+            Write-Host "[OK] Shortcut Server/Agent/Web dibuat di Startup folder" -ForegroundColor Green
+            Write-Host "[INFO] Server/Agent/Web will now auto-restart if they crash or exit unexpectedly" -ForegroundColor Green
+            Write-Host "[INFO] Jalan tanpa jendela sama sekali (bukan minimized) - jadi tidak ada yang bisa di-close tidak sengaja" -ForegroundColor Green
+
+            Write-Host ""
+            Write-Host "[INFO] Memulai Room App services sekarang..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $roomScripts.ServerVbs
+            Start-Sleep -Seconds 2
+            Start-Hidden -VbsPath $roomScripts.AgentVbs
+            Start-Sleep -Seconds 1
+            Start-Hidden -VbsPath $roomScripts.WebVbs
+        }
+
+        if ($kasirScript) {
+            New-HiddenShortcut -ShortcutPath (Join-Path $startupFolder "VideoController_Cashier.lnk") -VbsPath $kasirVbs
+            Write-Host "[OK] Shortcut Cashier dibuat di Startup folder" -ForegroundColor Green
+            Write-Host "[INFO] Cashier will now auto-restart if it crashes or exits unexpectedly" -ForegroundColor Green
+            Write-Host "[INFO] Jalan tanpa jendela sama sekali (bukan minimized) - jadi tidak ada yang bisa di-close tidak sengaja" -ForegroundColor Green
+
+            Write-Host ""
+            Write-Host "[INFO] Memulai Kasir service sekarang..." -ForegroundColor Yellow
+            Start-Hidden -VbsPath $kasirVbs
+        }
+
+        Write-Host ""
+        Write-Host "[OK] Auto-start diaktifkan!" -ForegroundColor Green
+        Write-Host "[INFO] Karena tidak ada jendela, untuk stop paksa gunakan Task Manager (cari proses node.exe / cmd.exe)," -ForegroundColor Yellow
+        Write-Host "       atau jalankan ulang install.ps1 dengan mode D/E/F untuk copot auto-start-nya." -ForegroundColor Yellow
+    } else {
+        Write-Host ""
+        Write-Host "[INFO] Auto-start belum diaktifkan - shortcut belum dibuat di Startup folder." -ForegroundColor Yellow
+        Write-Host "[INFO] Jalankan ulang script ini dengan mode yang sama untuk mengaktifkan nanti." -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host "[INFO] Script asli (.bat) terletak di: $scriptsFolder" -ForegroundColor Yellow
+    Write-Host "[INFO] Shortcut (.lnk), jika diaktifkan, terletak di: $startupFolder" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "[INFO] Untuk testing manual:" -ForegroundColor Yellow
+    Write-Host "  1. Buka folder: $scriptsFolder" -ForegroundColor Yellow
+    if ($mode -eq "room") {
+        Write-Host "  2. Jalankan VideoController_Server.bat / Agent.bat / Web.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\room_startup.log" -ForegroundColor Yellow
+    } elseif ($mode -eq "kasir") {
+        Write-Host "  2. Jalankan VideoController_Cashier.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log: $PROJECT_ROOT\cashier_startup.log" -ForegroundColor Yellow
+    } else {
+        Write-Host "  2. Jalankan VideoController_*.bat" -ForegroundColor Yellow
+        Write-Host "  3. Jika cmd langsung close, cek log di $PROJECT_ROOT" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "[OK] Auto-start ($mode) configured successfully!" -ForegroundColor Green
+}
+
+# ============================================
+# Stop a currently-running hidden autostart instance.
+#
+# These run as wscript.exe (invisible) -> cmd.exe (the generated .bat,
+# invisible) -> npm.cmd -> node.exe - there's no window to close and no PID
+# tracked anywhere (a Startup-folder shortcut launches it fresh on every
+# login, independent of this script). So find it by matching the .bat's own
+# path inside the process command line instead, and kill the whole tree.
+# ============================================
+function Stop-HiddenBatProcess {
+    param([string]$BatPath)
+
+    try {
+        $procMatches = Get-CimInstance Win32_Process -Filter "Name = 'cmd.exe' OR Name = 'wscript.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -and $_.CommandLine.Contains($BatPath) }
+        foreach ($proc in $procMatches) {
+            Write-Host "[INFO] Menghentikan proses yang sedang jalan (PID $($proc.ProcessId))..." -ForegroundColor Yellow
+            & taskkill /PID $proc.ProcessId /T /F 2>$null | Out-Null
+        }
+    } catch {}
+}
+
+# ============================================
+# Remove auto-start
+# ============================================
+function Remove-Autostart {
+    param([string]$mode)
+
+    Write-Host "[INFO] Removing auto-start for mode: $mode" -ForegroundColor Yellow
+
+    # Use Startup folder approach
+    $startupFolder = [Environment]::GetFolderPath('Startup')
+
+    # Actual .bat/.vbs scripts live here (see Setup-Autostart); Startup folder only has shortcuts
+    $scriptsFolder = Join-Path $PROJECT_ROOT ".autostart-scripts"
+
+    if ($mode -eq "room" -or $mode -eq "all") {
+        # Remove Room App shortcuts (.lnk in Startup) + scripts (.bat/.vbs in scripts folder)
+        # Also cleans up legacy .bat files from older installs that wrote directly into Startup
+        $baseNames = @("VideoController_Server", "VideoController_Agent", "VideoController_Web")
+        foreach ($baseName in $baseNames) {
+            Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "$baseName.bat")
+            $pathsToRemove = @(
+                (Join-Path $startupFolder "$baseName.lnk"),
+                (Join-Path $startupFolder "$baseName.bat"),
+                (Join-Path $scriptsFolder "$baseName.bat"),
+                (Join-Path $scriptsFolder "$baseName.vbs")
+            )
+            foreach ($path in $pathsToRemove) {
+                if (Test-Path $path) {
+                    Remove-Item -Path $path -Force
+                    Write-Host "[OK] Removed $path" -ForegroundColor Green
+                }
+            }
+        }
+    }
+
+    if ($mode -eq "kasir" -or $mode -eq "all") {
+        # Remove Cashier shortcut (.lnk in Startup) + script (.bat/.vbs in scripts folder)
+        # Also cleans up legacy files from older installs
+        Stop-HiddenBatProcess -BatPath (Join-Path $scriptsFolder "VideoController_Cashier.bat")
+        $pathsToRemove = @(
+            (Join-Path $startupFolder "VideoController_Cashier.lnk"),
+            (Join-Path $startupFolder "VideoController_Cashier.bat"),
+            (Join-Path $startupFolder "VideoController_Cashier.ps1"),
+            (Join-Path $scriptsFolder "VideoController_Cashier.bat"),
+            (Join-Path $scriptsFolder "VideoController_Cashier.vbs")
+        )
+        foreach ($path in $pathsToRemove) {
+            if (Test-Path $path) {
+                Remove-Item -Path $path -Force
+                Write-Host "[OK] Removed $path" -ForegroundColor Green
+            }
+        }
+        # Also remove log file if exists
+        $logFile = Join-Path $PROJECT_ROOT "cashier_startup.log"
+        if (Test-Path $logFile) {
+            Remove-Item -Path $logFile -Force
+            Write-Host "[OK] Removed cashier_startup.log" -ForegroundColor Green
+        }
+    }
+
+    Write-Host "[OK] Auto-start ($mode) removed successfully!" -ForegroundColor Green
+}
+
+# ============================================
+# Check whether a Node.js version string (e.g. "v20.19.0") satisfies what
+# this project's tooling actually requires: Vite 8.x needs
+# "^20.19.0 || >=22.12.0" and ESLint 10.x needs "^20.19.0 || ^22.13.0 || >=24"
+# (see web/node_modules/{vite,eslint}/package.json "engines"). Their
+# intersection is 20.19+, 22.13+, or 24+ - Node 21.x and 23.x are NOT
+# supported even though they're newer than 20.
+# ============================================
+function Test-NodeVersionOk {
+    param([string]$Version)
+
+    if ($Version -match 'v(\d+)\.(\d+)') {
+        $major = [int]$matches[1]
+        $minor = [int]$matches[2]
+        if ($major -ge 24) { return $true }
+        if ($major -eq 22 -and $minor -ge 13) { return $true }
+        if ($major -eq 20 -and $minor -ge 19) { return $true }
+    }
+    return $false
+}
+
+# ============================================
+# Find Node.js installation
+# ============================================
+function Find-NodeJS {
+    # Try to find node.exe in common installation directories
+    # Priority: C:\nodejs (ZIP) > Program Files (MSI)
+    $nodePaths = @(
+        # ZIP installations (newer)
+        "C:\nodejs\node-v22.13.1-win-x64\node.exe",
+        "C:\nodejs\node-v20.18.1-win-x64\node.exe",
+        # MSI installations
+        "C:\Program Files\nodejs\node.exe",
+        "C:\Program Files (x86)\nodejs\node.exe",
+        "$env:APPDATA\nodejs\node.exe",
+        "$env:LOCALAPPDATA\nodejs\node.exe"
+    )
+    
+    $foundNode = $null
+    $foundVersion = $null
+    
+    foreach ($path in $nodePaths) {
+        if (Test-Path $path) {
+            # Get version to compare
+            try {
+                $version = & $path --version 2>$null
+                if ($version -match 'v(\d+)\.(\d+)') {
+                    $major = [int]$matches[1]
+                    $minor = [int]$matches[2]
+                    
+                    # Always prefer v22 if found
+                    if ($major -ge 22 -and $foundVersion -notmatch 'v2[2-9]') {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                    # Store first found (v20) if no v22 found yet
+                    elseif (-not $foundNode) {
+                        $foundNode = $path
+                        $foundVersion = $version
+                    }
+                }
+            } catch {
+                # If version check fails, still return the path
+                if (-not $foundNode) {
+                    $foundNode = $path
+                }
+            }
+        }
+    }
+    return $foundNode
+}
+
+Write-Host "[INFO] Starting Video Controller..." -ForegroundColor Cyan
+
+# Find project root - look in script directory, parent directories, AND sibling directories
+$PROJECT_ROOT = $PSScriptRoot
+$found = $false
+
+# 0. Check current working directory (where user runs the script)
+if (Test-Path (Join-Path $PWD 'package.json')) {
+    $PROJECT_ROOT = $PWD
+    $found = $true
+}
+
+# 1. Check script directory (where script file is located)
+if (-not $found -and (Test-Path (Join-Path $PSScriptRoot 'package.json'))) {
+    $PROJECT_ROOT = $PSScriptRoot
+    $found = $true
+}
+
+# 2. If not found, walk up parent directories
+if (-not $found) {
+    $checkPath = $PSScriptRoot
+    $maxLevels = 5
+    for ($i = 0; $i -lt $maxLevels; $i++) {
+        if (Test-Path (Join-Path $checkPath 'package.json')) {
+            $PROJECT_ROOT = $checkPath
+            $found = $true
+            break
+        }
+        $parent = Split-Path $checkPath -Parent
+        if (-not $parent) { break }
+        $checkPath = $parent
+    }
+}
+
+# 3. Check for "video-controller" folder in script directory
+if (-not $found) {
+    $siblingPath = Join-Path $PSScriptRoot 'video-controller'
+    if (Test-Path $siblingPath) {
+        if (Test-Path (Join-Path $siblingPath 'package.json')) {
+            $PROJECT_ROOT = $siblingPath
+            $found = $true
+        }
+    }
+}
+
+# 4. Check for video-controller in parent directory (common case for Downloads)
+if (-not $found) {
+    $parentDir = Split-Path $PSScriptRoot -Parent
+    if ($parentDir) {
+        $siblingPath = Join-Path $parentDir 'video-controller'
+        if (Test-Path $siblingPath) {
+            if (Test-Path (Join-Path $siblingPath 'package.json')) {
+                $PROJECT_ROOT = $siblingPath
+                $found = $true
+            }
+        }
+    }
+}
+
+# Show where we found the project
+if ($found) {
+    Write-Host "[INFO] Project root: $PROJECT_ROOT" -ForegroundColor Cyan
+} else {
+    Write-Host "[WARNING] Cannot find project root (package.json)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "[INFO] Searched locations:" -ForegroundColor Yellow
+    Write-Host "  - $PWD (current directory)"
+    Write-Host "  - $PSScriptRoot (script location)"
+    
+    $checkPath = $PSScriptRoot
+    for ($i = 0; $i -lt 3; $i++) {
+        $parent = Split-Path $checkPath -Parent
+        if (-not $parent) { break }
+        Write-Host "  - $parent (parent $i)"
+        $checkPath = $parent
+    }
+    
+    Write-Host "  - $PSScriptRoot\video-controller (sibling)"
+    $parentDir = Split-Path $PSScriptRoot -Parent
+    if ($parentDir) {
+        Write-Host "  - $parentDir\video-controller (sibling in parent)"
+    }
+    
+    Write-Host ""
+    Write-Host "[Q] Download dari GitHub? [y/N]: " -ForegroundColor Cyan -NoNewline
+    $download = Read-Host
+    if ($download -eq 'y' -or $download -eq 'Y') {
+        Write-Host "[INFO] Downloading video-controller from GitHub..." -ForegroundColor Yellow
+        
+        $zipUrl = "https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip"
+        $zipFile = "$env:TEMP\video-controller.zip"
+        $extractDir = Split-Path $PSScriptRoot -Parent
+        if (-not $extractDir) { $extractDir = $PSScriptRoot }
+        
+        Write-Host "[INFO] Downloading from $zipUrl..." -ForegroundColor Yellow
+        try {
+            Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing
+            Write-Host "[INFO] Extracting..." -ForegroundColor Yellow
+            
+            # Use current working directory where user runs the script
+            $extractDir = $PWD
+            
+            Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
+            
+            # Move contents from video-controller-main to video-controller
+            $extractedPath = Join-Path $extractDir "video-controller-main"
+            $targetPath = Join-Path $extractDir "video-controller"
+            
+            # Only create/move if target doesn't have package.json
+            if (-not (Test-Path (Join-Path $targetPath 'package.json'))) {
+                if (Test-Path $targetPath) {
+                    Remove-Item -Path $targetPath -Recurse -Force
+                }
+                Move-Item -Path $extractedPath -Destination $targetPath
+            }
+            
+            $PROJECT_ROOT = $targetPath
+            $found = $true
+            Write-Host "[OK] Using project at: $PROJECT_ROOT" -ForegroundColor Green
+            
+            # Clean up zip
+            Remove-Item -Path $zipFile -Force -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "[ERROR] Failed to download: $_" -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host ""
+        Write-Host "[INFO] Solusi: Pindahkan install.ps1 ke dalam folder video-controller" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+$INSTALL_MODE = Get-InstallMode -RequestedMode $Mode
+$UPDATE_RESTART_MODE = 'none'
+
+# ============================================
+# Prompt for .env configuration
+# ============================================
+# Initialize variables
+$ServerIP = ""
+$RoomID = ""
+$RoomName = ""
+$Rooms = ""
+$BillingEnabled = ""
+$PricePerHour = ""
+$Packages = ""
+
+if ($INSTALL_MODE -ne "update" -and $INSTALL_MODE -ne "update-restart") {
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "  Konfigurasi .env (optional)" -ForegroundColor Cyan
+    Write-Host "==========================================" -ForegroundColor Cyan
+    Write-Host "Tekan Enter untuk skip/tidak ubah field"
+    Write-Host ""
+
+    # Room App mode - needs Server IP, Room ID, Room Name
+    if ($INSTALL_MODE -eq "room" -or $INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-room" -or $INSTALL_MODE -eq "docker-all") {
+        Write-Host "Topologi: 1 Ruangan = 1 PC. Server & agent jalan di PC yg sama." -ForegroundColor Cyan
+        Write-Host "SERVER_IP boleh dikosongkan (auto-detect IP lokal PC)." -ForegroundColor Cyan
+        $input = Read-Host "Server IP (contoh: 192.168.1.100, kosongkan untuk skip/auto)"
+        if ($input -ne "") { $ServerIP = $input }
+
+        $input = Read-Host "Room ID (contoh: room-001, kosongkan untuk skip)"
+        if ($input -ne "") { $RoomID = $input }
+
+        $input = Read-Host "Room Name (contoh: Room 1, kosongkan untuk skip)"
+        if ($input -ne "") { $RoomName = $input }
+
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
+
+        $input = Read-Host "Price Per Hour / tarif ruangan ini (contoh: 50000, kosongkan untuk skip)"
+        if ($input -ne "") { $PricePerHour = $input }
+
+        Write-Host "Paket harga tetap untuk ruangan ini (opsional). Kosongkan kalau tidak" -ForegroundColor Cyan
+        Write-Host "menawarkan paket - cashier tetap pakai durasi bebas (hourly) seperti biasa." -ForegroundColor Cyan
+        Write-Host "Contoh: [{`"id`":`"p2j`",`"name`":`"Paket 2 Jam`",`"durationMinutes`":120,`"price`":150000}]" -ForegroundColor Cyan
+        $input = Read-Host "Packages JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Packages = $input }
+    }
+
+    # Kasir mode - only needs Rooms JSON
+    if ($INSTALL_MODE -eq "kasir" -or $INSTALL_MODE -eq "docker-kasir") {
+        Write-Host "Topologi: PC Kasir konek ke N server ruangan yg terpisah." -ForegroundColor Cyan
+        Write-Host "Setiap 'ip' di rooms = IP PC Ruangan (bukan IP server pusat)." -ForegroundColor Cyan
+        Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di sini - dikonfigurasi lewat" -ForegroundColor Cyan
+        Write-Host "PRICE_PER_HOUR di server/.env tiap PC ruangan, lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+        Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
+        $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Rooms = $input }
+
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
+    }
+
+    # All mode - also needs Rooms JSON
+    if ($INSTALL_MODE -eq "all" -or $INSTALL_MODE -eq "docker-all") {
+        Write-Host "Untuk mode all, jika PC ini handle KASIR sekaligus:" -ForegroundColor Cyan
+        Write-Host "Tarif per jam (pricePerHour) TIDAK diisi di rooms JSON - dikonfigurasi lewat" -ForegroundColor Cyan
+        Write-Host "Price Per Hour di atas (server/.env PC ruangan tsb), lalu dikirim ke kasir otomatis." -ForegroundColor Cyan
+        Write-Host "Rooms JSON contoh: [{`"roomId`":`"room-001`",`"name`":`"Room 1`",`"ip`":`"192.168.1.101`",`"port`":53331}]" -ForegroundColor Cyan
+        $input = Read-Host "Rooms JSON (kosongkan untuk skip)"
+        if ($input -ne "") { $Rooms = $input }
+
+        $input = Read-Host "Billing Enabled (contoh: true/false, kosongkan untuk skip)"
+        if ($input -ne "") { $BillingEnabled = $input }
+    }
+}
+
+# Show selected mode
+switch ($INSTALL_MODE) {
+    'all' {
+        Write-Host "[INFO] Mode: Semua layanan (Room App + Kasir)" -ForegroundColor Yellow
+    }
+    'room' {
+        Write-Host "[INFO] Mode: Room App saja (agent, server, web)" -ForegroundColor Yellow
+    }
+    'kasir' {
+        Write-Host "[INFO] Mode: Kasir saja (cashier)" -ForegroundColor Yellow
+    }
+    'autostart-room' {
+        Write-Host "[INFO] Mode: Auto-start Room App" -ForegroundColor Green
+    }
+    'autostart-kasir' {
+        Write-Host "[INFO] Mode: Auto-start Kasir" -ForegroundColor Green
+    }
+    'autostart-all' {
+        Write-Host "[INFO] Mode: Auto-start Semua" -ForegroundColor Green
+    }
+    'remove-autostart-room' {
+        Write-Host "[INFO] Mode: Remove Auto-start Room App" -ForegroundColor Red
+    }
+    'remove-autostart-kasir' {
+        Write-Host "[INFO] Mode: Remove Auto-start Kasir" -ForegroundColor Red
+    }
+    'remove-autostart-all' {
+        Write-Host "[INFO] Mode: Remove Auto-start Semua" -ForegroundColor Red
+    }
+    'docker-room' {
+        Write-Host "[INFO] Mode: Docker Room App" -ForegroundColor Cyan
+    }
+    'docker-kasir' {
+        Write-Host "[INFO] Mode: Docker Kasir" -ForegroundColor Cyan
+    }
+    'docker-all' {
+        Write-Host "[INFO] Mode: Docker Semua" -ForegroundColor Cyan
+    }
+    'docker-down' {
+        Write-Host "[INFO] Mode: Docker Stop" -ForegroundColor Cyan
+    }
+    'update' {
+        Write-Host "[INFO] Mode: Update aplikasi" -ForegroundColor Magenta
+    }
+    'update-restart' {
+        Write-Host "[INFO] Mode: Update + restart layanan" -ForegroundColor Magenta
+    }
+}
+
+Write-Host ""
+
+if ($INSTALL_MODE -eq 'update' -or $INSTALL_MODE -eq 'update-restart') {
+    # Menu run (no -Mode): ask before stopping any service, so the room isn't
+    # down while the operator is still choosing.
+    if (-not $Mode -and -not $TargetVersion) {
+        Read-TargetVersion -ProjectRoot $PROJECT_ROOT
+    }
+    $UPDATE_RESTART_MODE = Get-UpdateRestartMode -ProjectRoot $PROJECT_ROOT
+    if ($UPDATE_RESTART_MODE -ne 'none') {
+        Write-Host "[INFO] Terdeteksi auto-start mode aktif: $UPDATE_RESTART_MODE" -ForegroundColor Cyan
+        Stop-RestartModeServices -ProjectRoot $PROJECT_ROOT -Mode $UPDATE_RESTART_MODE
+    } else {
+        if ($INSTALL_MODE -eq 'update-restart') {
+            Write-Host "[INFO] Tidak ada auto-start mode aktif yang terdeteksi. Update akan selesai tanpa restart otomatis." -ForegroundColor Yellow
+        } else {
+            Write-Host "[INFO] Tidak ada auto-start mode aktif yang terdeteksi." -ForegroundColor Yellow
+        }
+    }
+    $versionBefore = Get-AppVersion -ProjectRoot $PROJECT_ROOT
+    try {
+        Update-ProjectSource -ProjectRoot $PROJECT_ROOT
+    } catch {
+        Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[ERROR] Update gagal, aplikasi tetap di versi $(if ($versionBefore) { $versionBefore } else { 'unknown' })." -ForegroundColor Red
+        exit 1
+    }
+    $versionAfter = Get-AppVersion -ProjectRoot $PROJECT_ROOT
+    Write-Host "[INFO] Versi: $(if ($versionBefore) { $versionBefore } else { 'unknown' }) -> $(if ($versionAfter) { $versionAfter } else { 'unknown' })" -ForegroundColor Cyan
+}
+
+# Handle Docker modes - build/run via docker compose, no local Node.js needed
+if ($INSTALL_MODE -match "^docker-") {
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
+    Invoke-DockerDeploy -mode $INSTALL_MODE
+    exit 0
+}
+
+# Handle auto-start modes - skip service start
+if ($INSTALL_MODE -match "autostart-" -or $INSTALL_MODE -match "remove-autostart-") {
+    Write-Host "[INFO] Auto-start mode detected, checking Node.js..." -ForegroundColor Yellow
+
+    # Check Node.js
+    $nodeExePath = Find-NodeJS
+    if (-not $nodeExePath) {
+        Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
+        exit 1
+    }
+
+    $nodeVersion = & $nodeExePath --version 2>$null
+
+    if (-not $nodeVersion -or -not (Test-NodeVersionOk $nodeVersion)) {
+        Write-Host "[ERROR] Node.js $nodeVersion tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)!" -ForegroundColor Red
+        exit 1
+    }
+
+    $nodeDir = Split-Path $nodeExePath -Parent
+    $env:Path = $nodeDir + ";" + $env:Path
+
+    $npmVersion = & npm --version 2>$null
+    Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundColor Green
+
+    # Check if project files exist
+    if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
+        Write-Host "[ERROR] Project files not found in $PROJECT_ROOT" -ForegroundColor Red
+        exit 1
+    }
+
+    # Install dependencies if needed
+    Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
+    Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+
+    if ($INSTALL_MODE -eq "autostart-room" -or $INSTALL_MODE -eq "autostart-all") {
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent'
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server'
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
+        Ensure-PlaywrightBrowsers
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir" -or $INSTALL_MODE -eq "autostart-all") {
+        Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier'
+    }
+
+    # Build if needed
+    if ($INSTALL_MODE -eq "autostart-room" -or $INSTALL_MODE -eq "autostart-all") {
+        Write-Host "[INFO] Building Room App..." -ForegroundColor Yellow
+        Push-Location (Join-Path $PROJECT_ROOT 'server')
+        & npm run build
+        Pop-Location
+
+        Push-Location (Join-Path $PROJECT_ROOT 'agent')
+        & npm run build
+        Pop-Location
+
+        Push-Location (Join-Path $PROJECT_ROOT 'web')
+        & npm run build
+        Pop-Location
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir" -or $INSTALL_MODE -eq "autostart-all") {
+        Write-Host "[INFO] Building Kasir..." -ForegroundColor Yellow
+        Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+        & npm run build
+        Pop-Location
+    }
+
+    # Setup or remove auto-start
+    if ($INSTALL_MODE -eq "autostart-room") {
+        Setup-Autostart "room"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "autostart-kasir") {
+        Setup-Autostart "kasir"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "autostart-all") {
+        Setup-Autostart "all"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-room") {
+        Remove-Autostart "room"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-kasir") {
+        Remove-Autostart "kasir"
+        exit 0
+    }
+
+    if ($INSTALL_MODE -eq "remove-autostart-all") {
+        Remove-Autostart "all"
+        exit 0
+    }
+}
+
+# Normal mode - continue with service start
+
+# Apply .env configuration for existing project
+Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
+
+$nodeExePath = Find-NodeJS
+
+if (-not $nodeExePath) {
+    Write-Host "[ERROR] Node.js is not installed!" -ForegroundColor Red
+    Install-NodeJS
+    $nodeExePath = Find-NodeJS
+}
+
+if (-not $nodeExePath) {
+    Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+    Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
+    exit 1
+}
+
+# Get Node.js version using the found path
+$nodeVersion = & $nodeExePath --version 2>$null
+
+# Check if Node.js satisfies Vite 8.x / ESLint 10.x (20.19+, 22.13+, or 24+)
+if (-not $nodeVersion -or -not (Test-NodeVersionOk $nodeVersion)) {
+    Write-Host "[ERROR] Node.js $nodeVersion tidak memenuhi syarat (butuh 20.19+, 22.13+, atau 24+ untuk Vite 8.x & ESLint 10.x)" -ForegroundColor Red
+    Write-Host "[INFO] Installing Node.js v22..." -ForegroundColor Yellow
+    Install-NodeJS
+    $nodeExePath = Find-NodeJS
+
+    if (-not $nodeExePath) {
+        Write-Host "[ERROR] Node.js is still not available after installation." -ForegroundColor Red
+        Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
+        exit 1
+    }
+    $nodeVersion = & $nodeExePath --version 2>$null
+
+    if (-not (Test-NodeVersionOk $nodeVersion)) {
+        Write-Host "[ERROR] Node.js $nodeVersion masih belum memenuhi syarat setelah instalasi." -ForegroundColor Red
+        Write-Host "[INFO] Silakan tutup PowerShell ini dan buka PowerShell baru, lalu jalankan ulang script." -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# Add node directory to PATH for this session
+$nodeDir = Split-Path $nodeExePath -Parent
+$env:Path = $nodeDir + ";" + $env:Path
+
+# Find npm
+$npmExePath = $null
+$npmPaths = @(
+    (Join-Path $nodeDir "npm.cmd"),
+    (Join-Path $nodeDir "npm"),
+    "C:\nodejs\node-v22.13.1-win-x64\npm.cmd",
+    "C:\nodejs\node-v20.18.1-win-x64\npm.cmd",
+    "C:\Program Files\nodejs\npm.cmd",
+    "C:\Program Files (x86)\nodejs\npm.cmd"
+)
+foreach ($path in $npmPaths) {
+    if (Test-Path $path) {
+        $npmExePath = $path
+        break
+    }
+}
+
+if (-not $npmExePath) {
+    Write-Host "[ERROR] npm is not available." -ForegroundColor Red
+    exit 1
+}
+if (-not $npmExePath) {
+    Write-Host "[ERROR] npm is not available." -ForegroundColor Red
+    exit 1
+}
+
+$npmVersion = & $npmExePath --version 2>$null
+Write-Host "[OK] Node.js $nodeVersion and npm $npmVersion detected" -ForegroundColor Green
+
+if ($INSTALL_MODE -eq 'update' -or $INSTALL_MODE -eq 'update-restart') {
+    Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
+    Write-Host "[INFO] Updating all workspace dependencies..." -ForegroundColor Yellow
+
+    Install-Dependencies -Path $PROJECT_ROOT -Name 'root' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier' -ForceReinstall
+    Ensure-PlaywrightBrowsers
+
+    Write-Host "[INFO] Building all services..." -ForegroundColor Yellow
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'server')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'agent')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'web')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'web')
+        & npm run build
+        Pop-Location
+    }
+
+    if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) {
+        Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+        & npm run build
+        Pop-Location
+    }
+
+    Write-Host ""
+    Write-Host "[OK] Update aplikasi selesai." -ForegroundColor Green
+    if ($INSTALL_MODE -eq 'update-restart' -and $UPDATE_RESTART_MODE -ne 'none') {
+        Start-RestartModeServices -ProjectRoot $PROJECT_ROOT -Mode $UPDATE_RESTART_MODE
+        Write-Host "[INFO] Service auto-start untuk mode $UPDATE_RESTART_MODE sudah dinyalakan lagi." -ForegroundColor Yellow
+    } elseif ($INSTALL_MODE -eq 'update' -and $UPDATE_RESTART_MODE -ne 'none') {
+        Write-Host "[INFO] Service auto-start untuk mode $UPDATE_RESTART_MODE dibiarkan berhenti. Jalankan manual saat siap." -ForegroundColor Yellow
+    } else {
+        Write-Host "[INFO] Jalankan ulang mode room/kasir/all atau restart auto-start/Docker bila service sedang dipakai." -ForegroundColor Yellow
+    }
+    exit 0
+}
+
+if (-not (Test-Path (Join-Path $PROJECT_ROOT 'package.json'))) {
+    Write-Host "[INFO] Project files not found. Downloading ZIP archive..." -ForegroundColor Yellow
+
+    # Create video-controller subfolder in current directory
+    $destDir = Join-Path $PROJECT_ROOT 'video-controller'
+    $archiveUrl = 'https://github.com/muhammadfahrul/video-controller/archive/refs/heads/main.zip'
+    $archivePath = Join-Path $env:TEMP 'video-controller-main.zip'
+    $extractDir = Join-Path $destDir 'video-controller-main'
+
+    if (-not (Get-Command Expand-Archive -ErrorAction SilentlyContinue)) {
+        Write-Host "[ERROR] PowerShell archive support is unavailable." -ForegroundColor Red
+        Install-7Zip
+    }
+
+    # Only download if destination folder doesn't exist
+    if (-not (Test-Path (Join-Path $destDir 'package.json'))) {
+        # Remove existing destination folder if exists (but no package.json)
+        if (Test-Path $destDir) {
+            Remove-Item -Path $destDir -Recurse -Force
+        }
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+
+        Write-Host "[INFO] Downloading repository archive..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $archiveUrl -OutFile $archivePath -UseBasicParsing
+
+        Write-Host "[INFO] Extracting archive..." -ForegroundColor Yellow
+        Expand-Archive -Path $archivePath -DestinationPath $destDir -Force
+
+        # Move contents from video-controller-main to destDir
+        if (Test-Path $extractDir) {
+            $items = Get-ChildItem -Path $extractDir
+            foreach ($item in $items) {
+                $itemDestPath = Join-Path $destDir $item.Name
+                if (Test-Path $itemDestPath) {
+                    if ($item.PSIsContainer) {
+                        Remove-Item -Path $itemDestPath -Recurse -Force
+                    } else {
+                        Remove-Item -Path $itemDestPath -Force
+                    }
+                }
+                Move-Item -Path $item.FullName -Destination $itemDestPath -Force
+            }
+            Remove-Item -Path $extractDir -Recurse -Force
+        }
+
+        Remove-Item -Path $archivePath -Force -ErrorAction SilentlyContinue
+    } else {
+        Write-Host "[OK] Using existing project at $destDir" -ForegroundColor Green
+    }
+
+    $PROJECT_ROOT = $destDir
+
+    # Apply .env configuration AFTER PROJECT_ROOT is set correctly
+    Set-EnvConfig -ProjectRoot $PROJECT_ROOT -ServerIP $ServerIP -RoomID $RoomID -RoomName $RoomName -Rooms $Rooms -BillingEnabled $BillingEnabled -PricePerHour $PricePerHour -Packages $Packages
+}
+
+Stop-ProjectProcesses -ProjectRoot $PROJECT_ROOT
+Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+
+# Only remove node_modules if folders exist
+if (Test-Path (Join-Path $PROJECT_ROOT 'web')) {
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'web/node_modules')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json')
+}
+if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) {
+    Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'cashier/node_modules')
+    Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json')
+}
+
+if (-not (Test-Path (Join-Path $PROJECT_ROOT 'node_modules'))) {
+    Write-Host "[INFO] Removing old workspace node_modules..." -ForegroundColor Yellow
+    if (Test-Path (Join-Path $PROJECT_ROOT 'node_modules')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'agent/node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) { Remove-NodeModules -Path (Join-Path $PROJECT_ROOT 'server/node_modules') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'package-lock.json')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'agent')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'agent/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'server')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'server/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'web')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'web/package-lock.json') }
+    if (Test-Path (Join-Path $PROJECT_ROOT 'cashier')) { Remove-FileIfExists -Path (Join-Path $PROJECT_ROOT 'cashier/package-lock.json') }
+}
+
+Write-Host "[INFO] Checking dependencies..." -ForegroundColor Yellow
+Install-Dependencies -Path $PROJECT_ROOT -Name 'root'
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'agent') -Name 'agent'
+    Ensure-PlaywrightBrowsers
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'server') -Name 'server'
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'web') -Name 'web' -ForceReinstall
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Install-Dependencies -Path (Join-Path $PROJECT_ROOT 'cashier') -Name 'cashier' -ForceReinstall
+}
+
+Write-Host "[INFO] Building services..." -ForegroundColor Yellow
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Write-Host "[INFO] Building Room App (agent, server, web)..." -ForegroundColor Yellow
+    Push-Location (Join-Path $PROJECT_ROOT 'server')
+    & npm run build
+    Pop-Location
+
+    Push-Location (Join-Path $PROJECT_ROOT 'agent')
+    & npm run build
+    Pop-Location
+
+    Push-Location (Join-Path $PROJECT_ROOT 'web')
+    & npm run build
+    Pop-Location
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Write-Host "[INFO] Building Kasir (cashier)..." -ForegroundColor Yellow
+    Push-Location (Join-Path $PROJECT_ROOT 'cashier')
+    & npm run build
+    Pop-Location
+}
+
+Write-Host "[INFO] Starting services..." -ForegroundColor Yellow
+
+$processes = @()
+
+# Function to wait for server to be ready
+function Wait-ForServer {
+    param(
+        [string]$ServerIP = "127.0.0.1",
+        [int]$Port = 53331,
+        [int]$MaxWaitSeconds = 30
+    )
+    
+    Write-Host "   Waiting for server to be ready..." -ForegroundColor Yellow
+    $startTime = Get-Date
+    $serverUrl = "http://${ServerIP}:${Port}"
+    
+    while (((Get-Date) - $startTime).TotalSeconds -lt $MaxWaitSeconds) {
+        try {
+            $response = Invoke-WebRequest -Uri "$serverUrl/api/health" -TimeoutSec 2 -UseBasicParsing -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+                Write-Host "   [OK] Server is ready!" -ForegroundColor Green
+                return $true
+            }
+        } catch {
+            # Server not ready yet
+        }
+        Start-Sleep -Seconds 1
+    }
+    
+    Write-Host "   [WARNING] Server may not be ready, but continuing..." -ForegroundColor Yellow
+    return $false
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'room') {
+    Write-Host "[INFO] Starting Room App services..." -ForegroundColor Yellow
+
+    # Start Server first
+    $serverProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'server') -WindowStyle Hidden -PassThru
+    $processes += $serverProcess
+    Write-Host "   - Server: PID $($serverProcess.Id)" -ForegroundColor Cyan
+    
+    # Wait for server to be ready before starting agent
+    # Always probe localhost here, not $ServerIP - this script and the server
+    # run on the same machine, while $ServerIP is the LAN-facing address
+    # (often left blank by the user for auto-detect) and may not be reachable
+    # or even resolvable from the machine that's hosting it.
+    Wait-ForServer -ServerIP "127.0.0.1" -Port 53331 -MaxWaitSeconds 30
+    
+    # Check if server is still running after wait
+    if ($serverProcess.HasExited) {
+        Write-Host "   [ERROR] Server exited with code: $($serverProcess.ExitCode)" -ForegroundColor Red
+    } else {
+        Write-Host "   [OK] Server is running" -ForegroundColor Green
+    }
+
+    # Start Agent (only if server is still running)
+    if (-not $serverProcess.HasExited) {
+        $agentProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'set NODE_ENV=production&& set BROWSER_HEADLESS=false&& npm run start') -WorkingDirectory (Join-Path $PROJECT_ROOT 'agent') -WindowStyle Hidden -PassThru
+        $processes += $agentProcess
+        Write-Host "   - Agent: PID $($agentProcess.Id)" -ForegroundColor Cyan
+        Start-Sleep -Seconds 2
+        
+        # Check if agent is still running
+        if ($agentProcess.HasExited) {
+            Write-Host "   [ERROR] Agent exited with code: $($agentProcess.ExitCode)" -ForegroundColor Red
+        } else {
+            Write-Host "   [OK] Agent is running" -ForegroundColor Green
+        }
+    }
+
+    # Start Web
+    $webProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'web') -WindowStyle Hidden -PassThru
+    $processes += $webProcess
+    Write-Host "   - Web: PID $($webProcess.Id)" -ForegroundColor Cyan
+}
+
+if ($INSTALL_MODE -eq 'all' -or $INSTALL_MODE -eq 'kasir') {
+    Write-Host "[INFO] Starting Kasir service..." -ForegroundColor Yellow
+
+    $cashierProcess = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', 'npm run preview:host') -WorkingDirectory (Join-Path $PROJECT_ROOT 'cashier') -WindowStyle Hidden -PassThru
+    $processes += $cashierProcess
+    Write-Host "   - Cashier: PID $($cashierProcess.Id)" -ForegroundColor Cyan
+}
+
+Write-Host ""
+Write-Host "[OK] All selected services started!" -ForegroundColor Green
+Write-Host ""
+Write-Host "Press Ctrl+C to stop all services" -ForegroundColor Yellow
+
+try {
+    while ($true) { Start-Sleep -Seconds 1 }
+}
+finally {
+    Write-Host ""
+    Write-Host "[INFO] Stopping all services..." -ForegroundColor Yellow
+
+    foreach ($process in $processes) {
+        if ($null -ne $process -and -not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    Write-Host "[OK] All services stopped" -ForegroundColor Green
+}
